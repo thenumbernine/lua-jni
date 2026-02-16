@@ -1,10 +1,12 @@
-local ffi = require 'ffi'
 require 'java.ffi.jni'		-- get cdefs
+local ffi = require 'ffi'
 local class = require 'ext.class'
+local table = require 'ext.table'
 local assert = require 'ext.assert'
 local io = require 'ext.io'
 local path = require 'ext.path'
 local JNIEnv = require 'java.jnienv'
+
 
 -- how to know which jvm to load?
 -- this needs to be done only once per app, where to do it?
@@ -22,12 +24,17 @@ JavaVM.__name = 'JavaVM'
 function JavaVM:init(args)
 	args = args or {}
 
-	local options = ffi.new'JavaVMOption[1]'
-	options[0].optionString = '-Djava.class.path=.'	-- or path:cwd() ?
+	local optionTable = table()
+	if args.classpath then
+		local option = ffi.new'JavaVMOption'
+		option.optionString = '-Djava.class.path='..args.classpath
+		optionTable:insert(option)
+	end
+	local options = ffi.new('JavaVMOption[?]', #optionTable, optionTable)
 
 	local jvmargs = ffi.new'JavaVMInitArgs'
-	jvmargs.version = ffi.C.JNI_VERSION_1_6
-	jvmargs.nOptions = 1
+	jvmargs.version = args.version or ffi.C.JNI_VERSION_1_6
+	jvmargs.nOptions = #optionTable
 	jvmargs.options = options
 	jvmargs.ignoreUnrecognized = ffi.C.JNI_FALSE
 

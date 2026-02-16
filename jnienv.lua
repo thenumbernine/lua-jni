@@ -20,7 +20,17 @@ function JNIEnv:findClass(classpath)
 	end
 	return JavaClass{
 		env = self,
-		class = classptr,
+		ptr = classptr,
+	}
+end
+
+function JNIEnv:getObjectClass(classObj)
+	classObj = classObj.ptr or classObj
+	assert.type(classObj, 'cdata')
+	local classClass = self.ptr[0].GetObjectClass(self.ptr, classObj)
+	return JavaClass{
+		env = self,
+		ptr = classClass,
 	}
 end
 

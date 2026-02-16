@@ -4,9 +4,19 @@
 name = "java"
 files = {
 	"README.md",
+	"class.lua",
 	"distinfo",
 	"ffi/jni.lua",
-	"java.lua",
+	"jnienv.lua",
+	"method.lua",
+	"object.lua",
+	"string.lua",
+	"tests/Test.java",
+	"tests/test.lua",
+	"vm.lua",
+}
+deps = {
+	"ext",
 }
 generateBindings = ||{
 	{
