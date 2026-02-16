@@ -45,9 +45,13 @@ JavaMethod.__name = 'JavaMethod'
 
 function JavaMethod:init(args)
 	self.env = assert.index(args, 'env')		-- JNIEnv
-	self.class = assert.index(args, 'class')	-- JavaClass
 	self.ptr = assert.index(args, 'ptr')		-- cdata
 	self.sig = assert.index(args, 'sig')		-- sig desc is in require 'java.class' for now
+
+	-- TODO I was holding this to pass to CallStatic*Method calls
+	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)
+	-- so maybe I don't want .class to be saved.
+	self.class = assert.index(args, 'class')	-- JavaClass where the method came from ...
 	
 	-- you need to know if its static to load the method
 	-- and you need to know if its static to call the method
@@ -55,14 +59,17 @@ function JavaMethod:init(args)
 	self.static = arg.static
 end
 
-local function remapArgs(...)
-	if select('#', ...) == 0 then return end
-	local arg = ...
-	if type(arg) == 'table' then arg = arg.ptr end
-	return arg, remapArgs(select(2, ...))
+local function remapArg(arg)
+	if type(arg) == 'table' then return arg.ptr end
+	return arg
 end
 
-function JavaMethod:__call(...)
+local function remapArgs(...)
+	if select('#', ...) == 0 then return end
+	return remapArg(...), remapArgs(select(2, ...))
+end
+
+function JavaMethod:__call(thisOrClass, ...)
 	local callName
 	if self.static then
 		callName = callStaticNameForReturnType[self.sig[1]]
@@ -71,9 +78,12 @@ function JavaMethod:__call(...)
 		callName = callNameForReturnType[self.sig[1]]
 			or callNameForReturnType.object
 	end
+--print('callName', callName)	
+	-- if it's a static method then a class comes first
+	-- otherwise an object comes first
 	local result = self.env.ptr[0][callName](
 		self.env.ptr,
-		self.class.ptr,
+		assert(remapArg(thisOrClass)),	-- if it's a static method
 		self.ptr,
 		remapArgs(...)
 	)

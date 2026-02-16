@@ -1,5 +1,6 @@
 local class = require 'ext.class'
 local assert = require 'ext.assert'
+local string = require 'ext.string'
 local JavaClass = require 'java.class'
 
 local JNIEnv = class()
@@ -33,5 +34,11 @@ function JNIEnv:getObjectClass(classObj)
 		ptr = classClass,
 	}
 end
+
+function JNIEnv:__tostring()
+	return self.__name..'('..tostring(self.ptr)..')'
+end
+
+JNIEnv.__concat = string.concat
 
 return JNIEnv

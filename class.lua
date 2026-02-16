@@ -69,7 +69,7 @@ function JavaClass:getMethod(args)
 	local static = args.static
 	local sig = assert.type(assert.index(args, 'sig'), 'table')
 	local sigstr = getJNISig(sig)
-print('sigstr', sigstr)
+--DEBUG:print('sigstr', sigstr)
 
 	local method 
 	if static then
