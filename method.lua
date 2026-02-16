@@ -35,6 +35,7 @@ function JavaMethod:init(args)
 	self.env = assert.index(args, 'env')		-- JNIEnv
 	self.ptr = assert.index(args, 'ptr')		-- cdata
 	self.sig = assert.index(args, 'sig')		-- sig desc is in require 'java.class' for now
+	self.sig[1] = self.sig[1] or 'void'
 
 	-- TODO I was holding this to pass to CallStatic*Method calls
 	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)
@@ -49,12 +50,16 @@ end
 
 function JavaMethod:__call(thisOrClass, ...)
 	local callName
+	local returnVoid
+	local returnObject
 	if self.static then
-		callName = callStaticNameForReturnType[self.sig[1]]
-			or callStaticNameForReturnType.object
+		returnVoid = callStaticNameForReturnType.void 
+		returnObject = callStaticNameForReturnType.object
+		callName = callStaticNameForReturnType[self.sig[1]] or returnObject
 	else
-		callName = callNameForReturnType[self.sig[1]]
-			or callNameForReturnType.object
+		returnVoid = callNameForReturnType.void 
+		returnObject = callNameForReturnType.object
+		callName = callNameForReturnType[self.sig[1]] or returnObject
 	end
 --print('callName', callName)
 	-- if it's a static method then a class comes first
@@ -65,7 +70,8 @@ function JavaMethod:__call(thisOrClass, ...)
 		self.ptr,
 		self.env:luaToJavaArgs(...)	-- TODO sig as well to know what to convert it to?
 	)
-	if self.sig[1] == nil or self.sig[1] == 'void' then return end
+	if callName == returnVoid then return end
+	if callName ~= returnObject then return result end
 	-- convert / wrap the result
 	return JavaObject.createObjectForClassPath(
 		self.sig[1], {
