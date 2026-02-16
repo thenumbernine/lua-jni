@@ -71,9 +71,9 @@ function JavaMethod:__call(thisOrClass, ...)
 	-- otherwise an object comes first
 	local result = self._env._ptr[0][callName](
 		self._env._ptr,
-		assert(self._env:luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self.class by default?
+		assert(self._env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self.class by default?
 		self._ptr,
-		self._env:luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
+		self._env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
 	
 	self._env:_checkExceptions()
@@ -98,9 +98,9 @@ function JavaMethod:newObject(classObj, ...)
 	local classpath = assert(classObj._classpath)
 	local result = self._env._ptr[0].NewObject(
 		self._env._ptr,
-		self._env:luaToJavaArg(classObj),
+		self._env:_luaToJavaArg(classObj),
 		self._ptr,
-		self._env:luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
+		self._env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
 	-- fun fact, for java the ctor has return signature 'void'
 	-- which means the self._sig[1] won't hvae the expected classpath

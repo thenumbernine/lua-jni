@@ -26,6 +26,7 @@ local JVM = require 'java.vm'
 local jvm = JVM()			-- setup for classpath=.
 local J = jvm.jniEnv
 print('JNIEnv', J)
+print('JNI version', ('%x'):format(J:_version()))
 
 --public class Test {
 local Test = J:_class(classname)
@@ -67,13 +68,13 @@ print('arr:getClass():getName()', arr:getClass():getName())	-- [Ljava/lang/Strin
 -- can I get its length?
 print('#(arr String[3])', #arr)
 
-arr:setElem(0, 'a')
-arr:setElem(1, 'b')
-arr:setElem(2, 'c')
+arr:_set(0, 'a')
+arr:_set(1, 'b')
+arr:_set(2, 'c')
 
-print('arr[0]', arr:getElem(0))
-print('arr[1]', arr:getElem(1))
-print('arr[2]', arr:getElem(2))
+print('arr[0]', arr:_get(0))
+print('arr[1]', arr:_get(1))
+print('arr[2]', arr:_get(2))
 
 local doubleArr = J:_newArray('double', 5)
 print('doubleArr', doubleArr)
@@ -81,14 +82,14 @@ print('doubleArr.getClass().getName()',
 	doubleArr:getClass():getName()	-- '[D' ... just like the signature
 )
 
-doubleArr:setElem(3, 3.14)
-print('doubleArr[3]', doubleArr:getElem(3))
+doubleArr:_set(3, 3.14)
+print('doubleArr[3]', doubleArr:_get(3))
 
 local charArr = J:_newArray('char', 2)
-charArr:setElem(0, 100)
-charArr:setElem(1, 101)
---print('charArr[2]', charArr:getElem(2))	-- exception
-print('charArr[0]', charArr:getElem(0))
-print('charArr[1]', charArr:getElem(1))
+charArr:_set(0, 100)
+charArr:_set(1, 101)
+--print('charArr[2]', charArr:_get(2))	-- exception
+print('charArr[0]', charArr:_get(0))
+print('charArr[1]', charArr:_get(1))
 
 jvm:destroy()

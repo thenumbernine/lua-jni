@@ -46,7 +46,7 @@ local getArrayElementsField = prims:mapi(function(name)
 end):setmetatable(nil)
 
 -- I'd override __index, but that will bring with it a world of hurt....
-function JavaArray:getElem(i)
+function JavaArray:_get(i)
 	self._env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
@@ -74,7 +74,7 @@ local setArrayRegionField = prims:mapi(function(name)
 end):setmetatable(nil)
 
 
-function JavaArray:setElem(i, v)
+function JavaArray:_set(i, v)
 	self._env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
@@ -91,7 +91,7 @@ print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
 			self._env._ptr,
 			self._ptr,
 			i,
-			self._env:luaToJavaArg(v, self._elemClassPath)
+			self._env:_luaToJavaArg(v, self._elemClassPath)
 		)
 	end
 	

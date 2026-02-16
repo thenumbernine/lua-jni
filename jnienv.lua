@@ -27,7 +27,7 @@ function JNIEnv:init(ptr)
 	}
 end
 
-function JNIEnv:getVersion()
+function JNIEnv:_version()
 	return self._ptr[0].GetVersion(self._ptr)
 end
 
@@ -150,9 +150,9 @@ function JNIEnv:_checkExceptions()
 	if ex then error('JVM '..ex) end
 end
 
--- putting luaToJavaArgs here so it can auto-convert some objects like strings
+-- putting _luaToJavaArgs here so it can auto-convert some objects like strings
 
-function JNIEnv:luaToJavaArg(arg, sig)
+function JNIEnv:_luaToJavaArg(arg, sig)
 	local t = type(arg)
 	if t == 'table' then 
 		-- assert it is a cdata
@@ -170,10 +170,10 @@ function JNIEnv:luaToJavaArg(arg, sig)
 end
 
 
-function JNIEnv:luaToJavaArgs(sigIndex, sig, ...)
+function JNIEnv:_luaToJavaArgs(sigIndex, sig, ...)
 	if select('#', ...) == 0 then return end
-	return self:luaToJavaArg(..., sig[sigIndex]), 
-		self:luaToJavaArgs(sigIndex+1, sig, select(2, ...))
+	return self:_luaToJavaArg(..., sig[sigIndex]), 
+		self:_luaToJavaArgs(sigIndex+1, sig, select(2, ...))
 end
 
 function JNIEnv:__tostring()
