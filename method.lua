@@ -65,6 +65,7 @@ function JavaMethod:__call(thisOrClass, ...)
 		self.ptr,
 		self.env:luaToJavaArgs(...)	-- TODO sig as well to know what to convert it to?
 	)
+	if self.sig[1] == nil or self.sig[1] == 'void' then return end
 	-- convert / wrap the result
 	return JavaObject.createObjectForClassPath(
 		self.sig[1], {
