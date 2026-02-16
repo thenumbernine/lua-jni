@@ -57,8 +57,8 @@ print('testObj toString', testObj:getJavaToString())
 
 -- can I make a new String?
 -- chicken-and-egg, you have to use JNIEnv
-print('new string', J:newStr'new string')
-print('#(new string)', #J:newStr'new string')
+print('new string', J:_str'new string')
+print('#(new string)', #J:_str'new string')
 
 -- can I make an array of Strings?
 local arr = J:_newArray('java/lang/String', 3)

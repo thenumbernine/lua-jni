@@ -48,7 +48,7 @@ function JNIEnv:_class(classpath)
 	return classObj
 end
 
-function JNIEnv:newStr(s, len)
+function JNIEnv:_str(s, len)
 	assert(type(s) == 'string' or type(s) == 'cdata', 'expected string or cdata')
 	local jstring
 	if len then
@@ -158,7 +158,7 @@ function JNIEnv:luaToJavaArg(arg, sig)
 		-- assert it is a cdata
 		return arg._ptr 
 	elseif t == 'string' then
-		return self:newStr(arg)._ptr
+		return self:_str(arg)._ptr
 	elseif t == 'cdata' then
 		return arg
 	elseif t == 'number' then
