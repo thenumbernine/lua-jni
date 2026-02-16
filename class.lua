@@ -10,7 +10,7 @@ JavaClass.__name = 'JavaClass'
 
 function JavaClass:init(args)
 	self._env = assert.index(args, 'env')
-	self.ptr = assert.index(args, 'ptr')
+	self._ptr = assert.index(args, 'ptr')
 	self.classpath = assert.index(args, 'classpath')
 end
 
@@ -32,9 +32,9 @@ function JavaClass:getMethod(args)
 
 	local method
 	if static then
-		method = self._env.ptr[0].GetStaticMethodID(self._env.ptr, self.ptr, funcname, sigstr)
+		method = self._env._ptr[0].GetStaticMethodID(self._env._ptr, self._ptr, funcname, sigstr)
 	else
-		method = self._env.ptr[0].GetMethodID(self._env.ptr, self.ptr, funcname, sigstr)
+		method = self._env._ptr[0].GetMethodID(self._env._ptr, self._ptr, funcname, sigstr)
 	end
 	if method == nil then
 		error("failed to find "..tostring(funcname)..' '..tostring(sigstr))
@@ -58,7 +58,7 @@ function JavaClass:__tostring()
 	return self.__name..'('
 		..tostring(self.classpath)
 		..' '
-		..tostring(self.ptr)
+		..tostring(self._ptr)
 		..')'
 end
 

@@ -37,7 +37,7 @@ function JavaArray:init(args)
 end
 
 function JavaArray:__len()
-	return self._env.ptr[0].GetArrayLength(self._env.ptr, self.ptr)
+	return self._env._ptr[0].GetArrayLength(self._env._ptr, self._ptr)
 end
 
 
@@ -52,7 +52,7 @@ function JavaArray:getElem(i)
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
 	local getArrayElements = getArrayElementsField[self.elemClassPath]
 	if getArrayElements then
-		local arptr = self._env.ptr[0][getArrayElements](self._env.ptr, self.ptr, nil)
+		local arptr = self._env._ptr[0][getArrayElements](self._env._ptr, self._ptr, nil)
 		if arptr == nil then error("array index null pointer exception") end
 		-- TODO throw a real Java out of bounds exception
 		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
@@ -61,7 +61,7 @@ function JavaArray:getElem(i)
 		local elemClassPath = self.elemClassPath
 		return JavaObject.createObjectForClassPath(elemClassPath, {
 			env = self._env,
-			ptr = self._env.ptr[0].GetObjectArrayElement(self._env.ptr, self.ptr, i),
+			ptr = self._env._ptr[0].GetObjectArrayElement(self._env._ptr, self._ptr, i),
 			classpath = elemClassPath,
 		})
 	end
@@ -81,15 +81,15 @@ function JavaArray:setElem(i, v)
 	local setArrayRegion = setArrayRegionField[self.elemClassPath]
 	if setArrayRegion then
 print(setArrayRegion, 'setting array at', i, 'to', v, self.elemClassPath)
-		self._env.ptr[0][setArrayRegion](self._env.ptr, self.ptr, i, 1,
+		self._env._ptr[0][setArrayRegion](self._env._ptr, self._ptr, i, 1,
 			self.elemFFIType_1(v)
 		)
 	else
 		-- another one of these primitive array problems
 		-- the setter will depend on what the underlying primitive type is.
-		self._env.ptr[0].SetObjectArrayElement(
-			self._env.ptr,
-			self.ptr,
+		self._env._ptr[0].SetObjectArrayElement(
+			self._env._ptr,
+			self._ptr,
 			i,
 			self._env:luaToJavaArg(v, self.elemClassPath)
 		)

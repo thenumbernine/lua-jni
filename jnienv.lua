@@ -13,7 +13,7 @@ local JNIEnv = class()
 JNIEnv.__name = 'JNIEnv'
 
 function JNIEnv:init(ptr)
-	self.ptr = assert.type(ptr, 'cdata', "expected a JNIEnv*")
+	self._ptr = assert.type(ptr, 'cdata', "expected a JNIEnv*")
 	self._classesLoaded = {}
 
 
@@ -28,13 +28,13 @@ function JNIEnv:init(ptr)
 end
 
 function JNIEnv:getVersion()
-	return self.ptr[0].GetVersion(self.ptr)
+	return self._ptr[0].GetVersion(self._ptr)
 end
 
 function JNIEnv:_class(classpath)
 	local classObj = self._classesLoaded[classpath]
 	if not classObj then
-		local classptr = self.ptr[0].FindClass(self.ptr, classpath)
+		local classptr = self._ptr[0].FindClass(self._ptr, classpath)
 		if classptr == nil then
 			error('failed to find class '..tostring(classpath))
 		end
@@ -58,14 +58,14 @@ function JNIEnv:newStr(s, len)
 			for i=0,len-1 do
 				jstr.v[i] = s:byte(i+1)
 			end
-			jstring = self.ptr[0].NewString(self.ptr, jstr.v, len)
+			jstring = self._ptr[0].NewString(self._ptr, jstr.v, len)
 		else
 			-- cdata + len, use as-is
-			jstring = self.ptr[0].NewString(self.ptr, s, len)
+			jstring = self._ptr[0].NewString(self._ptr, s, len)
 		end
 	else
 		-- assume it's a lua string or char* cdata
-		jstring = self.ptr[0].NewStringUTF(self.ptr, s)
+		jstring = self._ptr[0].NewStringUTF(self._ptr, s)
 	end
 	if jstring == nil then error("NewString failed") end
 	local resultClassPath = 'java/lang/String'
@@ -91,9 +91,9 @@ function JNIEnv:_newArray(jtype, length, objInit)
 		local jclassObj = self:_class(jtype)
 		-- TODO objInit as JavaObject, but how to encode null?
 		-- am I going to need a java.null placeholder object?
-		obj = self.ptr[0].NewObjectArray(self.ptr, length, jclassObj.ptr, objInit)
+		obj = self._ptr[0].NewObjectArray(self._ptr, length, jclassObj._ptr, objInit)
 	else
-		obj = self.ptr[0][field](self.ptr, length)
+		obj = self._ptr[0][field](self._ptr, length)
 	end
 
 	-- now for each prim, JNI has a separate void* type for use with each its methods for primitive getters and setters ...
@@ -119,7 +119,7 @@ end
 
 -- get a jclass pointer for a jobject pointer
 function JNIEnv:_getObjClass(objPtr)
-	return self.ptr[0].GetObjectClass(self.ptr, objPtr)
+	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
 end
 
 -- get a classname for a jobject pointer
@@ -131,7 +131,7 @@ function JNIEnv:_getObjClassPath(objPtr)
 end
 
 function JNIEnv:_exceptionOccurred()
-	local e = self.ptr[0].ExceptionOccurred(self.ptr)
+	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
 
 	local classpath = self:_getObjClassPath(e)
@@ -156,9 +156,9 @@ function JNIEnv:luaToJavaArg(arg, sig)
 	local t = type(arg)
 	if t == 'table' then 
 		-- assert it is a cdata
-		return arg.ptr 
+		return arg._ptr 
 	elseif t == 'string' then
-		return self:newStr(arg).ptr
+		return self:newStr(arg)._ptr
 	elseif t == 'cdata' then
 		return arg
 	elseif t == 'number' then
@@ -177,7 +177,7 @@ function JNIEnv:luaToJavaArgs(sigIndex, sig, ...)
 end
 
 function JNIEnv:__tostring()
-	return self.__name..'('..tostring(self.ptr)..')'
+	return self.__name..'('..tostring(self._ptr)..')'
 end
 
 JNIEnv.__concat = string.concat

@@ -31,7 +31,7 @@ print('JNIEnv', J)
 local Test = J:_class(classname)
 print('Test', Test)
 -- J:_class returns a JavaClass wrapper to a jclass pointer
--- so Test.ptr is a ... jobject ... of the class
+-- so Test._ptr is a ... jobject ... of the class
 
 print('Test:getName()', Test:getName())
 -- TODO how to get some name other than "java.lang.Class" ?

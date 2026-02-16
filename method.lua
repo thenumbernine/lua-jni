@@ -33,7 +33,7 @@ JavaMethod.__name = 'JavaMethod'
 
 function JavaMethod:init(args)
 	self._env = assert.index(args, 'env')		-- JNIEnv
-	self.ptr = assert.index(args, 'ptr')		-- cdata
+	self._ptr = assert.index(args, 'ptr')		-- cdata
 	self.sig = assert.index(args, 'sig')		-- sig desc is in require 'java.class' for now
 	self.sig[1] = self.sig[1] or 'void'
 
@@ -69,10 +69,10 @@ function JavaMethod:__call(thisOrClass, ...)
 --print('callName', callName)
 	-- if it's a static method then a class comes first
 	-- otherwise an object comes first
-	local result = self._env.ptr[0][callName](
-		self._env.ptr,
+	local result = self._env._ptr[0][callName](
+		self._env._ptr,
 		assert(self._env:luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self.class by default?
-		self.ptr,
+		self._ptr,
 		self._env:luaToJavaArgs(2, self.sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
 	
@@ -96,10 +96,10 @@ end
 -- TODO if I do my own matching of args to stored java reflect methods then I don't need to require the end-user to pick out the ctor method themselves...
 function JavaMethod:newObject(classObj, ...)
 	local classpath = assert(classObj.classpath)
-	local result = self._env.ptr[0].NewObject(
-		self._env.ptr,
+	local result = self._env._ptr[0].NewObject(
+		self._env._ptr,
 		self._env:luaToJavaArg(classObj),
-		self.ptr,
+		self._ptr,
 		self._env:luaToJavaArgs(2, self.sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
 	-- fun fact, for java the ctor has return signature 'void'
@@ -116,7 +116,7 @@ function JavaMethod:newObject(classObj, ...)
 end
 
 function JavaMethod:__tostring()
-	return self.__name..'('..tostring(self.ptr)..')'
+	return self.__name..'('..tostring(self._ptr)..')'
 end
 
 JavaMethod.__concat = string.concat

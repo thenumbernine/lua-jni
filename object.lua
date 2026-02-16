@@ -7,7 +7,7 @@ JavaObject.__name = 'JavaObject'
 
 function JavaObject:init(args)
 	self._env = assert.index(args, 'env')
-	self.ptr = assert.index(args, 'ptr')
+	self._ptr = assert.index(args, 'ptr')
 
 	-- TODO detect if not provided?
 	self.classpath = assert.index(args, 'classpath')
@@ -34,7 +34,7 @@ end
 
 -- gets a JavaClass wrapping the java call `obj.getClass()`
 function JavaObject:getClass()
-	local classpath, jclass = self._env:_getObjClassPath(self.ptr)
+	local classpath, jclass = self._env:_getObjClassPath(self._ptr)
 	local JavaClass = require 'java.class'
 	return JavaClass{
 		env = self._env,
@@ -60,7 +60,7 @@ function JavaObject:getDebugStr()
 	return self.__name..'('
 		..tostring(self.classpath)
 		..' '
-		..tostring(self.ptr)
+		..tostring(self._ptr)
 		..')'
 end
 

@@ -47,19 +47,19 @@ function JavaVM:init(args)
 --DEBUG:print('jniEnvPtr', jniEnvPtr[0])
 
 	if jvm[0] == nil then error("failed to find a JavaVM*") end
-	self.ptr = jvm[0]
+	self._ptr = jvm[0]
 	if jniEnvPtr[0] == nil then error("failed to find a JNIEnv*") end
 	self.jniEnv = JNIEnv(jniEnvPtr[0])
 end
 
 function JavaVM:destroy()
-	if self.ptr then
+	if self._ptr then
 		-- do you need to destroy the JNIEnv?
-		local result = self.ptr[0].DestroyJavaVM(self.ptr)
+		local result = self._ptr[0].DestroyJavaVM(self._ptr)
 		if result ~= 0 then
 			print('DestroyJavaVM failed with code', result)
 		end
-		self.ptr = nil
+		self._ptr = nil
 	end
 end
 
