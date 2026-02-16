@@ -2,7 +2,7 @@ local ffi = require 'ffi'
 local JavaObject = require 'java.object'
 
 local JavaString = JavaObject:subclass()
-JavaString.__name = 'JavaString' 
+JavaString.__name = 'JavaString'
 
 function JavaString:__tostring()
 	local str = self.env.ptr[0].GetStringUTFChars(self.env.ptr, self.ptr, nil)

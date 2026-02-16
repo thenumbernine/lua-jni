@@ -18,21 +18,21 @@ local prims = table{
 	'double',
 }
 
-local callNameForReturnType = 
+local callNameForReturnType =
 	table{'void', 'object'}
 	:append(prims)
 	:mapi(function(name)
 		return 'Call'..name:sub(1,1):upper()..name:sub(2)..'Method', name
 	end):setmetatable(nil)
 
-local callNonvirtualNameForReturnType = 
+local callNonvirtualNameForReturnType =
 	table{'void', 'object'}
 	:append(prims)
 	:mapi(function(name)
 		return 'CallNonvirtual'..name:sub(1,1):upper()..name:sub(2)..'Method', name
 	end):setmetatable(nil)
 
-local callStaticNameForReturnType = 
+local callStaticNameForReturnType =
 	table{'void', 'object'}
 	:append(prims)
 	:mapi(function(name)
@@ -41,7 +41,7 @@ local callStaticNameForReturnType =
 
 
 local JavaMethod = class()
-JavaMethod.__name = 'JavaMethod' 
+JavaMethod.__name = 'JavaMethod'
 
 function JavaMethod:init(args)
 	self.env = assert.index(args, 'env')		-- JNIEnv
@@ -52,7 +52,7 @@ function JavaMethod:init(args)
 	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)
 	-- so maybe I don't want .class to be saved.
 	self.class = assert.index(args, 'class')	-- JavaClass where the method came from ...
-	
+
 	-- you need to know if its static to load the method
 	-- and you need to know if its static to call the method
 	-- ... seems that is something that shoudlve been saved with the  method itself ...
@@ -68,7 +68,7 @@ function JavaMethod:__call(thisOrClass, ...)
 		callName = callNameForReturnType[self.sig[1]]
 			or callNameForReturnType.object
 	end
---print('callName', callName)	
+--print('callName', callName)
 	-- if it's a static method then a class comes first
 	-- otherwise an object comes first
 	local result = self.env.ptr[0][callName](

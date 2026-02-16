@@ -11,7 +11,6 @@ getJNISig accepts string for a single arg
 	where the first element of hte table is the return type
 	and the rest is the method call argumetns
 TODO this won't handle an array-of-methods
-I 
 --]]
 local getJNISig
 local function getJNISigArg(s)
@@ -35,7 +34,7 @@ local function getJNISigArg(s)
 			float = 'F',
 			double = 'D',
 			void = 'V',
-		})[s] 
+		})[s]
 		or 'L'..s..';'
 	)
 end
@@ -61,7 +60,7 @@ end
 args:
 	name
 	sig
-		= table of args as slash-separated classpaths, 
+		= table of args as slash-separated classpaths,
 		first arg is return type
 	static = boolean
 --]]
@@ -73,7 +72,7 @@ function JavaClass:getMethod(args)
 	local sigstr = getJNISig(sig)
 --DEBUG:print('sigstr', sigstr)
 
-	local method 
+	local method
 	if static then
 		method = self.env.ptr[0].GetStaticMethodID(self.env.ptr, self.ptr, funcname, sigstr)
 	else

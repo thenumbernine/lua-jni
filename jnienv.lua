@@ -1,7 +1,9 @@
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
+local vector = require 'stl.vector-lua'
 local JavaClass = require 'java.class'
+
 
 local JNIEnv = class()
 JNIEnv.__name = 'JNIEnv'
@@ -40,6 +42,37 @@ function JNIEnv:findClass(classpath)
 		self.classesLoaded[classpath] = classObj
 	end
 	return classObj
+end
+
+function JNIEnv:newStr(s, len)
+	assert(type(s) == 'string' or type(s) == 'cdata', 'expected string or cdata')
+	local jstring
+	if len then
+		if type(s) == 'string' then
+			-- string + length, manually convert to jchar
+			local jstr = vector('jchar', len)
+			for i=0,len-1 do
+				jstr.v[i] = s:byte(i+1)
+			end
+			jstring = self.ptr[0].NewString(self.ptr, jstr.v, len)
+		else
+			-- cdata + len, use as-is
+			jstring = self.ptr[0].NewString(self.ptr, s, len)
+		end
+	else
+		-- assume it's a lua string or char* cdata
+		jstring = self.ptr[0].NewStringUTF(self.ptr, s)
+	end
+	if jstring == nil then error("NewString failed") end
+	local JavaObject = require 'java.object'
+	local stringclasspath = 'java/lang/String'
+	return JavaObject.createObjectForClassPath(
+		stringclasspath, {
+			env = self,
+			ptr = jstring,
+			classpath = stringclasspath,
+		}
+	)
 end
 
 function JNIEnv:__tostring()

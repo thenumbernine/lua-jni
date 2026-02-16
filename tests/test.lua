@@ -53,3 +53,7 @@ local testObj = Test_init:newObject(Test)
 print('testObj', testObj)
 
 print('testObj toString', testObj:getJavaToString())
+
+-- can I make a new String?
+-- chicken-and-egg, you have to use JNIEnv
+print(jniEnv:newStr'new string')
