@@ -3,49 +3,7 @@ local assert = require 'ext.assert'
 local string = require 'ext.string'
 local table = require 'ext.table'
 local JavaMethod = require 'java.method'
-local remapArgs = require 'java.util'.remapArgs
-
---[[
-getJNISig accepts string for a single arg
-	or a table for a method
-	where the first element of hte table is the return type
-	and the rest is the method call argumetns
-TODO this won't handle an array-of-methods
---]]
-local getJNISig
-local function getJNISigArg(s)
-	if type(s) == 'table' then return getJNISig(s) end
-	local arrayCount = 0
-	while true do
-		local rest = s:match'^(.*)%[%]$'
-		if not rest then break end
-		arrayCount = arrayCount + 1
-		s = rest
-	end
-	return ('['):rep(arrayCount)
-	.. (
-		({
-			boolean = 'Z',
-			byte = 'B',
-			char = 'C',	-- in java, char is 16bit
-			short = 'S',
-			int = 'I',
-			long = 'J',
-			float = 'F',
-			double = 'D',
-			void = 'V',
-		})[s]
-		or 'L'..s..';'
-	)
-end
-local function getJNISig(sig)
-	return '('
-		..table.sub(sig, 2)
-			:mapi(getJNISigArg)
-			:concat()
-	..')'..getJNISigArg(sig[1] or 'void')
-end
-
+local getJNISig = require 'java.util'.getJNISig
 
 local JavaClass = class()
 JavaClass.__name = 'JavaClass'

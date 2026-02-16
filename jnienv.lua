@@ -3,6 +3,8 @@ local assert = require 'ext.assert'
 local string = require 'ext.string'
 local vector = require 'stl.vector-lua'
 local JavaClass = require 'java.class'
+local prims = require 'java.util'.prims
+local getJNISig = require 'java.util'.getJNISig
 
 
 local JNIEnv = class()
@@ -64,13 +66,53 @@ function JNIEnv:newStr(s, len)
 		jstring = self.ptr[0].NewStringUTF(self.ptr, s)
 	end
 	if jstring == nil then error("NewString failed") end
+	local resultClassPath = 'java/lang/String'
 	local JavaObject = require 'java.object'
-	local stringclasspath = 'java/lang/String'
 	return JavaObject.createObjectForClassPath(
-		stringclasspath, {
+		resultClassPath, {
 			env = self,
 			ptr = jstring,
-			classpath = stringclasspath,
+			classpath = resultClassPath,
+		}
+	)
+end
+
+local newArrayForType = prims:mapi(function(name)
+	return 'New'..name:sub(1,1):upper()..name:sub(2)..'Array', name
+end):setmetatable(nil)
+
+-- jtype is a primitive or a classname
+function JNIEnv:newArray(jtype, length, objInit)
+	local field = newArrayForType[jtype] or 'NewObjectArray'
+	local obj
+	if field == 'NewObjectArray' then
+		-- TODO only expect classpath, or should I give an option for a JavaClass or a jclass?
+		local jclassObj = self:findClass(jtype)
+		-- TODO objInit as JavaObject, but how to encode null?
+		-- am I going to need a java.null placeholder object?
+		obj = self.ptr[0].NewObjectArray(self.ptr, length, jclassObj.ptr, objInit)
+	else
+		obj = self.ptr[0][field](self.ptr, length)
+	end
+
+	-- now for each prim, JNI has a separate void* type for use with each its methods for primitive getters and setters ...
+	-- TODO THIS CLASSPATH WON'T MATCH NON-ARRAY CLASSPATHS
+	-- their classpath is java/lang/String or whatever
+	-- this one will, for the same, be Ljava/lang/string;
+	-- ...
+	-- so I wiil send it jtype[], 
+	-- but now the JavaObject classpath wouldn't match its getClass():getName() ...
+	-- TODO switch over all stored .classpath's to JNI-sig name qualifiers.
+	local resultClassPath = jtype..'[]'
+	local JavaObject = require 'java.object'
+	return JavaObject.createObjectForClassPath(
+		resultClassPath, {
+			env = self,
+			ptr = obj,
+			classpath = resultClassPath,
+			-- how to handle classpaths of primitives ....
+			-- java as a langauge is a bit of a mess
+			elemClassPath = jtype,
 		}
 	)
 end

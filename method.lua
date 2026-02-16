@@ -5,18 +5,7 @@ local table = require 'ext.table'
 local JavaObject = require 'java.object'
 local remapArg = require 'java.util'.remapArg
 local remapArgs = require 'java.util'.remapArgs
-
--- seems this goes somewhere with the sig stuff in java.class
-local prims = table{
-	'boolean',
-	'byte',
-	'char',
-	'short',
-	'int',
-	'long',
-	'float',
-	'double',
-}
+local prims = require 'java.util'.prims
 
 local callNameForReturnType =
 	table{'void', 'object'}

@@ -56,4 +56,26 @@ print('testObj toString', testObj:getJavaToString())
 
 -- can I make a new String?
 -- chicken-and-egg, you have to use JNIEnv
-print(jniEnv:newStr'new string')
+print('new string', jniEnv:newStr'new string')
+print('#(new string)', #jniEnv:newStr'new string')
+
+-- can I make an array of Strings?
+local arr = jniEnv:newArray('java/lang/String', 3)
+print('arr String[3]', arr)
+print('arr:getClass():getName()', arr:getClass():getName())	-- [Ljava/lang/String; ... i.e. String[]
+-- can I get its length?
+print('#(arr String[3])', #arr)
+
+arr:setElem(0, jniEnv:newStr'a')
+arr:setElem(1, jniEnv:newStr'b')
+arr:setElem(2, jniEnv:newStr'c')
+
+print('arr[0]', arr:getElem(0))
+print('arr[1]', arr:getElem(1))
+print('arr[2]', arr:getElem(2))
+
+local doubleArr = jniEnv:newArray('double', 5)
+print('doubleArr', doubleArr)
+print('doubleArr.getClass().getName()', 
+	doubleArr:getClass():getName()	-- '[D' ... just like the signature
+)

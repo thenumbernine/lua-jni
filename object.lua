@@ -13,27 +13,17 @@ function JavaObject:init(args)
 	self.classpath = assert.index(args, 'classpath')
 end
 
-function JavaObject:__tostring()
-	return self.__name..'('
-		..tostring(self.classpath)
-		..' '
-		..tostring(self.ptr)
-		..')'
-end
-
-JavaObject.__concat = string.concat
-
 -- static helper function for getting the correct JavaObject subclass depending on the classpath
-function JavaObject.getWrapper(classpath)
-	if classpath == 'java/lang/String' then
-		-- TODO I *could* fully-qualify all these in some directory namespace, that'd be the Java thing to do ....
-		return require 'java.string'
-	end
-	return JavaObject
-end
-
 function JavaObject.createObjectForClassPath(classpath, args)
-	return JavaObject.getWrapper(classpath)(args)
+	if classpath == 'java/lang/String' then
+		return require 'java.string'(args)
+	-- I can't tell how I should format the classpath
+	elseif classpath:match'^%[' 
+	or classpath:match'%[%]$'
+	then
+		return require 'java.array'(args)
+	end
+	return JavaObject(args)
 end
 
 -- gets a JavaClass wrapping the java call `obj.getClass()`
@@ -62,10 +52,24 @@ end
 
 -- calls in java `obj.toString()`
 function JavaObject:getJavaToString()
-	return self:getMethod{
+	return tostring(self:getMethod{
 		name = 'toString',
 		sig = {'java/lang/String'},
-	}(self)
+	}(self))
 end
+
+function JavaObject:getDebugStr()
+	return self.__name..'('
+		..tostring(self.classpath)
+		..' '
+		..tostring(self.ptr)
+		..')'
+end
+
+function JavaObject:__tostring()
+	return self:getJavaToString()
+end
+
+JavaObject.__concat = string.concat
 
 return JavaObject

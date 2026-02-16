@@ -11,4 +11,8 @@ function JavaString:__tostring()
 	return luastr
 end
 
+function JavaString:__len()
+	return self.env.ptr[0].GetStringLength(self.env.ptr, self.ptr)
+end
+
 return JavaString
