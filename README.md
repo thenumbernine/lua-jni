@@ -1,4 +1,4 @@
-# Android in LuaJIT
+# JNI in LuaJIT
 
 Alright, so I've got my [SDL-LuaJIT](https://github.com/thenumbernine/SDLLuaJIT-android) launcher.
 
