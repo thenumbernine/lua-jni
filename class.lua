@@ -89,6 +89,18 @@ function JavaClass:getMethod(args)
 	}
 end
 
+function JavaClass:getName()
+	-- store this for safe keeping
+	-- TODO maybe a java.classesloaded[] table or something
+	JavaClass.java_lang_Class = JavaClass.java_lang_Class 
+		or self.env:findClass'java/lang/Class'
+	
+	JavaClass.java_lang_Class_getName = JavaClass.java_lang_Class_getName
+		or JavaClass.java_lang_Class:getMethod{name='getName', sig={'java.lang.String'}}
+
+	return JavaClass.java_lang_Class_getName(self)
+end
+
 function JavaClass:__tostring()
 	return self.__name..'('..tostring(self.ptr)..')'
 end

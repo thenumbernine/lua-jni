@@ -26,18 +26,13 @@ local jvm = JVM()			-- setup for classpath=.
 local jniEnv = jvm.jniEnv
 print('jniEnv', jniEnv)
 
-local java_lang_Class = jniEnv:findClass'java/lang/Class'
-print('java_lang_Class', java_lang_Class)
-local java_lang_Class_getName = java_lang_Class:getMethod{name='getName', sig={'java.lang.String'}}
-print('java_lang_Class_getName', java_lang_Class_getName)
-
 --public class Test {
 local Test = jniEnv:findClass(classname)
 print('Test', Test)
 -- jniEnv:findClass returns a JavaClass wrapper to a jclass pointer
 -- so Test.ptr is a ... jobject ... of the class
 
-print('Test.getName()', java_lang_Class_getName(Test))
+print('Test:getName()', Test:getName())
 -- TODO how to get some name other than "java.lang.Class" ?
 -- TODO how to enumerate all properties of a JavaClass?
 --]]
@@ -48,4 +43,4 @@ local Test_test = Test:getMethod{name='test', sig={'java.lang.String'}, static=t
 print('Test.test', Test_test)
 
 local result = Test_test(Test)
-print('result', result)
+print('Test.test()', result)
