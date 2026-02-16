@@ -55,14 +55,17 @@ function JavaObject:getClass()
 	}
 end
 
+-- shorthand for self:getClass():getMethod(args)
+function JavaObject:getMethod(args)
+	return self:getClass():getMethod(args)
+end
+
 -- calls in java `obj.toString()`
 function JavaObject:getJavaToString()
-	local classObj = self:getClass()
-	local toString = classObj:getMethod{
+	return self:getMethod{
 		name = 'toString',
 		sig = {'java/lang/String'},
-	}
-	return toString(self) 
+	}(self) 
 end
 
 return JavaObject
