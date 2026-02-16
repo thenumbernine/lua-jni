@@ -5,7 +5,7 @@ name = "java"
 files = {
 	"README.md",
 	"distinfo",
-	"ffi/java.lua",
+	"ffi/jni.lua",
 	"java.lua",
 }
 generateBindings = ||{
@@ -17,6 +17,6 @@ generateBindings = ||{
 			os.home()..'/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include',
 		},
 		inc = '<jni.h>',
-		out = 'java.lua',
+		out = 'jni.lua',
 	}
 }

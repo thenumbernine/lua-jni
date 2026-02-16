@@ -1,20 +1,19 @@
-require 'java.ffi.java'	-- just does ffi.cdef
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local JavaClass = require 'java.class'
 
-local JavaEnv = class()
-JavaEnv.__name = 'JavaEnv'
+local JNIEnv = class()
+JNIEnv.__name = 'JNIEnv'
 
-function JavaEnv:init(ptr)
+function JNIEnv:init(ptr)
 	self.ptr = assert.type(ptr, 'cdata', "expected a JNIEnv*")
 end
 
-function JavaEnv:getVersion()
+function JNIEnv:getVersion()
 	return self.ptr[0].GetVersion(self.ptr)
 end
 
-function JavaEnv:findClass(classpath)
+function JNIEnv:findClass(classpath)
 	local classptr = self.ptr[0].FindClass(self.ptr, classpath)
 	if classptr == nil then
 		error('failed to find class '..tostring(classpath))
@@ -25,4 +24,4 @@ function JavaEnv:findClass(classpath)
 	}
 end
 
-return JavaEnv
+return JNIEnv

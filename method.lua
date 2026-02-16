@@ -10,7 +10,7 @@ function JavaMethod:init(args)
 end
 
 function JavaMethod:__call(...)
-	local result self.env.ptr[0].CallStaticObjectMethod(
+	local result = self.env.ptr[0].CallStaticObjectMethod(
 		self.env.ptr,
 		self.class.ptr,
 		self.ptr,

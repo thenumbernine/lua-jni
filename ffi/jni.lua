@@ -413,3 +413,5 @@ enum { JNI_COMMIT = 1 };
 enum { JNI_ABORT = 2 };
 /* + END <jni.h> Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/jni.h */
 ]]
+-- half my jni code doesnt need to load jvm so ... 
+--return require 'ffi.load' 'jvm'

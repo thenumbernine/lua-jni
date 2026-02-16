@@ -11,6 +11,8 @@ function JavaClass:init(args)
 end
 
 function JavaClass:getStaticMethod(funcname, funcsig)
+	assert.type(funcname, 'string')
+	assert.type(funcsig, 'string')
 	local method = self.env.ptr[0].GetStaticMethodID(self.env.ptr, self.ptr, funcname, funcsig)
 	if method == nil then
 		error("failed to find "..tostring(funcname)..' '..tostring(funcsig))
