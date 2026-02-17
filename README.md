@@ -72,7 +72,7 @@ I'm sure this has been done before, but here's my version.
 - `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
 - args:
 - - `name` = the method name
-- - `sig` = the method signature, a table of classnames/primitives, the first is the return type.  An empty table defaults to a `void` return type.
+- - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
 - - `static` = set to `true` to retrieve a static method.
 
 - `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
@@ -83,7 +83,7 @@ I'm sure this has been done before, but here's my version.
 - - `sig` = signature string of the field.
 - - `static` = true for static fields.
 
-- `cl:_name()` = returns the classname of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
+- `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
 
 ### JavaObject
 `JavaObject = require 'java.object'`
@@ -94,7 +94,7 @@ I'm sure this has been done before, but here's my version.
 - - `ptr` = `jobject`
 - - `classpath` = string
 
-- `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classname.
+- `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classpath.
 
 - `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
 
@@ -166,6 +166,5 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # TODO
 
-- convert all slash classnames to dot classnames
 - `jni:_new(obj, args...)`, `class:_new(args)` to auto grab the ctor method ... needs runtime name resolution 
 - reflection for full namespace search ... packages, methods, fields

@@ -34,8 +34,31 @@ end
 
 -- gets a JavaClass wrapping the java call `obj._class()`
 function JavaObject:_class()
-	local classpath, jclass = self._env:_getObjClassPath(self._ptr)
-	local classObj = self._env:_saveJClassForClassPath(jclass, classpath)
+--DEBUG:print('	JavaObject:_class()')
+	local env = self._env
+	local classpath, jclass = env:_getObjClassPath(self._ptr)
+--DEBUG:print('JavaObject:_class classpath='..classpath)
+	--[[ always make a new one
+	local classObj = env:_saveJClassForClassPath(jclass, classpath)
+	--]]
+	-- [[ write only if it exists
+-- TODO problems FIXME
+	local classObj = env._classesLoaded[classpath]
+--DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
+--DEBUG:print('classObj', classObj)
+	if not classObj then
+--DEBUG:print('!!! JavaObject._class creating JavaClass for classpath='..classpath)
+		local JavaClass = require 'java.class'
+		classObj = JavaClass{
+			env = env,
+			ptr = jclass,
+			classpath = classpath,
+		}
+--DEBUG:print('!!! JavaObject._class overwriting '..classpath..' with classObj '..classObj)
+		env._classesLoaded[classpath] = classObj
+assert.eq(classObj._classpath, classpath)
+	end
+	--]]
 	return classObj
 end
 

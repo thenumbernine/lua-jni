@@ -83,14 +83,14 @@ local function sigStrToObj(s)
 	end
 --DEBUG:print('should be class', s)	
 	-- what's left? objects?
-	local classname, rest = s:match'^L([^;]*);(.*)$'
---DEBUG:print('classname', classname)	
-	if classname then
+	local classpath, rest = s:match'^L([^;]*);(.*)$'
+--DEBUG:print('classpath', classpath)	
+	if classpath then
 		-- convert from /-separator when it is to .-separator
-		classname = classname:gsub('/', '%.')
+		classpath = classpath:gsub('/', '%.')
 		assert.eq(rest, '')
---DEBUG:print('returning', 	classname..arraySuffix)
-		return classname..arraySuffix 
+--DEBUG:print('returning', 	classpath..arraySuffix)
+		return classpath..arraySuffix 
 	end
 	return nil --error("sigStrToObj "..tostring(s))
 end

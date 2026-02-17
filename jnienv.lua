@@ -17,15 +17,20 @@ function JNIEnv:init(ptr)
 	self._ptr = assert.type(ptr, 'cdata', "expected a JNIEnv*")
 	self._classesLoaded = {}
 
+	-- always keep this non-nil for __index's sake
+	self._dontCheckExceptions = false
 
 	-- save this up front
 	local java_lang_Class = self:_class'java.lang.Class'
 
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
-	java_lang_Class.java_lang_Class_getName = java_lang_Class:_method{
+	java_lang_Class.java_lang_Class_getName = assert(java_lang_Class:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
-	}
+	})
+--DEBUG:print("JNIEnv._classesLoaded['java.lang.Class']", self._classesLoaded['java.lang.Class'])
+assert.eq(java_lang_Class._classpath, 'java.lang.Class')
+--DEBUG:print('!!! saved java_lang_Class.java_lang_Class_getName')
 end
 
 function JNIEnv:_version()
@@ -68,7 +73,7 @@ local newArrayForType = prims:mapi(function(name)
 	return 'New'..name:sub(1,1):upper()..name:sub(2)..'Array', name
 end):setmetatable(nil)
 
--- jtype is a primitive or a classname
+-- jtype is a primitive or a classpath
 function JNIEnv:_newArray(jtype, length, objInit)
 	local field = newArrayForType[jtype] or 'NewObjectArray'
 	local obj
@@ -97,10 +102,14 @@ function JNIEnv:_newArray(jtype, length, objInit)
 end
 
 function JNIEnv:_class(classpath)
+--DEBUG:print('JNIEnv:_class', classpath)
 	self:_checkExceptions()
 
 	local classObj = self._classesLoaded[classpath]
+--DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
+--DEBUG:print('for', classpath, 'got', classObj)	
 	if not classObj then
+--DEBUG:print('***JNIENV*** _class making new', classpath)		
 		-- FindClass wants /-separator
 		local slashClassPath = classpath:gsub('%.', '/')
 		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
@@ -110,6 +119,7 @@ function JNIEnv:_class(classpath)
 			return nil, 'failed to find class '..tostring(classpath), ex
 		end
 		classObj = self:_saveJClassForClassPath(jclass, classpath)
+		assert(classObj)
 	end
 
 	self:_checkExceptions()
@@ -121,13 +131,14 @@ end
 -- saves it in _classesLoaded
 -- used by JNIENV:_class and JavaObject:_class
 function JNIEnv:_saveJClassForClassPath(jclass, classpath)
-print('*** JNIEnv caching '..classpath)	
+--DEBUG:print('*** JNIEnv saving '..classpath)	
 	local classObj = JavaClass{
 		env = self,
 		ptr = jclass,
 		classpath = classpath,
 	}
 	self._classesLoaded[classpath] = classObj
+assert.eq(classObj._classpath, classpath)
 	return classObj
 end
 
@@ -136,12 +147,11 @@ function JNIEnv:_getObjClass(objPtr)
 	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
 end
 
--- get a classname for a jobject pointer
+-- get a classpath for a jobject pointer
 function JNIEnv:_getObjClassPath(objPtr)
 	local jclass = self:_getObjClass(objPtr)
 	local java_lang_Class = self:_class'java.lang.Class'
-	local sigstr = java_lang_Class
-		.java_lang_Class_getName(jclass)
+	local sigstr = java_lang_Class.java_lang_Class_getName(jclass)
 -- wait
 -- are you telling me
 -- when its a prim or an array, getName returns it as a signature-qualified string
@@ -159,14 +169,14 @@ end
 function JNIEnv:_exceptionOccurred()
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
-	self._ptr[0].ExceptionClear(self._ptr)
 
 	if self._dontCheckExceptions then
 		error("java exception in exception handler")
 	end
-
 	assert(not self._dontCheckExceptions)
 	self._dontCheckExceptions = true
+	
+	self._ptr[0].ExceptionClear(self._ptr)
 
 	local classpath = self:_getObjClassPath(e)
 	local result = JavaObject._createObjectForClassPath(
@@ -178,7 +188,7 @@ function JNIEnv:_exceptionOccurred()
 		}
 	)
 
-	self._dontCheckExceptions = nil
+	self._dontCheckExceptions = false
 
 	return result
 end
@@ -196,7 +206,7 @@ function JNIEnv:_checkExceptions()
 
 	local errstr = 'JVM '..ex
 
-	self._dontCheckExceptions = nil
+	self._dontCheckExceptions = false
 
 	error(errstr)
 end
@@ -242,7 +252,13 @@ function JNIEnv:__index(k)
 	--if v ~= nil then return v end
 	v = JNIEnv[k]
 	if v ~= nil then return v end
-	if k:sub(1,1) == '_' then return end	-- skip our lua fields
+
+	-- don't build namespaces off private vars
+	if k:match'^_' then 
+print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a jnienv classname resolve")
+print(debug.traceback())
+		return 
+	end
 
 	-- alright this is anything not in self and not in the class
 	-- do automatic namespace lookup here
@@ -272,12 +288,12 @@ function Name:__index(k)
 	if v ~= nil then return v end
 
 	local env = rawget(self, '_env')
-	local classname = rawget(self, '_name')..'.'..k
-	local cl = env:_class(classname)
+	local classpath = rawget(self, '_name')..'.'..k
+	local cl = env:_class(classpath)
 	if cl then return cl end
 
---DEBUG:print('Name __index', k, 'classname', classname)
-	return Name{env=env, name=classname}
+--DEBUG:print('Name __index', k, 'classpath', classpath)
+	return Name{env=env, name=classpath}
 end
 
 return JNIEnv

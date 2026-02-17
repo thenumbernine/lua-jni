@@ -14,6 +14,7 @@ JavaClass.__name = 'JavaClass'
 
 function JavaClass:init(args)
 	self._env = assert.index(args, 'env')
+--DEBUG:assert(require 'java.jnienv':isa(self._env))
 	self._ptr = assert.index(args, 'ptr')
 	self._classpath = assert.index(args, 'classpath')
 end
@@ -27,6 +28,7 @@ args:
 	static = boolean
 --]]
 function JavaClass:_method(args)
+--DEBUG:assert(require 'java.jnienv':isa(self._env))
 	self._env:_checkExceptions()
 
 	assert.type(args, 'table')
@@ -83,12 +85,18 @@ function JavaClass:_field(args)
 end
 
 -- calls in java `class.getName()`
--- notice, this matches getJNISig(classname)
+-- notice, this matches getJNISig(classpath)
 -- so java.lang.String will be Ljava/lang/String;
 -- and double[] will be [D
 function JavaClass:_name()
-	local classpath = self._env:_class'java.lang.Class'
-		.java_lang_Class_getName(self)
+--DEBUG:print('JavaClass:_name')
+--DEBUG:print("getting env:_class'java.lang.Class'")
+	local classObj = self._env:_class'java.lang.Class'
+assert('got', classObj)
+assert.eq(classObj._classpath, 'java.lang.Class')
+--DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
+assert(classObj.java_lang_Class_getName)
+	local classpath = classObj.java_lang_Class_getName(self)
 --[[ wait, is this a classpath or a signature?
 -- how come double[] arrays return [D ?
 -- how come String[] arrays return [Ljava/lang/String;
@@ -99,6 +107,14 @@ print('JavaClass:_name', type(classpath), classpath)
 	classpath = tostring(classpath)
 	classpath = sigStrToObj(classpath) or classpath
 	return classpath
+end
+
+function JavaClass:_getDebugStr()
+	return self.__name..'('
+		..tostring(self._classpath)
+		..' '
+		..tostring(self._ptr)
+		..')'
 end
 
 function JavaClass:__tostring()
