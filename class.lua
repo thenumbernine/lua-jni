@@ -34,7 +34,7 @@ function JavaClass:_setupReflection()
 	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
 	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
 	self._javaObjConstructors = java_lang_Class._java_lang_Class_getConstructors(self)
-print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
+--DEBUG:print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
 
 	local java_lang_reflect_Field = env:_class'java.lang.reflect.Field'
 	local java_lang_reflect_Method = env:_class'java.lang.reflect.Method'
@@ -80,7 +80,7 @@ print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._jav
 
 		self._members[name] = self._members[name] or table()
 		self._members[name]:insert(fieldObj)
-print('field['..i..'] = '..name, fieldClassPath)
+--DEBUG:print('field['..i..'] = '..name, fieldClassPath)
 	end
 
 	-- TODO how does name resolution go? fields or methods first?
@@ -129,7 +129,7 @@ print('field['..i..'] = '..name, fieldClassPath)
 		}
 		self._members[name] = self._members[name] or table()
 		self._members[name]:insert(methodObj)
-print('method['..i..'] = '..name, require'ext.tolua'(sig))
+--DEBUG:print('method['..i..'] = '..name, require'ext.tolua'(sig))
 	end
 
 	-- can constructors use JNIEnv.FromReflectedMethod ?
@@ -169,7 +169,7 @@ print('method['..i..'] = '..name, require'ext.tolua'(sig))
 			}
 			self._members[name] = self._members[name] or table()
 			self._members[name]:insert(methodObj)
-print('constructor['..i..'] = '..require'ext.tolua'(sig))
+--DEBUG:print('constructor['..i..'] = '..require'ext.tolua'(sig))
 		end
 	end
 end
