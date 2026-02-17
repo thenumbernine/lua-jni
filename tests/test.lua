@@ -85,6 +85,13 @@ print('testObj.foo', testObj.foo)
 print('testObj.bar', testObj.bar)
 print('testObj.baz', testObj.baz)
 
+--[[ errors for now, I should try to assign it with Java somehow, idk
+testObj.foo = 12345
+print('testObj.foo', testObj.foo, type(testObj.foo))
+--]]
+testObj.foo = 'string'
+print('testObj.foo', testObj.foo, type(testObj.foo))
+
 print('testObj.testing()', testObj:test())
 
 -- can I make a new String?

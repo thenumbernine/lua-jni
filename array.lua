@@ -20,7 +20,8 @@ args:
 	elemClassPath
 --]]
 function JavaArray:init(args)
-	JavaArray.super.init(self, args)
+	-- self._classpath but thats in super which I can't call yet
+	local _classpath = assert.index(args, 'classpath')
 
 	-- right now jniEnv:_newArray passes in classpath as
 	-- elemClassPath..'[]'
@@ -28,8 +29,8 @@ function JavaArray:init(args)
 	-- better yet, use the arg
 	-- TODO should I be switching all my stored "classpath"s over to JNI-signatures to handle prims as well, and to match with .getClass().getName() ?
 	self._elemClassPath = args.elemClassPath
-		or self._classpath:match'^(.*)%[%]$'
-		or error("didn't provide JavaArray .elemClassPath, and .classpath "..tostring(self._classpath).." did not end in []")
+		or _classpath:match'^(.*)%[%]$'
+		or error("didn't provide JavaArray .elemClassPath, and .classpath "..tostring(_classpath).." did not end in []")
 
 	local ffiTypes = ffiTypesForPrim[self._elemClassPath]
 	if ffiTypes then
@@ -38,6 +39,9 @@ function JavaArray:init(args)
 		self.elemFFIType_1 = ffiTypes.array1Type
 		self.elemFFIType_ptr = ffiTypes.ptrType
 	end
+
+	-- do super last because it write-protects the object for java namespace lookup __newindex
+	JavaArray.super.init(self, args)
 end
 
 function JavaArray:__len()

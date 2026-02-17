@@ -1,6 +1,8 @@
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
+local table = require 'ext.table'
+
 
 local JavaObject = class()
 JavaObject.__name = 'JavaObject'
@@ -17,6 +19,38 @@ function JavaObject:init(args)
 -- and those would reach here before the bootstrapping of classes is done,
 -- so env:_class() wouldn't work
 --	self._jclass = self._env:_class(self._classpath)
+
+	-- set our __newindex last after we're done writing to it
+	local mt = getmetatable(self)
+	setmetatable(self, table(mt, {
+		__newindex = function(self, k, v)
+			--see if we are trying to write to a Java field
+			if type(k) == 'string'
+			and not k:match'^_'
+			then
+				local classObj = self:_class()
+				local membersForName = classObj._members[k]
+				if membersForName then
+assert.gt(#membersForName, 0, k)
+if #membersForName > 1 then print("for name "..k.." there are "..#membersForName.." options") end
+					local member = membersForName[1]
+					local JavaField = require 'java.field'
+					local JavaMethod = require 'java.method'
+					if JavaField:isa(member) then
+						return member:_set(self, v)	-- call the getter of the field
+					elseif JavaMethod:isa(member) then
+						error("can't overwrite a Java method "..k)
+					else
+						error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
+					end
+				end
+				error("object is write-protected -- can't write private members afer creation")
+			end
+
+			-- finally do our write
+			rawset(self, k, v)
+		end,
+	}):setmetatable(nil))
 end
 
 -- static helper
@@ -101,7 +135,6 @@ end
 
 JavaObject.__concat = string.concat
 
--- [[
 function JavaObject:__index(k)
 	-- if self[k] exists then this isn't called
 	local cl = getmetatable(self)
@@ -123,14 +156,14 @@ print(debug.traceback())
 --DEBUG:print(require'ext.table'.keys(classObj._members):sort():concat', ')
 	local membersForName = classObj._members[k]
 	if membersForName then
-assert.gt(#membersForName, 0, k)		
---DEBUG:print('#membersForName', k, #membersForName)
-		local JavaField = require 'java.field'
-		local JavaMethod = require 'java.method'
-		-- how to resolve
+assert.gt(#membersForName, 0, k)
 if #membersForName > 1 then print("for name "..k.." there are "..#membersForName.." options") end
+--DEBUG:print('#membersForName', k, #membersForName)
+		-- how to resolve
 		-- now if its a field vs a method ...
 		local member = membersForName[1]
+		local JavaField = require 'java.field'
+		local JavaMethod = require 'java.method'
 		if JavaField:isa(member) then
 			return member:_get(self)	-- call the getter of the field
 		elseif JavaMethod:isa(member) then
@@ -143,13 +176,12 @@ if #membersForName > 1 then print("for name "..k.." there are "..#membersForName
 			--else
 				-- still wants self as 1st arg
 				-- so you can use Lua's a.b vs a:b tricks
-				return member	
+				return member
 			--end
 		else
 			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 		end
 	end
 end
---]]
 
 return JavaObject

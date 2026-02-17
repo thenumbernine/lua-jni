@@ -11,6 +11,8 @@ local getJNISig = require 'java.util'.getJNISig
 local sigStrToObj = require 'java.util'.sigStrToObj
 
 
+local isPrimitive = prims:mapi(function(name) return true, name end):setmetatable(nil)
+
 local bootstrapClasses = {
 	['java.lang.Class'] = true,
 	['java.lang.reflect.Field'] = true,
@@ -46,7 +48,7 @@ function JNIEnv:init(ptr)
 		name = 'getFields',
 		sig = {'java.lang.reflect.Field[]'},
 	})
-	
+
 	local java_lang_reflect_Field = self:_class'java.lang.reflect.Field'
 	java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(java_lang_reflect_Field:_method{
 		name = 'getName',
@@ -60,10 +62,10 @@ function JNIEnv:init(ptr)
 		name = 'getModifiers',
 		sig = {'int'},
 	})
-	
+
 	-- only now that we got these methods can we do this
 	local java_lang_reflect_Method = self:_class'java.lang.reflect.Method'
---DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)	
+--DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)
 	java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(java_lang_reflect_Method:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
@@ -80,7 +82,7 @@ function JNIEnv:init(ptr)
 		name = 'getModifiers',
 		sig = {'int'},
 	})
-	
+
 --DEBUG:print("JNIEnv._classesLoaded['java.lang.Class']", self._classesLoaded['java.lang.Class'])
 assert.eq(java_lang_Class._classpath, 'java.lang.Class')
 --DEBUG:print('!!! saved java_lang_Class._java_lang_Class_getName')
@@ -291,6 +293,9 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	elseif t == 'cdata' then
 		return arg
 	elseif t == 'number' then
+		if not isPrimitive[sig] then
+			error("can't convert number to "..sig)
+		end
 		-- TODO will vararg know how to convert things?
 		-- TODO assert sig is a primitive
 		return ffi.new('j'..sig, arg)
