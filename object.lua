@@ -39,7 +39,7 @@ function JavaObject:_class()
 	local classpath, jclass = env:_getObjClassPath(self._ptr)
 --DEBUG:print('JavaObject:_class classpath='..classpath)
 	--[[ always make a new one
-	local classObj = env:_saveJClassForClassPath(jclass, classpath)
+	local classObj = env:_saveJClassForClassPath{ptr=jclass, classpath=classpath}
 	--]]
 	-- [[ write only if it exists
 -- TODO problems FIXME
@@ -54,6 +54,7 @@ function JavaObject:_class()
 			ptr = jclass,
 			classpath = classpath,
 		}
+		classObj:_setupReflection()
 --DEBUG:print('!!! JavaObject._class overwriting '..classpath..' with classObj '..classObj)
 		env._classesLoaded[classpath] = classObj
 assert.eq(classObj._classpath, classpath)

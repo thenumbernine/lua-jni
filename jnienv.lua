@@ -2,12 +2,20 @@ local ffi = require 'ffi'
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
+local table = require 'ext.table'
 local vector = require 'stl.vector-lua'
 local JavaClass = require 'java.class'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
 local getJNISig = require 'java.util'.getJNISig
 local sigStrToObj = require 'java.util'.sigStrToObj
+
+
+local bootstrapClasses = {
+	['java.lang.Class'] = true,
+	['java.lang.reflect.Field'] = true,
+	['java.lang.reflect.Method'] = true,
+}
 
 
 local JNIEnv = class()
@@ -20,18 +28,121 @@ function JNIEnv:init(ptr)
 	-- always keep this non-nil for __index's sake
 	self._dontCheckExceptions = false
 
-	-- save this up front
-	local java_lang_Class = self:_class'java.lang.Class'
-
+	-- save these up front
+	-- must match bootstrapClasses for the subsequent class cache build to not cause a stack overflow
+	-- TODO better would be to just not make/use the cache until after building these classes and methods
+	-- we need these for later:
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
-	java_lang_Class.java_lang_Class_getName = assert(java_lang_Class:_method{
+	local java_lang_Class = self:_class'java.lang.Class'
+	java_lang_Class._java_lang_Class_getName = assert(java_lang_Class:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
 	})
+	java_lang_Class._java_lang_Class_getMethods = assert(java_lang_Class:_method{
+		name = 'getMethods',
+		sig = {'java.lang.reflect.Method[]'},
+	})
+	java_lang_Class._java_lang_Class_getFields = assert(java_lang_Class:_method{
+		name = 'getFields',
+		sig = {'java.lang.reflect.Field[]'},
+	})
+	
+	local java_lang_reflect_Field = self:_class'java.lang.reflect.Field'
+	java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(java_lang_reflect_Field:_method{
+		name = 'getName',
+		sig = {'java.lang.String'},
+	})
+	
+	-- only now that we got these methods can we do this
+	local java_lang_reflect_Method = self:_class'java.lang.reflect.Method'
+--DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)	
+	java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(java_lang_reflect_Method:_method{
+		name = 'getName',
+		sig = {'java.lang.String'},
+	})
+	
 --DEBUG:print("JNIEnv._classesLoaded['java.lang.Class']", self._classesLoaded['java.lang.Class'])
 assert.eq(java_lang_Class._classpath, 'java.lang.Class')
---DEBUG:print('!!! saved java_lang_Class.java_lang_Class_getName')
+--DEBUG:print('!!! saved java_lang_Class._java_lang_Class_getName')
+
+	-- only setup reflection after all fields and methods for setting up reflection are grabbed
+	java_lang_Class:_setupReflection()
+	java_lang_reflect_Field:_setupReflection()
+	java_lang_reflect_Method:_setupReflection()
 end
+
+function JNIEnv:_class(classpath)
+--DEBUG:print('JNIEnv:_class', classpath)
+	self:_checkExceptions()
+
+	local classObj = self._classesLoaded[classpath]
+--DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
+--DEBUG:print('for', classpath, 'got', classObj)
+	if not classObj then
+--DEBUG:print('***JNIENV*** _class making new', classpath)
+		-- FindClass wants /-separator
+		local slashClassPath = classpath:gsub('%.', '/')
+		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
+		if jclass == nil then
+			-- I think this throws an exception?
+			local ex = self:_exceptionOccurred()
+			return nil, 'failed to find class '..tostring(classpath), ex
+		end
+		classObj = self:_saveJClassForClassPath{
+			ptr = jclass,
+			classpath = classpath,
+		}
+		assert(classObj)
+	end
+
+	self:_checkExceptions()
+
+	return classObj
+end
+
+-- makes a JavaClass object for a jclass pointer
+-- saves it in _classesLoaded
+-- used by JNIENV:_class and JavaObject:_class
+function JNIEnv:_saveJClassForClassPath(args)
+	local classpath = args.classpath
+--DEBUG:print('*** JNIEnv saving '..classpath)
+	args.env = self
+	local classObj = JavaClass(args)
+
+	-- maybe do this in the ctor
+	-- don't do bootstrapClasses here or we'll get stack overflow from JNIEnv:init
+	if not bootstrapClasses[classpath] then
+		classObj:_setupReflection()
+	end
+
+	self._classesLoaded[classpath] = classObj
+assert.eq(classObj._classpath, classpath)
+	return classObj
+end
+
+-- get a jclass pointer for a jobject pointer
+function JNIEnv:_getObjClass(objPtr)
+	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
+end
+
+-- get a classpath for a jobject pointer
+function JNIEnv:_getObjClassPath(objPtr)
+	local jclass = self:_getObjClass(objPtr)
+	local java_lang_Class = self:_class'java.lang.Class'
+	local sigstr = java_lang_Class._java_lang_Class_getName(jclass)
+-- wait
+-- are you telling me
+-- when its a prim or an array, getName returns it as a signature-qualified string
+-- but when it's not, getName just returns the classpath?
+-- isn't that ambiguous?
+	sigstr = tostring(sigstr)
+--DEBUG:print('JNIEnv:_getObjClassPath', sigstr)
+	-- opposite of util.getJNISig
+	local classpath = sigStrToObj(sigstr) or sigstr
+--DEBUG:print('JNIEnv:_getObjClassPath', classpath)
+	return classpath, jclass
+end
+
 
 function JNIEnv:_version()
 	return self._ptr[0].GetVersion(self._ptr)
@@ -101,70 +212,6 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	)
 end
 
-function JNIEnv:_class(classpath)
---DEBUG:print('JNIEnv:_class', classpath)
-	self:_checkExceptions()
-
-	local classObj = self._classesLoaded[classpath]
---DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
---DEBUG:print('for', classpath, 'got', classObj)	
-	if not classObj then
---DEBUG:print('***JNIENV*** _class making new', classpath)		
-		-- FindClass wants /-separator
-		local slashClassPath = classpath:gsub('%.', '/')
-		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
-		if jclass == nil then
-			-- I think this throws an exception?
-			local ex = self:_exceptionOccurred()
-			return nil, 'failed to find class '..tostring(classpath), ex
-		end
-		classObj = self:_saveJClassForClassPath(jclass, classpath)
-		assert(classObj)
-	end
-
-	self:_checkExceptions()
-
-	return classObj
-end
-
--- makes a JavaClass object for a jclass pointer
--- saves it in _classesLoaded
--- used by JNIENV:_class and JavaObject:_class
-function JNIEnv:_saveJClassForClassPath(jclass, classpath)
---DEBUG:print('*** JNIEnv saving '..classpath)	
-	local classObj = JavaClass{
-		env = self,
-		ptr = jclass,
-		classpath = classpath,
-	}
-	self._classesLoaded[classpath] = classObj
-assert.eq(classObj._classpath, classpath)
-	return classObj
-end
-
--- get a jclass pointer for a jobject pointer
-function JNIEnv:_getObjClass(objPtr)
-	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
-end
-
--- get a classpath for a jobject pointer
-function JNIEnv:_getObjClassPath(objPtr)
-	local jclass = self:_getObjClass(objPtr)
-	local java_lang_Class = self:_class'java.lang.Class'
-	local sigstr = java_lang_Class.java_lang_Class_getName(jclass)
--- wait
--- are you telling me
--- when its a prim or an array, getName returns it as a signature-qualified string
--- but when it's not, getName just returns the classpath?
--- isn't that ambiguous?
-	sigstr = tostring(sigstr)
---DEBUG:print('JNIEnv:_getObjClassPath', sigstr)
-	-- opposite of util.getJNISig
-	local classpath = sigStrToObj(sigstr) or sigstr
---DEBUG:print('JNIEnv:_getObjClassPath', classpath)
-	return classpath, jclass
-end
-
 -- check-and-return exceptions
 function JNIEnv:_exceptionOccurred()
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
@@ -175,7 +222,7 @@ function JNIEnv:_exceptionOccurred()
 	end
 	assert(not self._dontCheckExceptions)
 	self._dontCheckExceptions = true
-	
+
 	self._ptr[0].ExceptionClear(self._ptr)
 
 	local classpath = self:_getObjClassPath(e)
@@ -254,10 +301,10 @@ function JNIEnv:__index(k)
 	if v ~= nil then return v end
 
 	-- don't build namespaces off private vars
-	if k:match'^_' then 
+	if k:match'^_' then
 print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a jnienv classname resolve")
 print(debug.traceback())
-		return 
+		return
 	end
 
 	-- alright this is anything not in self and not in the class
@@ -275,6 +322,13 @@ end
 function Name:init(args)
 	rawset(self, '_env', assert.index(args, 'env'))
 	rawset(self, '_name', assert.index(args, 'name'))
+
+	-- dont' allow writes
+	setmetatable(self, table(Name, {
+		__newindex = function(k,v)
+			error("namespace object is write-protected")
+		end,
+	}):setmetatable(nil))
 end
 
 function Name:__tostring()

@@ -43,7 +43,7 @@ I'm sure this has been done before, but here's my version.
 
 - `classpath, jclass = jniEnv:_getObjClassPath(objPtr)` = returns a Lua string of the classpath and `jclass` for the object in `objPtr`.
 
-- `classObj = jniEnv:_saveJClassForClassPath(jclass, classpath)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
+- `classObj = jniEnv:_saveJClassForClassPath(args)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
 
 - `jniEnv:_class(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
 
@@ -166,5 +166,5 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # TODO
 
-- `jni:_new(obj, args...)`, `class:_new(args)` to auto grab the ctor method ... needs runtime name resolution 
 - reflection for full namespace search ... packages, methods, fields
+- `jni:_new(obj, args...)`, `class:_new(args)` to auto grab the ctor method ... needs runtime name resolution

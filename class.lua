@@ -19,6 +19,47 @@ function JavaClass:init(args)
 	self._classpath = assert.index(args, 'classpath')
 end
 
+-- call this after creating JavaClass to fill its reflection contents
+function JavaClass:_setupReflection()
+	local env = self._env
+
+	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
+	
+	local java_lang_Class = assert(env:_class'java.lang.Class')
+	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
+	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
+--DEBUG:print(self._classpath, 'has', #self._javaObjFields, 'fields and', #self._javaObjMethods, 'methods')
+	
+	local java_lang_reflect_Field = env:_class'java.lang.reflect.Field'
+	local java_lang_reflect_Method = env:_class'java.lang.reflect.Method'
+--DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)	
+
+	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
+	for i=0,#self._javaObjFields-1 do
+		local field = self._javaObjFields[i]
+		local name = tostring(java_lang_reflect_Field
+			._java_lang_reflect_Field_getName(
+				field
+			))
+--DEBUG:print('field['..i..'] = '..name, field)
+		self._members[name] = self._members[name] or table()
+		self._members[name]:insert(field)
+	end
+
+	-- TODO how does name resolution go? fields or methods first?
+	-- I think they shouldn't ever overlap?
+	for i=0,#self._javaObjMethods-1 do
+		local method = self._javaObjMethods[i]
+		local name = tostring(java_lang_reflect_Method
+			._java_lang_reflect_Method_getName(
+				method
+			))
+--DEBUG:print('method['..i..'] = '..name, method)
+		self._members[name] = self._members[name] or table()
+		self._members[name]:insert(method)
+	end
+end
+
 --[[
 args:
 	name
@@ -95,8 +136,8 @@ function JavaClass:_name()
 assert('got', classObj)
 assert.eq(classObj._classpath, 'java.lang.Class')
 --DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
-assert(classObj.java_lang_Class_getName)
-	local classpath = classObj.java_lang_Class_getName(self)
+assert(classObj._java_lang_Class_getName)
+	local classpath = classObj._java_lang_Class_getName(self)
 --[[ wait, is this a classpath or a signature?
 -- how come double[] arrays return [D ?
 -- how come String[] arrays return [Ljava/lang/String;
