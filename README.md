@@ -174,3 +174,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 # TODO
 
 - `jni:_new(obj, args...)`, `class:_new(args)` to auto grab the ctor method ... needs runtime name resolution
+- proper symbol overload resolution based on method # of args and coercion or whatever
