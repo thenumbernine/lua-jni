@@ -81,6 +81,7 @@ function JavaArray:_set(i, v)
 	local setArrayRegion = setArrayRegionField[self._elemClassPath]
 	if setArrayRegion then
 print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
+		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
 		self._env._ptr[0][setArrayRegion](self._env._ptr, self._ptr, i, 1,
 			self.elemFFIType_1(v)
 		)

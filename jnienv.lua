@@ -37,7 +37,7 @@ function JNIEnv:_class(classpath)
 	if not classObj then
 		local classptr = self._ptr[0].FindClass(self._ptr, classpath)
 		if classptr == nil then
-			error('failed to find class '..tostring(classpath))
+			return nil, 'failed to find class '..tostring(classpath)
 		end
 		classObj = JavaClass{
 			env = self,
@@ -68,7 +68,9 @@ function JNIEnv:_str(s, len)
 		-- assume it's a lua string or char* cdata
 		jstring = self._ptr[0].NewStringUTF(self._ptr, s)
 	end
-	if jstring == nil then error("NewString failed") end
+	if jstring == nil 
+		then error("NewString failed") 
+	end
 	local resultClassPath = 'java/lang/String'
 	return JavaObject.createObjectForClassPath(
 		resultClassPath, {

@@ -38,7 +38,7 @@ function JavaClass:_method(args)
 		method = self._env._ptr[0].GetMethodID(self._env._ptr, self._ptr, funcname, sigstr)
 	end
 	if method == nil then
-		error("failed to find "..tostring(funcname)..' '..tostring(sigstr))
+		return nil, "failed to find "..tostring(funcname)..' '..tostring(sigstr)..(static and ' static' or '')
 	end
 	return JavaMethod{
 		env = self._env,
