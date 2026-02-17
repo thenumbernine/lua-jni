@@ -2,13 +2,13 @@
 -- following https://www.inonit.com/cygwin/jni/invocationApi/c.html
 local assert = require 'ext.assert'
 
-local classname = 'Test'	-- i.e. Test.class, from Test.java
+local classpath = 'Test'	-- i.e. Test.class, from Test.java
 
 do -- make sure it's built
 	local os = require 'ext.os'
 	local Targets = require 'make.targets'
 	local targets = Targets()
-	local dst = classname..'.class'
+	local dst = classpath..'.class'
 	local src = 'Test.java'
 	targets:add{
 		dsts = {dst},
@@ -33,7 +33,7 @@ print('java.lang.Class', J:_class'java.lang.Class')
 print('java.lang.String', J:_class'java.lang.String')
 
 --public class Test {
-local Test = J:_class(classname)	-- fast but verbose way
+local Test = J:_class(classpath)	-- fast but verbose way
 print("Test from J:_class'Test'", Test)
 -- J:_class returns a JavaClass wrapper to a jclass pointer
 -- so Test._ptr is a ... jobject ... of the class
@@ -57,6 +57,14 @@ local Test_init = assert(Test:_method{name='<init>', sig={}})
 print('Test_init', Test_init)
 local testObj = Test_init:_new(Test)
 print('testObj', testObj)
+
+local testObj = Test:_new()
+print('testObj', testObj)
+
+
+-- test J:_new(classpath, args)
+-- test J:_new(classobj, args)
+-- test classobj:_new(args)
 
 -- TODO again with jni shorthand ... needs runtime name lookup / function signature matching
 --local testObj = J:_new(Test)

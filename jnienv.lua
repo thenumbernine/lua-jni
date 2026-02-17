@@ -300,6 +300,14 @@ function JNIEnv:_checkExceptions()
 	error(errstr)
 end
 
+-- shorthand
+function JNIEnv:_new(classObj, ...)
+	if type(classObj) == 'string' then
+		classObj = self:_class(classObj)
+	end
+	return classObj:_new(...)
+end
+
 -- putting _luaToJavaArgs here so it can auto-convert some objects like strings
 
 function JNIEnv:_luaToJavaArg(arg, sig)
@@ -321,7 +329,6 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	end
 	error("idk how to convert arg from Lua type "..t)
 end
-
 
 function JNIEnv:_luaToJavaArgs(sigIndex, sig, ...)
 	if select('#', ...) == 0 then return end

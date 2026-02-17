@@ -264,6 +264,17 @@ print('JavaClass:_name', type(classpath), classpath)
 	return classpath
 end
 
+function JavaClass:_new(...)
+	local ctors = self._members['<init>']
+	if #ctors == 0 then
+		error("can't new, no constructors present for "..self._classpath)
+	end
+	-- TODO here and JavaCallResolve, we are translating args multiple times
+	-- TODO just do it once
+	local ctor = JavaCallResolve.resolve(ctors, self, ...)
+	return ctor:_new(self, ...)
+end
+
 function JavaClass:_getDebugStr()
 	return self.__name..'('
 		..tostring(self._classpath)
@@ -314,10 +325,7 @@ assert.gt(#membersForName, 0, k)
 			return member:_get(self)	-- call the getter of the field
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve{
-				caller = self,
-				options = membersForName,
-			}
+			return JavaCallResolve(membersForName)
 		else
 			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 		end

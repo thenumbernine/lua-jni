@@ -3,16 +3,24 @@ local class = require 'ext.class'
 
 local JavaCallResolve = class()
 
-function JavaCallResolve:init(args)
-	self._caller = assert.index(args, 'caller')
-	self._options = assert.index(args, 'options')
+function JavaCallResolve:init(options)
+	self._options = assert(options)
 end
 
 function JavaCallResolve:__call(...)
-	-- ok now ...
-	-- we gotta match up ... args with all the method option arsg
-
-	return self._options[1]
+	local option = JavaCallResolve.resolve(self._options, ...)
+	return option(...)
 end
 
-return JavaCallResolve 
+-- static method, used by JavaClass.__new also
+function JavaCallResolve.resolve(options, ...)
+	-- ok now ...
+	-- we gotta match up ... args with all the method option arsg
+	-- TODO
+
+	local option = options[1]
+
+	return option
+end
+
+return JavaCallResolve

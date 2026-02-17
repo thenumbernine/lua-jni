@@ -167,10 +167,7 @@ assert.gt(#membersForName, 0, k)
 			return member:_get(self)	-- call the getter of the field
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve{
-				caller = self,
-				options = membersForName,
-			}
+			return JavaCallResolve(membersForName)
 		else
 			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 		end
