@@ -272,6 +272,9 @@ function JavaClass:_new(...)
 	-- TODO here and JavaCallResolve, we are translating args multiple times
 	-- TODO just do it once
 	local ctor = JavaCallResolve.resolve(ctors, self, ...)
+	if not ctor then
+		error("args mismatch")
+	end
 	return ctor:_new(self, ...)
 end
 
