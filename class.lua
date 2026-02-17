@@ -20,19 +20,21 @@ function JavaClass:init(args)
 end
 
 -- call this after creating JavaClass to fill its reflection contents
+-- TODO this is using getFields and getMethods
+-- should I use getDeclaredFields and getDeclaredMethods ?
+-- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env
-
+--DEBUG:print('calling setupReflect on', self._classpath)
 	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
 	
 	local java_lang_Class = assert(env:_class'java.lang.Class')
 	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
 	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
---DEBUG:print(self._classpath, 'has', #self._javaObjFields, 'fields and', #self._javaObjMethods, 'methods')
+print(self._classpath, 'has', #self._javaObjFields, 'fields and', #self._javaObjMethods, 'methods')
 	
 	local java_lang_reflect_Field = env:_class'java.lang.reflect.Field'
 	local java_lang_reflect_Method = env:_class'java.lang.reflect.Method'
---DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)	
 
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
 	for i=0,#self._javaObjFields-1 do
@@ -41,9 +43,39 @@ function JavaClass:_setupReflection()
 			._java_lang_reflect_Field_getName(
 				field
 			))
---DEBUG:print('field['..i..'] = '..name, field)
+print('field['..i..'] = '..name)
+		
+		-- fieldType is a jobject ... of a java.lang.Class
+		-- can I just treat it like a jclass?
+		-- can I just call java.lang.Class.getName() on it?
+		-- I guess I can also just do _javaToString and get the same results?
+		local fieldType = java_lang_reflect_Field
+			._java_lang_reflect_Field_getType(
+				field
+			)
+		local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getName(fieldType))
+--DEBUG:print('fieldType', fieldType, fieldClassPath)
+
+		local fieldModifiers = java_lang_reflect_Field
+			._java_lang_reflect_Field_getModifiers(
+				field
+			)
+--DEBUG:print('fieldModifiers', fieldModifiers)	
+
+		-- ok now switch this reflect field obj to a jni jfieldID
+		local jfieldID = env._ptr[0].FromReflectedField(env._ptr, field._ptr)
+--DEBUG:print('jfieldID', jfieldID)
+		assert(jfieldID ~= nil, "couldn't get jfieldID from reflect field for "..tostring(name))
+		
+		local fieldObj = JavaField{
+			env = env,
+			ptr = jfieldID,
+			sig = fieldClassPath,
+			static = 0 ~= bit.band(fieldModifiers, 8),	-- java.lang.reflect.Modifier.STATIC
+		}
+		
 		self._members[name] = self._members[name] or table()
-		self._members[name]:insert(field)
+		self._members[name]:insert(fieldObj)
 	end
 
 	-- TODO how does name resolution go? fields or methods first?
@@ -54,9 +86,43 @@ function JavaClass:_setupReflection()
 			._java_lang_reflect_Method_getName(
 				method
 			))
---DEBUG:print('method['..i..'] = '..name, method)
+print('method['..i..'] = '..name, method)
+	
+		local sig = table()
+		local methodReturnType = java_lang_reflect_Method
+			._java_lang_reflect_Method_getReturnType(
+				method
+			)
+		local methodReturnTypeName = tostring(java_lang_Class._java_lang_Class_getName(methodReturnType))
+		sig:insert(methodReturnTypeName) 
+		
+		local methodParameterTypes = java_lang_reflect_Method
+			._java_lang_reflect_Method_getParameterTypes(
+				method
+			)
+		for j=0,#methodParameterTypes-1 do
+			local methodParamType = methodParameterTypes[j]
+			local methodParamTypeName = tostring(java_lang_Class._java_lang_Class_getName(methodParamType))
+			sig:insert(methodParamTypeName)
+		end
+
+		local methodModifiers = java_lang_reflect_Method
+			._java_lang_reflect_Method_getModifiers(
+				method
+			)
+		
+		local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
+--DEBUG:print('jmethodID', jmethodID)
+		assert(jmethodID ~= nil, "couldn't get jmethodID from reflect method for "..tostring(name))
+	
+		local methodObj = JavaMethod{
+			env = env,
+			ptr = jmethodID,
+			sig = sig,
+			static = 0 ~= bit.band(methodModifiers, 8),
+		}
 		self._members[name] = self._members[name] or table()
-		self._members[name]:insert(method)
+		self._members[name]:insert(methodObj)
 	end
 end
 
@@ -107,19 +173,19 @@ function JavaClass:_field(args)
 	local sig = assert.type(assert.index(args, 'sig'), 'string')
 	local sigstr = getJNISig(sig)
 	local static = args.static
-	local field
+	local jfieldID
 	if static then
-		field = self._env._ptr[0].GetStaticFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = self._env._ptr[0].GetStaticFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
 	else
-		field = self._env._ptr[0].GetFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = self._env._ptr[0].GetFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
 	end
-	if field == nil then
+	if jfieldID == nil then
 		local ex = self._env:_exceptionOccurred()
-		return nil, "failed to find field "..tostring(fieldname)..' '..tostring(sig)..(static and ' static' or ''), ex
+		return nil, "failed to find jfieldID "..tostring(fieldname)..' '..tostring(sig)..(static and ' static' or ''), ex
 	end
 	return JavaField{
 		env = self._env,
-		ptr = field,
+		ptr = jfieldID,
 		sig = sig,
 		static = static,
 	}

@@ -37,8 +37,9 @@ local Test = J:_class(classname)	-- fast but verbose way
 print("Test from J:_class'Test'", Test)
 -- J:_class returns a JavaClass wrapper to a jclass pointer
 -- so Test._ptr is a ... jobject ... of the class
-local Test = J.Test			-- runtime namespace resolution (slow but concise)
-print('Test from J.Test', Test)
+local Test2 = J.Test			-- runtime namespace resolution (slow but concise)
+print('Test from J.Test', Test2)
+assert.eq(Test, Test2)
 
 print('Test:_name()', Test:_name())
 -- TODO how to get some name other than "java.lang.Class" ?
@@ -79,6 +80,12 @@ print('testObj.baz', Test_baz(testObj))
 Test_baz(testObj, 234)
 print('testObj.baz', Test_baz(testObj))
 
+-- now using inferred read/write
+print('testObj.foo', testObj.foo)
+print('testObj.bar', testObj.bar)
+print('testObj.baz', testObj.baz)
+
+print('testObj.testing()', testObj:test())
 
 -- can I make a new String?
 -- chicken-and-egg, you have to use JNIEnv

@@ -3,11 +3,11 @@ public class Test {
 		System.out.println("Test:Test()");
 	}
 
-	String foo = "bar";
+	public String foo = "bar";
 
-	int bar = 1;
+	public int bar = 1;
 
-	double baz = 2;
+	public double baz = 2;
 
 	public static String test() { return "Testing"; }
 }

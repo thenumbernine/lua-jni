@@ -52,6 +52,14 @@ function JNIEnv:init(ptr)
 		name = 'getName',
 		sig = {'java.lang.String'},
 	})
+	java_lang_reflect_Field._java_lang_reflect_Field_getType = assert(java_lang_reflect_Field:_method{
+		name = 'getType',
+		sig = {'java.lang.Class'},
+	})
+	java_lang_reflect_Field._java_lang_reflect_Field_getModifiers = assert(java_lang_reflect_Field:_method{
+		name = 'getModifiers',
+		sig = {'int'},
+	})
 	
 	-- only now that we got these methods can we do this
 	local java_lang_reflect_Method = self:_class'java.lang.reflect.Method'
@@ -59,6 +67,18 @@ function JNIEnv:init(ptr)
 	java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(java_lang_reflect_Method:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
+	})
+	java_lang_reflect_Method._java_lang_reflect_Method_getReturnType = assert(java_lang_reflect_Method:_method{
+		name = 'getReturnType',
+		sig = {'java.lang.Class'},
+	})
+	java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes = assert(java_lang_reflect_Method:_method{
+		name = 'getParameterTypes',
+		sig = {'java.lang.Class[]'},
+	})
+	java_lang_reflect_Method._java_lang_reflect_Method_getModifiers = assert(java_lang_reflect_Method:_method{
+		name = 'getModifiers',
+		sig = {'int'},
 	})
 	
 --DEBUG:print("JNIEnv._classesLoaded['java.lang.Class']", self._classesLoaded['java.lang.Class'])
@@ -172,7 +192,8 @@ function JNIEnv:_str(s, len)
 	end
 	local resultClassPath = 'java.lang.String'
 	return JavaObject._createObjectForClassPath(
-		resultClassPath, {
+		resultClassPath,
+		{
 			env = self,
 			ptr = jstring,
 			classpath = resultClassPath,
@@ -297,12 +318,14 @@ function JNIEnv:__index(k)
 	-- automatic, right?
 	--local v = rawget(self, k)
 	--if v ~= nil then return v end
-	v = JNIEnv[k]
+	local v = JNIEnv[k]
 	if v ~= nil then return v end
+
+	if type(k) ~= 'string' then return end
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
-print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a jnienv classname resolve")
+print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
 print(debug.traceback())
 		return
 	end
@@ -338,7 +361,7 @@ end
 Name.__concat = string.concat
 
 function Name:__index(k)
-	v = rawget(Name, k)
+	local v = rawget(Name, k)
 	if v ~= nil then return v end
 
 	local env = rawget(self, '_env')

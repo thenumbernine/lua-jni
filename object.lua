@@ -11,6 +11,12 @@ function JavaObject:init(args)
 
 	-- TODO detect if not provided?
 	self._classpath = assert.index(args, 'classpath')
+
+-- I would like to always save the class here
+-- but for the bootstrap classes, they need to call java functions, which wrap Java object results
+-- and those would reach here before the bootstrapping of classes is done,
+-- so env:_class() wouldn't work
+--	self._jclass = self._env:_class(self._classpath)
 end
 
 -- static helper
@@ -94,5 +100,56 @@ function JavaObject:__tostring()
 end
 
 JavaObject.__concat = string.concat
+
+-- [[
+function JavaObject:__index(k)
+	-- if self[k] exists then this isn't called
+	local cl = getmetatable(self)
+	local v = cl[k]
+	if v ~= nil then return v end
+
+	if type(k) ~= 'string' then return end
+
+	-- don't build namespaces off private vars
+	if k:match'^_' then
+print('JavaObject.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
+print(debug.traceback())
+		return
+	end
+
+	-- now check fields/methods
+	local classObj = self:_class()
+--DEBUG:print('here', classObj._classpath)
+--DEBUG:print(require'ext.table'.keys(classObj._members):sort():concat', ')
+	local membersForName = classObj._members[k]
+	if membersForName then
+assert.gt(#membersForName, 0, k)		
+--DEBUG:print('#membersForName', k, #membersForName)
+		local JavaField = require 'java.field'
+		local JavaMethod = require 'java.method'
+		-- how to resolve
+if #membersForName > 1 then print("for name "..k.." there are "..#membersForName.." options") end
+		-- now if its a field vs a method ...
+		local member = membersForName[1]
+		if JavaField:isa(member) then
+			return member:_get(self)	-- call the getter of the field
+		elseif JavaMethod:isa(member) then
+			-- TODO return the method in a state to call this object?
+			-- or return a new wrapper for methods + call context of this object?
+			-- or for now return a function that calls the method with this
+			--if member._static then
+				-- bind 1st arg to the object
+			--	return function(...) return member(self, ...) end
+			--else
+				-- still wants self as 1st arg
+				-- so you can use Lua's a.b vs a:b tricks
+				return member	
+			--end
+		else
+			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
+		end
+	end
+end
+--]]
 
 return JavaObject

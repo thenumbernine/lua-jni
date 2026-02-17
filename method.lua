@@ -46,7 +46,7 @@ function JavaMethod:init(args)
 	-- you need to know if its static to load the method
 	-- and you need to know if its static to call the method
 	-- ... seems that is something that shoudlve been saved with the  method itself ...
-	self._static = args.static
+	self._static = not not args.static
 end
 
 function JavaMethod:__call(thisOrClass, ...)
