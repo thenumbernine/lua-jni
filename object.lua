@@ -14,12 +14,12 @@ function JavaObject:init(args)
 end
 
 -- static helper
-function JavaObject.getLuaClassForClassPath(classpath)
+function JavaObject._getLuaClassForClassPath(classpath)
 	if classpath == 'java/lang/String' then
 		return require 'java.string'
 	-- I can't tell how I should format the classpath
 	elseif classpath:match'^%[' then
-		error("dont' use jni signatures for classpaths") 
+		error("dont' use jni signatures for classpaths")
 		return require 'java.array'
 	elseif classpath:match'%[%]$' then
 		return require 'java.array'
@@ -28,8 +28,8 @@ function JavaObject.getLuaClassForClassPath(classpath)
 end
 
 -- static helper function for getting the correct JavaObject subclass depending on the classpath
-function JavaObject.createObjectForClassPath(classpath, args)
-	return JavaObject.getLuaClassForClassPath(classpath)(args)
+function JavaObject._createObjectForClassPath(classpath, args)
+	return JavaObject._getLuaClassForClassPath(classpath)(args)
 end
 
 -- gets a JavaClass wrapping the java call `obj._class()`
@@ -49,14 +49,14 @@ function JavaObject:_method(args)
 end
 
 -- calls in java `obj.toString()`
-function JavaObject:getJavaToString()
+function JavaObject:_javaToString()
 	return tostring(self:_method{
 		name = 'toString',
 		sig = {'java/lang/String'},
 	}(self))
 end
 
-function JavaObject:getDebugStr()
+function JavaObject:_getDebugStr()
 	return self.__name..'('
 		..tostring(self._classpath)
 		..' '
@@ -65,7 +65,7 @@ function JavaObject:getDebugStr()
 end
 
 function JavaObject:__tostring()
-	return self:getJavaToString()
+	return self:_javaToString()
 end
 
 JavaObject.__concat = string.concat

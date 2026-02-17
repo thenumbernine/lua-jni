@@ -33,7 +33,7 @@ function JNIEnv:_version()
 end
 
 function JNIEnv:_class(classpath)
-	
+
 	self:_checkExceptions()
 
 	local classObj = self._classesLoaded[classpath]
@@ -51,9 +51,9 @@ function JNIEnv:_class(classpath)
 		}
 		self._classesLoaded[classpath] = classObj
 	end
-	
+
 	self:_checkExceptions()
-	
+
 	return classObj
 end
 
@@ -76,11 +76,11 @@ function JNIEnv:_str(s, len)
 		-- assume it's a lua string or char* cdata
 		jstring = self._ptr[0].NewStringUTF(self._ptr, s)
 	end
-	if jstring == nil 
-		then error("NewString failed") 
+	if jstring == nil
+		then error("NewString failed")
 	end
 	local resultClassPath = 'java/lang/String'
-	return JavaObject.createObjectForClassPath(
+	return JavaObject._createObjectForClassPath(
 		resultClassPath, {
 			env = self,
 			ptr = jstring,
@@ -112,11 +112,11 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	-- their classpath is java/lang/String or whatever
 	-- this one will, for the same, be Ljava/lang/string;
 	-- ...
-	-- so I wiil send it jtype[], 
+	-- so I wiil send it jtype[],
 	-- but now the JavaObject classpath wouldn't match its getClass():getName() ...
 	-- TODO switch over all stored .classpath's to JNI-sig name qualifiers.
 	local resultClassPath = jtype..'[]'
-	return JavaObject.createObjectForClassPath(
+	return JavaObject._createObjectForClassPath(
 		resultClassPath,
 		{
 			env = self,
@@ -146,7 +146,7 @@ function JNIEnv:_getObjClassPath(objPtr)
 -- but when it's not, getName just returns the classpath?
 -- isn't that ambiguous?
 	sigstr = tostring(sigstr)
---DEBUG:print('JNIEnv:_getObjClassPath', sigstr)	
+--DEBUG:print('JNIEnv:_getObjClassPath', sigstr)
 	-- opposite of util.getJNISig
 	local classpath = sigStrToObj(sigstr) or sigstr
 --DEBUG:print('JNIEnv:_getObjClassPath', classpath)
@@ -167,15 +167,15 @@ function JNIEnv:_exceptionOccurred()
 	self._dontCheckExceptions = true
 
 	local classpath = self:_getObjClassPath(e)
-	local result = JavaObject.createObjectForClassPath(
-		classpath, 
+	local result = JavaObject._createObjectForClassPath(
+		classpath,
 		{
 			env = self,
 			ptr = e,
 			classpath = classpath,
 		}
 	)
-	
+
 	self._dontCheckExceptions = nil
 
 	return result
@@ -188,24 +188,24 @@ function JNIEnv:_checkExceptions()
 	if not ex then return end
 
 	-- let's flag our jnienv for when it should and shouldn't catch exceptions
-	
+
 	assert(not self._dontCheckExceptions)
 	self._dontCheckExceptions = true
-	
+
 	local errstr = 'JVM '..ex
-	
+
 	self._dontCheckExceptions = nil
-	
-	error(errstr) 
+
+	error(errstr)
 end
 
 -- putting _luaToJavaArgs here so it can auto-convert some objects like strings
 
 function JNIEnv:_luaToJavaArg(arg, sig)
 	local t = type(arg)
-	if t == 'table' then 
+	if t == 'table' then
 		-- assert it is a cdata
-		return arg._ptr 
+		return arg._ptr
 	elseif t == 'string' then
 		return self:_str(arg)._ptr
 	elseif t == 'cdata' then
@@ -221,7 +221,7 @@ end
 
 function JNIEnv:_luaToJavaArgs(sigIndex, sig, ...)
 	if select('#', ...) == 0 then return end
-	return self:_luaToJavaArg(..., sig[sigIndex]), 
+	return self:_luaToJavaArg(..., sig[sigIndex]),
 		self:_luaToJavaArgs(sigIndex+1, sig, select(2, ...))
 end
 
@@ -249,7 +249,7 @@ function JNIEnv:__index(k)
 	local cl = self:_class(k)
 	if cl then return cl end
 
-print('JNIEnv __index', k)
+--DEBUG:print('JNIEnv __index', k)
 	return Name{env=self, name=k}
 end
 
@@ -266,8 +266,6 @@ end
 Name.__concat = string.concat
 
 function Name:__index(k)
-	v = rawget(self, k)		-- automatic?
-	if v ~= nil then return v end
 	v = rawget(Name, k)
 	if v ~= nil then return v end
 
@@ -276,7 +274,7 @@ function Name:__index(k)
 	local cl = env:_class(classname)
 	if cl then return cl end
 
-print('Name __index', k, 'classname', classname)
+--DEBUG:print('Name __index', k, 'classname', classname)
 	return Name{env=env, name=classname}
 end
 

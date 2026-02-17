@@ -53,10 +53,10 @@ print('Test_init', Test_init)
 
 
 -- call its tostring
-local testObj = Test_init:newObject(Test)
+local testObj = Test_init:_new(Test)
 print('testObj', testObj)
 
-print('testObj toString', testObj:getJavaToString())
+print('testObj toString', testObj:_javaToString())
 
 -- can I make a new String?
 -- chicken-and-egg, you have to use JNIEnv
@@ -86,10 +86,14 @@ arr:_set(2, 'c')
 print('arr[0]', arr:_get(0))
 print('arr[1]', arr:_get(1))
 print('arr[2]', arr:_get(2))
+arr[1] = J:_str'testing'
+print('arr[0]', arr[0])
+print('arr[1]', arr[1])
+print('arr[2]', arr[2])
 
 local doubleArr = J:_newArray('double', 5)
 print('doubleArr', doubleArr)
-print('doubleArr._class()._name()', 
+print('doubleArr._class()._name()',
 	doubleArr:_class():_name()	-- '[D' ... just like the signature
 )
 
@@ -102,5 +106,7 @@ charArr:_set(1, 101)
 --print('charArr[2]', charArr:_get(2))	-- exception
 print('charArr[0]', charArr:_get(0))
 print('charArr[1]', charArr:_get(1))
+print('charArr[0]', charArr[0])
+print('charArr[1]', charArr[1])
 
 jvm:destroy()

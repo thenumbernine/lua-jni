@@ -34,22 +34,22 @@ JavaMethod.__name = 'JavaMethod'
 function JavaMethod:init(args)
 	self._env = assert.index(args, 'env')		-- JNIEnv
 	self._ptr = assert.index(args, 'ptr')		-- cdata
-	self._sig = assert.index(args, 'sig')		-- sig desc is in require 'java.class' for now
+	self._sig = args.sig or {}					-- sig desc is in require 'java.class' for now
 	self._sig[1] = self._sig[1] or 'void'
 
 	-- TODO I was holding this to pass to CallStatic*Method calls
 	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)
 	-- so maybe I don't want .class to be saved.
-	self.class = assert.index(args, 'class')	-- JavaClass where the method came from ...
+	--self._class = assert.index(args, 'class')	-- JavaClass where the method came from ...
 
 	-- you need to know if its static to load the method
 	-- and you need to know if its static to call the method
 	-- ... seems that is something that shoudlve been saved with the  method itself ...
-	self.static = args.static
+	self._static = args.static
 end
 
 function JavaMethod:__call(thisOrClass, ...)
-	
+
 	-- I don't want to clear exceptions
 	-- but I don't want them messing with my stuff
 	-- but I don't want to check exceptiosn twice
@@ -57,12 +57,12 @@ function JavaMethod:__call(thisOrClass, ...)
 	self._env:_checkExceptions()
 
 	local callName, returnVoid, returnObject
-	if self.static then
-		returnVoid = callStaticNameForReturnType.void 
+	if self._static then
+		returnVoid = callStaticNameForReturnType.void
 		returnObject = callStaticNameForReturnType.object
 		callName = callStaticNameForReturnType[self._sig[1]] or returnObject
 	else
-		returnVoid = callNameForReturnType.void 
+		returnVoid = callNameForReturnType.void
 		returnObject = callNameForReturnType.object
 		callName = callNameForReturnType[self._sig[1]] or returnObject
 	end
@@ -71,17 +71,17 @@ function JavaMethod:__call(thisOrClass, ...)
 	-- otherwise an object comes first
 	local result = self._env._ptr[0][callName](
 		self._env._ptr,
-		assert(self._env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self.class by default?
+		assert(self._env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
 		self._ptr,
 		self._env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
-	
+
 	self._env:_checkExceptions()
 
 	if callName == returnVoid then return end
 	if callName ~= returnObject then return result end
 	-- convert / wrap the result
-	return JavaObject.createObjectForClassPath(
+	return JavaObject._createObjectForClassPath(
 		self._sig[1], {
 			env = self._env,
 			ptr = result,
@@ -94,7 +94,7 @@ end
 -- first arg is the ctor's class obj
 -- rest are ctor args
 -- TODO if I do my own matching of args to stored java reflect methods then I don't need to require the end-user to pick out the ctor method themselves...
-function JavaMethod:newObject(classObj, ...)
+function JavaMethod:_new(classObj, ...)
 	local classpath = assert(classObj._classpath)
 	local result = self._env._ptr[0].NewObject(
 		self._env._ptr,
@@ -105,7 +105,7 @@ function JavaMethod:newObject(classObj, ...)
 	-- fun fact, for java the ctor has return signature 'void'
 	-- which means the self._sig[1] won't hvae the expected classpath
 	-- which means we have to store/retrieve extra the classpath of the classObj
-	return JavaObject.createObjectForClassPath(
+	return JavaObject._createObjectForClassPath(
 		classpath,
 		{
 			env = self._env,

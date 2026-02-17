@@ -22,6 +22,11 @@ local jni = ffi.load((javarootdir/'lib/server/libjvm.so').path)
 local JavaVM = class()
 JavaVM.__name = 'JavaVM'
 
+--[[
+args:
+	version
+	classpath
+--]]
 function JavaVM:init(args)
 	args = args or {}
 

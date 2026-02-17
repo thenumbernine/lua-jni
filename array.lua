@@ -15,6 +15,10 @@ end):setmetatable(nil)
 local JavaArray = JavaObject:subclass()
 JavaArray.__name = 'JavaArray'
 
+--[[
+args:
+	elemClassPath
+--]]
 function JavaArray:init(args)
 	JavaArray.super.init(self, args)
 
@@ -59,7 +63,7 @@ function JavaArray:_get(i)
 		return ffi.cast(self.elemFFIType_ptr, arptr)[i]
 	else
 		local elemClassPath = self._elemClassPath
-		return JavaObject.createObjectForClassPath(elemClassPath, {
+		return JavaObject._createObjectForClassPath(elemClassPath, {
 			env = self._env,
 			ptr = self._env._ptr[0].GetObjectArrayElement(self._env._ptr, self._ptr, i),
 			classpath = elemClassPath,
@@ -80,7 +84,7 @@ function JavaArray:_set(i, v)
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
 	local setArrayRegion = setArrayRegionField[self._elemClassPath]
 	if setArrayRegion then
-print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
+--DEBUG:print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
 		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
 		self._env._ptr[0][setArrayRegion](self._env._ptr, self._ptr, i, 1,
 			self.elemFFIType_1(v)
@@ -95,8 +99,25 @@ print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
 			self._env:_luaToJavaArg(v, self._elemClassPath)
 		)
 	end
-	
+
 	self._env:_checkExceptions()
+end
+
+function JavaArray:__index(k)
+	local v = JavaArray[k]
+	if v ~= nil then return v end
+
+	if type(k) == 'number' then
+		return self:_get(k)
+	end
+end
+
+function JavaArray:__newindex(k, v)
+	if type(k) == 'number' then
+		return self:_set(k, v)
+	end
+
+	rawset(self, k, v)
 end
 
 return JavaArray
