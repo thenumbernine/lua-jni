@@ -209,6 +209,7 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - how about `primitive`.class interoperability?
 - generics
+- I'm not building proper reflection for arrays ...
 - functions / lambdas
 - threads , esp with [`lua-thread`](http://github.com/thenumbernine/lua-thread) so that things don't segfault.
-- some automatic way to call Java to LuaJIT without providing my own class (tho that works) 
+- some automatic way to call Java to LuaJIT without providing my own class (tho that works)

@@ -38,7 +38,7 @@ function JNIEnv:init(args)
 	-- always keep this non-nil for __index's sake
 	self._dontCheckExceptions = false
 	-- don't JavaObject-wrap excpetions during startup
-	self._exceptionsIgnoredDuringStartup = true
+	self._ignoringExceptions = true
 
 	-- save these up front
 	-- must match bootstrapClasses for the subsequent class cache build to not cause a stack overflow
@@ -110,14 +110,19 @@ function JNIEnv:init(args)
 		sig = {'int'},
 	})
 
+	-- now that reflection is setup, we can start JavaObject-wrapping excpetions
+	assert.eq(true, self._ignoringExceptions)
+	self._ignoringExceptions = false
+	-- and throw away alll those field-not-found, method-not-found etc exceptions
+	self:_exceptionClear()
+
 	-- only setup reflection after all fields and methods for setting up reflection are grabbed
+	-- NOTICE these are going to also ignore and clear exceptions, individually
+	-- as they will do during runtime for each newly loaded class
 	self._java_lang_Class:_setupReflection()
 	self._java_lang_reflect_Field:_setupReflection()
 	self._java_lang_reflect_Method:_setupReflection()
 	self._java_lang_reflect_Constructor:_setupReflection()
-
-	-- now that reflection is setup, we can start JavaObject-wrapping excpetions
-	self._exceptionsIgnoredDuringStartup = false
 end
 
 function JNIEnv:_findClass(classpath)
@@ -275,7 +280,7 @@ function JNIEnv:_exceptionOccurred()
 	-- during startup, reflection on base classes, I don't want this class' mechanism to be used for repackaging exceptions
 	-- while the classes they would be packaged with aren't yet fully initialized
 	-- so during startup all exceptions just get deferred
-	if self._exceptionsIgnoredDuringStartup then return end
+	if self._ignoringExceptions then return end
 
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
@@ -391,10 +396,13 @@ function JNIEnv:__index(k)
 	-- I guess that means classes only
 
 	-- ignore exceptions while we search for the class
-	assert.eq(false, self._exceptionsIgnoredDuringStartup)
-	self._exceptionsIgnoredDuringStartup = true
+	self:_checkExceptions()
+assert.eq(false, self._ignoringExceptions)
+	self._ignoringExceptions = true
 	local cl = self:_findClass(k)
-	self._exceptionsIgnoredDuringStartup = false
+assert.eq(true, self._ignoringExceptions)
+	self._ignoringExceptions = false
+	self:_exceptionClear()
 
 	if cl then return cl end
 
@@ -424,7 +432,7 @@ Name.__concat = string.concat
 function Name:__index(k)
 	local v = rawget(Name, k)
 	if v ~= nil then return v end
-	
+
 	-- don't build namespaces off private vars
 	-- this is really here to prevent stackoverflows during __index operations
 	if k:match'^_' then
@@ -437,10 +445,13 @@ function Name:__index(k)
 	local classpath = rawget(self, '_name')..'.'..k
 
 	-- ignore exceptions while we search for the class
-	assert.eq(false, env._exceptionsIgnoredDuringStartup)
-	env._exceptionsIgnoredDuringStartup = true
+	env:_checkExceptions()
+assert.eq(false, env._ignoringExceptions)
+	env._ignoringExceptions = true
 	local cl = env:_findClass(classpath)
-	env._exceptionsIgnoredDuringStartup = false
+assert.eq(true, env._ignoringExceptions)
+	env._ignoringExceptions = false
+	env:_exceptionClear()
 
 	if cl then return cl end
 

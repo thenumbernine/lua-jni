@@ -73,7 +73,7 @@ function JavaObject._createObjectForClassPath(classpath, args)
 end
 
 -- gets a JavaClass wrapping the java call `obj._getClass()`
--- equivalent to java object.getClass(), 
+-- equivalent to java object.getClass(),
 -- but that function returns a java.lang.Object instance of a java.lang.Class class, generic subclass of the class you're looking for
 -- while this returns the class that you're looking for
 -- though technically obj:getClass() == obj:_getClass():_class() is equivalent to java's `object.getClass()`
@@ -120,10 +120,34 @@ end
 
 -- calls in java `obj.toString()`
 function JavaObject:_javaToString()
-	return tostring(self:_method{
+	-- [[ this works more often than I realize it should
+	-- NOTICE I'm going to hide exceptions for this too
+	-- because it's used internally, specifically, with Lua __tostring
+	-- so if you want your Java toString to throw then be sure to call obj:toString() and not tostring(obj)
+	local env = self._env
+	env:_checkExceptions()
+	local pushIgnore = env._ignoringExceptions
+	env._ignoringExceptions = true
+	local str = tostring(self:_method{
 		name = 'toString',
 		sig = {'java.lang.String'},
 	}(self))
+	env._ignoringExceptions = pushIgnore
+	env:_exceptionClear()
+	return str
+	--]]
+	--[[ check our reflection, but sometimes getting toString works even when the reflection says it's not there ... ? fallback on java.lang.Class.toString() ?
+	local classObj = self:_getClass()	-- TODO cache this?
+	local toStrings = classObj._members.toString
+	if not toStrings then return self:_getDebugStr() end
+	--[=[ TODO if _methods found toString then why can't I call it?
+	-- because my call-resolver doesn't agree that its for me to call?
+	return tostring(self:toString())
+	--]=]
+	-- [=[ invoke it manually ...
+	-- ... at this point why not just do the first way
+	--]=]
+	--]]
 end
 
 function JavaObject:_getDebugStr()
