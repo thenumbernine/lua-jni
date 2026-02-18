@@ -59,6 +59,7 @@ J.TestNativeRunnable:_new(ffi.cast('jlong', closure)):run()
 -- maybe with java.lang.reflect.Proxy?
 -- probably yes up until I try to cross the native C call bridge.
 
+--[[ wait maybe this won't work
 -- TODO I would need generics to get this to work
 -- generics means I'd no longer cache methods by classpath alone (or would I?, could I just provide JavaClass instances per generic instances?)
 local Runnable = J.java.lang.Runnable
@@ -86,7 +87,6 @@ print('Runnable:_class():getClassLoader()', Runnable:_class():getClassLoader())	
 local Proxy = J.java.lang.reflect.Proxy
 print('Proxy', Proxy)
 
---[[
 local proxyRunnable = Proxy:newProxyInstance(
 	Runnable:_class():getClassLoader(),
 	J:_newArray(J.java.lang.Class, 1, Runnable:_class()),

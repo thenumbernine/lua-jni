@@ -32,20 +32,25 @@ end
 -- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env
+
+	-- throw any excpetions occurred so far
+	-- because from here on out in setupReflection I will be throwing exceptions away (java.lang.NoSuchMethodError, etc)
+	env:_checkExceptions()
+
 --DEBUG:print('calling setupReflect on', self._classpath)
 	if self._members then return end	-- or should I warn?
 	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
 
-	local java_lang_Class = assert(env:_findClass'java.lang.Class')
+	local java_lang_Class = env._java_lang_Class
+	local java_lang_reflect_Field = env._java_lang_reflect_Field
+	local java_lang_reflect_Method = env._java_lang_reflect_Method
+	local java_lang_reflect_Constructor = env._java_lang_reflect_Constructor
+
 	-- do I need to save these?
 	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
 	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
 	self._javaObjConstructors = java_lang_Class._java_lang_Class_getConstructors(self)
 --DEBUG:print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
-
-	local java_lang_reflect_Field = env:_findClass'java.lang.reflect.Field'
-	local java_lang_reflect_Method = env:_findClass'java.lang.reflect.Method'
-	local java_lang_reflect_Constructor = env:_findClass'java.lang.reflect.Constructor'
 
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
 	for i=0,#self._javaObjFields-1 do

@@ -26,12 +26,13 @@ JNIEnv.__name = 'JNIEnv'
 
 --[[
 args:
-	vm = vm to store
 	ptr = JNIEnv* cdata
+	vm = vm to store (optional, to prevent it from gc'ing if we hold only the JNIEnv)
 --]]
 function JNIEnv:init(args)
-	self._vm = assert.index(args, 'vm')	-- jnienv will hold the vm just so the vm doesn't gc
 	self._ptr = assert.type(assert.index(args, 'ptr'), 'cdata', "expected a JNIEnv*")
+	self._vm = args.vm		-- jnienv will hold the vm just so the vm doesn't gc
+
 	self._classesLoaded = {}
 
 	-- always keep this non-nil for __index's sake
@@ -42,54 +43,54 @@ function JNIEnv:init(args)
 	-- TODO better would be to just not make/use the cache until after building these classes and methods
 	-- we need these for later:
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
-	local java_lang_Class = self:_findClass'java.lang.Class'
-	java_lang_Class._java_lang_Class_getName = assert(java_lang_Class:_method{
+	self._java_lang_Class = self:_findClass'java.lang.Class'
+	self._java_lang_Class._java_lang_Class_getName = assert(self._java_lang_Class:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
 	})
-	java_lang_Class._java_lang_Class_getFields = assert(java_lang_Class:_method{
+	self._java_lang_Class._java_lang_Class_getFields = assert(self._java_lang_Class:_method{
 		name = 'getFields',
 		sig = {'java.lang.reflect.Field[]'},
 	})
-	java_lang_Class._java_lang_Class_getMethods = assert(java_lang_Class:_method{
+	self._java_lang_Class._java_lang_Class_getMethods = assert(self._java_lang_Class:_method{
 		name = 'getMethods',
 		sig = {'java.lang.reflect.Method[]'},
 	})
-	java_lang_Class._java_lang_Class_getConstructors = assert(java_lang_Class:_method{
+	self._java_lang_Class._java_lang_Class_getConstructors = assert(self._java_lang_Class:_method{
 		name = 'getConstructors',
 		sig = {'java.lang.reflect.Constructor[]'},
 	})
 
-	local java_lang_reflect_Field = self:_findClass'java.lang.reflect.Field'
-	java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(java_lang_reflect_Field:_method{
+	self._java_lang_reflect_Field = self:_findClass'java.lang.reflect.Field'
+	self._java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(self._java_lang_reflect_Field:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
 	})
-	java_lang_reflect_Field._java_lang_reflect_Field_getType = assert(java_lang_reflect_Field:_method{
+	self._java_lang_reflect_Field._java_lang_reflect_Field_getType = assert(self._java_lang_reflect_Field:_method{
 		name = 'getType',
 		sig = {'java.lang.Class'},
 	})
-	java_lang_reflect_Field._java_lang_reflect_Field_getModifiers = assert(java_lang_reflect_Field:_method{
+	self._java_lang_reflect_Field._java_lang_reflect_Field_getModifiers = assert(self._java_lang_reflect_Field:_method{
 		name = 'getModifiers',
 		sig = {'int'},
 	})
 
 	-- only now that we got these methods can we do this
-	local java_lang_reflect_Method = self:_findClass'java.lang.reflect.Method'
---DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)
-	java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(java_lang_reflect_Method:_method{
+	self._java_lang_reflect_Method = self:_findClass'java.lang.reflect.Method'
+--DEBUG:print('JNIEnv:init self._java_lang_reflect_Method', self._java_lang_reflect_Method)
+	self._java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(self._java_lang_reflect_Method:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
 	})
-	java_lang_reflect_Method._java_lang_reflect_Method_getReturnType = assert(java_lang_reflect_Method:_method{
+	self._java_lang_reflect_Method._java_lang_reflect_Method_getReturnType = assert(self._java_lang_reflect_Method:_method{
 		name = 'getReturnType',
 		sig = {'java.lang.Class'},
 	})
-	java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes = assert(java_lang_reflect_Method:_method{
+	self._java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes = assert(self._java_lang_reflect_Method:_method{
 		name = 'getParameterTypes',
 		sig = {'java.lang.Class[]'},
 	})
-	java_lang_reflect_Method._java_lang_reflect_Method_getModifiers = assert(java_lang_reflect_Method:_method{
+	self._java_lang_reflect_Method._java_lang_reflect_Method_getModifiers = assert(self._java_lang_reflect_Method:_method{
 		name = 'getModifiers',
 		sig = {'int'},
 	})
@@ -97,25 +98,21 @@ function JNIEnv:init(args)
 	-- so if Method and Constructor both inherit from Executable, and it has getName, getParameterTypes, getModifiers, can I just get those methods from it and use on both?
 	-- or does the jmethodID not do vtable lookup?
 	-- I won't risk it
-	local java_lang_reflect_Constructor = self:_findClass'java.lang.reflect.Constructor'
-	java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes = assert(java_lang_reflect_Constructor:_method{
+	self._java_lang_reflect_Constructor = self:_findClass'java.lang.reflect.Constructor'
+	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes = assert(self._java_lang_reflect_Constructor:_method{
 		name = 'getParameterTypes',
 		sig = {'java.lang.Class[]'},
 	})
-	java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers = assert(java_lang_reflect_Constructor:_method{
+	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers = assert(self._java_lang_reflect_Constructor:_method{
 		name = 'getModifiers',
 		sig = {'int'},
 	})
 
---DEBUG:print("JNIEnv._classesLoaded['java.lang.Class']", self._classesLoaded['java.lang.Class'])
-assert.eq(java_lang_Class._classpath, 'java.lang.Class')
---DEBUG:print('!!! saved java_lang_Class._java_lang_Class_getName')
-
 	-- only setup reflection after all fields and methods for setting up reflection are grabbed
-	java_lang_Class:_setupReflection()
-	java_lang_reflect_Field:_setupReflection()
-	java_lang_reflect_Method:_setupReflection()
-	java_lang_reflect_Constructor:_setupReflection()
+	self._java_lang_Class:_setupReflection()
+	self._java_lang_reflect_Field:_setupReflection()
+	self._java_lang_reflect_Method:_setupReflection()
+	self._java_lang_reflect_Constructor:_setupReflection()
 end
 
 function JNIEnv:_findClass(classpath)
@@ -175,8 +172,7 @@ end
 -- get a classpath for a jobject pointer
 function JNIEnv:_getObjClassPath(objPtr)
 	local jclass = self:_getObjClass(objPtr)
-	local java_lang_Class = self:_findClass'java.lang.Class'
-	local sigstr = java_lang_Class._java_lang_Class_getName(jclass)
+	local sigstr = self._java_lang_Class._java_lang_Class_getName(jclass)
 -- wait
 -- are you telling me
 -- when its a prim or an array, getName returns it as a signature-qualified string
@@ -268,7 +264,7 @@ end
 function JNIEnv:_exceptionOccurred()
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
-
+--DEBUG:print('got exception', e)
 	if self._dontCheckExceptions then
 		error("java exception in exception handler")
 	end
@@ -278,6 +274,7 @@ function JNIEnv:_exceptionOccurred()
 	self._ptr[0].ExceptionClear(self._ptr)
 
 	local classpath = self:_getObjClassPath(e)
+--DEBUG:print('exception classpath', classpath)
 	local result = JavaObject._createObjectForClassPath(
 		classpath,
 		{
@@ -337,7 +334,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		-- TODO assert sig is a primitive
 		return ffi.new('j'..sig, arg)
 	end
-	error("idk how to convert arg from Lua type "..t)
+	error("idk how to convert arg from Lua type "..t.." to Java type "..tostring(sig))
 end
 
 function JNIEnv:_luaToJavaArgs(sigIndex, sig, ...)

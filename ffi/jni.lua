@@ -402,13 +402,13 @@ enum { JNI_VERSION_1_1 = 0x00010001 };
 enum { JNI_VERSION_1_2 = 0x00010002 };
 enum { JNI_VERSION_1_4 = 0x00010004 };
 enum { JNI_VERSION_1_6 = 0x00010006 };
-/* #define JNI_OK (0) ### define is not number */
-/* #define JNI_ERR (-1) ### define is not number */
-/* #define JNI_EDETACHED (-2) ### define is not number */
-/* #define JNI_EVERSION (-3) ### define is not number */
-/* #define JNI_ENOMEM (-4) ### define is not number */
-/* #define JNI_EEXIST (-5) ### define is not number */
-/* #define JNI_EINVAL (-6) ### define is not number */
+enum { JNI_OK = 0 };
+enum { JNI_ERR = -1 };
+enum { JNI_EDETACHED = -2 };
+enum { JNI_EVERSION = -3 };
+enum { JNI_ENOMEM = -4 };
+enum { JNI_EEXIST = -5 };
+enum { JNI_EINVAL = -6 };
 enum { JNI_COMMIT = 1 };
 enum { JNI_ABORT = 2 };
 /* + END <jni.h> Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/jni.h */

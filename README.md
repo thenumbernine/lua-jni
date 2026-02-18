@@ -204,6 +204,7 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # TODO
 
+- I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - how about `primitive`.class interoperability?
 - generics
 - functions / lambdas
