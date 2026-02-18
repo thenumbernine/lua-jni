@@ -1,10 +1,10 @@
-class Runnable implements java.lang.Runnable {
+class TestNativeRunnable implements java.lang.Runnable {
     static { System.loadLibrary("runnable_lib"); }
 	long funcptr, arg;	//bitness of the systems ... is there 128-bit addressing anywhere?
-	public Runnable(long funcptr) { this(funcptr, 0); }
-	public Runnable(long funcptr, long arg) { this.funcptr = funcptr; this.arg = arg; }
+	public TestNativeRunnable(long funcptr) { this(funcptr, 0); }
+	public TestNativeRunnable(long funcptr, long arg) { this.funcptr = funcptr; this.arg = arg; }
 
-	// this is Runnable, and Runnable has not results, so this has no result
+	// this is our Runnable interface, and Runnable has not results, so this has no result
 	public void run() { runNative(funcptr, arg); }
 
 	// this is a wrapper for what should be an underlying pthread-style callback,

@@ -20,8 +20,8 @@ require 'make.targets'():add{
 
 -- build java
 require 'make.targets'():add{
-	dsts = {'Runnable.class'},
-	srcs = {'Runnable.java'},
+	dsts = {'TestNativeRunnable.class'},
+	srcs = {'TestNativeRunnable.java'},
 	rule = function(r)
 		assert(os.exec('javac '..r.srcs[1]))
 	end,
@@ -42,8 +42,9 @@ local J = jvm.jniEnv
 
 -- this loads librunnable_lib.so
 -- so this can be used as an entry point for Java->JNI->LuaJIT code
-print('J.Runnable.run', J.Runnable.run)
-print('J.Runnable.runNative', J.Runnable.runNative)
+print('J.TestNativeRunnable', J.TestNativeRunnable)
+print('J.TestNativeRunnable.run', J.TestNativeRunnable.run)
+print('J.TestNativeRunnable.runNative', J.TestNativeRunnable.runNative)
 
 -- I'd return something, but
 callback = function(arg)
@@ -51,4 +52,12 @@ callback = function(arg)
 end
 local ffi = require 'ffi'
 closure = ffi.cast('void *(*)(void*)', callback)	-- using a pthread signature here and in runnable_lib.c
-J.Runnable:_new(ffi.cast('jlong', closure)):run()
+J.TestNativeRunnable:_new(ffi.cast('jlong', closure)):run()
+
+
+-- can I do the same thing but without a trampoline class?
+-- maybe with java.lang.reflect.Proxy?
+-- probably yes up until I try to cross the native C call bridge.
+
+local Runnable = J.java.lang.Runnable
+print('Runnable', Runnable)
