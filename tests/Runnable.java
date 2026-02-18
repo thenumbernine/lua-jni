@@ -1,7 +1,8 @@
-class Runnable {
+class Runnable implements java.lang.Runnable {
     static {
         System.loadLibrary("runnable_lib");
     }
 
-	public static native void run();
+	public void run() { runNative(); }
+	public static native void runNative();
 }

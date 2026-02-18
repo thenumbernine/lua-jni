@@ -42,4 +42,8 @@ local J = jvm.jniEnv
 
 -- this loads librunnable_lib.so
 -- so this can be used as an entry point for Java->JNI->LuaJIT code
-J.Runnable:run()
+print('J.Runnable.run', J.Runnable.run)
+print('J.Runnable.runNative', J.Runnable.runNative)
+--J.Runnable:runNative()	-- works
+--J.Runnable:run()	-- segfaults because its a member-method called with a class ...
+J.Runnable:_new():run()

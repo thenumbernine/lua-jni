@@ -19,6 +19,11 @@ function JavaClass:init(args)
 --DEBUG:assert(require 'java.jnienv':isa(self._env))
 	self._ptr = assert.index(args, 'ptr')
 	self._classpath = assert.index(args, 'classpath')
+
+	-- locking namespace for java name resolve,
+	-- so define all to-be-used variables here,
+	-- even as 'false' for the if-exists tests to fail:
+	self._members = false
 end
 
 -- call this after creating JavaClass to fill its reflection contents
@@ -28,6 +33,7 @@ end
 function JavaClass:_setupReflection()
 	local env = self._env
 --DEBUG:print('calling setupReflect on', self._classpath)
+	if self._members then return end	-- or should I warn?
 	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
 
 	local java_lang_Class = assert(env:_class'java.lang.Class')
@@ -136,6 +142,9 @@ function JavaClass:_setupReflection()
 	-- can constructors use JNIEnv.FromReflectedMethod ?
 	do
 		local name = '<init>'	-- all constructors have the same name
+		self._members[name] = self._members[name] or table()	-- honestly there shouldn't be one here ... unless a constructor got listed as a method, and that would be atypical
+		local ctors = self._members[name]
+		local foundDefaultCtor
 		for i=0,#self._javaObjConstructors-1 do
 			local method = self._javaObjConstructors[i]
 
@@ -162,15 +171,30 @@ function JavaClass:_setupReflection()
 --DEBUG:print('jmethodID', jmethodID)
 			assert(jmethodID ~= nil, "couldn't get jmethodID from reflect constructor")
 
+			if #sig == 1 and sig[1] == 'void' then
+				foundDefaultCtor = true
+			end
+
 			local methodObj = JavaMethod{
 				env = env,
 				ptr = jmethodID,
 				sig = sig,
 				static = 0 ~= bit.band(modifiers, 8),
 			}
-			self._members[name] = self._members[name] or table()
-			self._members[name]:insert(methodObj)
+			ctors:insert(methodObj)
 --DEBUG:print('constructor['..i..'] = '..require'ext.tolua'(sig))
+		end
+
+		-- another Java quirk: every function has a default no-arg constructor
+		-- but it won't be listed in the java.lang.Class.getConstructors() list
+		--  unless it was explicitly defined
+		if not foundDefaultCtor then
+			local defaultCtorMethod = self:_method{name=name, sig={}}
+			-- can this ever not exist?
+			-- maybe by protecting it or something?
+			if defaultCtorMethod then
+				ctors:insert(defaultCtorMethod)
+			end
 		end
 	end
 end
@@ -267,16 +291,17 @@ end
 
 function JavaClass:_new(...)
 	local ctors = self._members['<init>']
-	if #ctors == 0 then
+	if not ctors or #ctors == 0 then
 		error("can't new, no constructors present for "..self._classpath)
+	else
+		-- TODO here and JavaCallResolve, we are translating args multiple times
+		-- TODO just do it once
+		local ctor = JavaCallResolve.resolve(ctors, self, ...)
+		if not ctor then
+			error("args mismatch")
+		end
+		return ctor:_new(self, ...)
 	end
-	-- TODO here and JavaCallResolve, we are translating args multiple times
-	-- TODO just do it once
-	local ctor = JavaCallResolve.resolve(ctors, self, ...)
-	if not ctor then
-		error("args mismatch")
-	end
-	return ctor:_new(self, ...)
 end
 
 function JavaClass:_getDebugStr()

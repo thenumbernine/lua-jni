@@ -59,8 +59,9 @@ local J = jvm.jniEnv
 
 - `J:_new(class, ...)` = create a new JavaObject.  `class` can be either a JavaClass or a classpath string.
 
-- `J:_newArray(javaType, length, objInit)`
-- - creates a Java array using one of the C API `JNIEnv.New*Array` methods
+- `J:_newArray(javaType, length, [objInit])`
+- - creates a Java array using one of the C API `JNIEnv.New*Array` methods.
+- - `javaType` can be a primitive string, a classpath string, or a `JavaClass` object.
 - - see `JavaArray`
 
 - `jclass = J:_getObjClass(objPtr)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
