@@ -42,7 +42,7 @@ function JNIEnv:init(args)
 	-- TODO better would be to just not make/use the cache until after building these classes and methods
 	-- we need these for later:
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
-	local java_lang_Class = self:_class'java.lang.Class'
+	local java_lang_Class = self:_findClass'java.lang.Class'
 	java_lang_Class._java_lang_Class_getName = assert(java_lang_Class:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
@@ -60,7 +60,7 @@ function JNIEnv:init(args)
 		sig = {'java.lang.reflect.Constructor[]'},
 	})
 
-	local java_lang_reflect_Field = self:_class'java.lang.reflect.Field'
+	local java_lang_reflect_Field = self:_findClass'java.lang.reflect.Field'
 	java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(java_lang_reflect_Field:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
@@ -75,7 +75,7 @@ function JNIEnv:init(args)
 	})
 
 	-- only now that we got these methods can we do this
-	local java_lang_reflect_Method = self:_class'java.lang.reflect.Method'
+	local java_lang_reflect_Method = self:_findClass'java.lang.reflect.Method'
 --DEBUG:print('JNIEnv:init java_lang_reflect_Method', java_lang_reflect_Method)
 	java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(java_lang_reflect_Method:_method{
 		name = 'getName',
@@ -97,7 +97,7 @@ function JNIEnv:init(args)
 	-- so if Method and Constructor both inherit from Executable, and it has getName, getParameterTypes, getModifiers, can I just get those methods from it and use on both?
 	-- or does the jmethodID not do vtable lookup?
 	-- I won't risk it
-	local java_lang_reflect_Constructor = self:_class'java.lang.reflect.Constructor'
+	local java_lang_reflect_Constructor = self:_findClass'java.lang.reflect.Constructor'
 	java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes = assert(java_lang_reflect_Constructor:_method{
 		name = 'getParameterTypes',
 		sig = {'java.lang.Class[]'},
@@ -118,15 +118,15 @@ assert.eq(java_lang_Class._classpath, 'java.lang.Class')
 	java_lang_reflect_Constructor:_setupReflection()
 end
 
-function JNIEnv:_class(classpath)
---DEBUG:print('JNIEnv:_class', classpath)
+function JNIEnv:_findClass(classpath)
+--DEBUG:print('JNIEnv:_findClass', classpath)
 	self:_checkExceptions()
 
 	local classObj = self._classesLoaded[classpath]
 --DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
 --DEBUG:print('for', classpath, 'got', classObj)
 	if not classObj then
---DEBUG:print('***JNIENV*** _class making new', classpath)
+--DEBUG:print('***JNIENV*** _findClass making new', classpath)
 		-- FindClass wants /-separator
 		local slashClassPath = classpath:gsub('%.', '/')
 		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
@@ -149,7 +149,7 @@ end
 
 -- makes a JavaClass object for a jclass pointer
 -- saves it in _classesLoaded
--- used by JNIENV:_class and JavaObject:_class
+-- used by JNIENV:_findClass and JavaObject:_findClass
 function JNIEnv:_saveJClassForClassPath(args)
 	local classpath = args.classpath
 --DEBUG:print('*** JNIEnv saving '..classpath)
@@ -175,7 +175,7 @@ end
 -- get a classpath for a jobject pointer
 function JNIEnv:_getObjClassPath(objPtr)
 	local jclass = self:_getObjClass(objPtr)
-	local java_lang_Class = self:_class'java.lang.Class'
+	local java_lang_Class = self:_findClass'java.lang.Class'
 	local sigstr = java_lang_Class._java_lang_Class_getName(jclass)
 -- wait
 -- are you telling me
@@ -239,7 +239,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	if field == 'NewObjectArray' then
 		local jclassObj = jtype
 		if type(jtype) == 'string' then
-			jclassObj = self:_class(jclassObj)
+			jclassObj = self:_findClass(jclassObj)
 		else
 			assert(JavaClass:isa(jclassObj), "JNIEnv:_newArray expects a classpath or a JavaClass object")
 		end
@@ -313,7 +313,7 @@ end
 -- shorthand
 function JNIEnv:_new(classObj, ...)
 	if type(classObj) == 'string' then
-		classObj = self:_class(classObj)
+		classObj = self:_findClass(classObj)
 	end
 	return classObj:_new(...)
 end
@@ -375,7 +375,7 @@ function JNIEnv:__index(k)
 	-- do automatic namespace lookup here
 	-- symbol resolution of global scope of 'k'
 	-- I guess that means classes only
-	local cl = self:_class(k)
+	local cl = self:_findClass(k)
 	if cl then return cl end
 
 --DEBUG:print('JNIEnv __index', k)
@@ -407,7 +407,7 @@ function Name:__index(k)
 
 	local env = rawget(self, '_env')
 	local classpath = rawget(self, '_name')..'.'..k
-	local cl = env:_class(classpath)
+	local cl = env:_findClass(classpath)
 	if cl then return cl end
 
 --DEBUG:print('Name __index', k, 'classpath', classpath)

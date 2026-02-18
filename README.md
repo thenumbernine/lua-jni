@@ -70,7 +70,7 @@ local J = jvm.jniEnv
 
 - `classObj = J:_saveJClassForClassPath(args)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
 
-- `J:_class(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
+- `J:_findClass(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
 
 - `ex = J:_exceptionOccurred()` = if an exception occurred then returns the exception JavaObject.
 

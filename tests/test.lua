@@ -23,13 +23,13 @@ local J = require 'java'
 print('JNIEnv', J)
 print('JNI version', ('%x'):format(J:_version()))
 
-print('java.lang.Class', J:_class'java.lang.Class')
-print('java.lang.String', J:_class'java.lang.String')
+print('java.lang.Class', J:_findClass'java.lang.Class')
+print('java.lang.String', J:_findClass'java.lang.String')
 
 --public class Test {
-local Test = J:_class(classpath)	-- fast but verbose way
-print("Test from J:_class'Test'", Test)
--- J:_class returns a JavaClass wrapper to a jclass pointer
+local Test = J:_findClass(classpath)	-- fast but verbose way
+print("Test from J:_findClass'Test'", Test)
+-- J:_findClass returns a JavaClass wrapper to a jclass pointer
 -- so Test._ptr is a ... jobject ... of the class
 local Test2 = J.Test			-- runtime namespace resolution (slow but concise)
 print('Test from J.Test', Test2)

@@ -36,16 +36,16 @@ function JavaClass:_setupReflection()
 	if self._members then return end	-- or should I warn?
 	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
 
-	local java_lang_Class = assert(env:_class'java.lang.Class')
+	local java_lang_Class = assert(env:_findClass'java.lang.Class')
 	-- do I need to save these?
 	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
 	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
 	self._javaObjConstructors = java_lang_Class._java_lang_Class_getConstructors(self)
 --DEBUG:print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
 
-	local java_lang_reflect_Field = env:_class'java.lang.reflect.Field'
-	local java_lang_reflect_Method = env:_class'java.lang.reflect.Method'
-	local java_lang_reflect_Constructor = env:_class'java.lang.reflect.Constructor'
+	local java_lang_reflect_Field = env:_findClass'java.lang.reflect.Field'
+	local java_lang_reflect_Method = env:_findClass'java.lang.reflect.Method'
+	local java_lang_reflect_Constructor = env:_findClass'java.lang.reflect.Constructor'
 
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
 	for i=0,#self._javaObjFields-1 do
@@ -289,8 +289,8 @@ end
 -- and double[] will be [D
 function JavaClass:_name()
 --DEBUG:print('JavaClass:_name')
---DEBUG:print("getting env:_class'java.lang.Class'")
-	local classObj = self._env:_class'java.lang.Class'
+--DEBUG:print("getting env:_findClass'java.lang.Class'")
+	local classObj = self._env:_findClass'java.lang.Class'
 assert('got', classObj)
 assert.eq(classObj._classpath, 'java.lang.Class')
 --DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)

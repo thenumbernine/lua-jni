@@ -18,8 +18,8 @@ function JavaObject:init(args)
 -- I would like to always save the class here
 -- but for the bootstrap classes, they need to call java functions, which wrap Java object results
 -- and those would reach here before the bootstrapping of classes is done,
--- so env:_class() wouldn't work
---	self._jclass = self._env:_class(self._classpath)
+-- so env:_findClass() wouldn't work
+--	self._jclass = self._env:_findClass(self._classpath)
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
