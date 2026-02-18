@@ -2,7 +2,7 @@
 local ffi = require 'ffi'
 local os = require 'ext.os'
 
--- build the jni 
+-- build the jni
 require 'make.targets'():add{
 	dsts = {'librunnable_lib.so'},
 	srcs = {'runnable_lib.c'},
@@ -95,17 +95,32 @@ local runnable = J.TestNativeRunnable:_new(
 	ffi.cast('jlong', thread.funcptr),
 	ffi.cast('jlong', ffi.cast('void*', threadArg+0))
 )
--- [[ run in same thread and quit - for testing
+--[[ run in same thread and quit - for testing
 runnable:run()
 thread:showErr()
 --]]
---[[
-J.javax.swing.SwingUtilities:invokeLater(runnable)
+--[[ run on a new Java thread
+local th = J.java.lang.Thread:_new(runnable)
+print('thread', th)
+th:start()
+th:join()
+thread:showErr()
+--]]
+-- [[ do invokeLater, but that doesnt block, and I am not Java who waits for all threads to finish ...
+--J.javax.swing.SwingUtilities:invokeLater(runnable)
 -- does this block until ui quit?
 -- no?
---require 'ffi.req' 'c.unistd' ffi.C.sleep(100)
+print('invokeAndWait')
+J.javax.swing.SwingUtilities:invokeAndWait(runnable)
 print'invokeLater finished'
-
 thread:showErr()
-print'DONE'
 --]]
+
+-- TODO TODO OK OK
+-- https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingUtilities.html#invokeAndWait-java.lang.Runnable-
+-- this says we ...
+-- 1) make the new thread,
+-- 2) jump into it, then call invokeAndWait on our new Runnable
+-- 3) Runnable goes inside the thread
+
+print'DONE'

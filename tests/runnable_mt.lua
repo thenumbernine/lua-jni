@@ -2,7 +2,7 @@
 local ffi = require 'ffi'
 local os = require 'ext.os'
 
--- build the jni 
+-- build the jni
 require 'make.targets'():add{
 	dsts = {'librunnable_lib.so'},
 	srcs = {'runnable_lib.c'},
@@ -76,7 +76,22 @@ print('jniEnv after AttachCurrentThread', jniEnvPtrArr[0])
 	jniEnv = jniEnvPtrArr[0]	-- I have to use the new one
 end
 
-local J = require 'java.jnienv'{ptr=jniEnv, vm=jvm}
+local J = require 'java.jnienv'{
+	ptr = jniEnv,
+	vm = jvm,
+}
+-- reverse-order, create the JVM object from the JNIEnv object
+J._vm = setmetatable({
+	jniEnv = J,
+	_ptr = jvm,
+	destroy = function() end,
+}, require 'java.vm')
+
+
+-- TODO everything above here can be put inside a JavaThread class
+-- too bad it is dependent on the TestNativeRunnable java class to be there ...
+-- ... would be nice to do it without any extra Java.
+
 
 print('J', J)
 print('J.java', J.java)
