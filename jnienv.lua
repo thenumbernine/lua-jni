@@ -284,8 +284,10 @@ function JNIEnv:_exceptionOccurred()
 
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
-print('got exception', e)
-print(debug.traceback())
+
+--DEBUG:print('got exception', e)
+--DEBUG:print(debug.traceback())
+
 	if self._dontCheckExceptions then
 		error("java exception in exception handler")
 	end
@@ -295,8 +297,10 @@ print(debug.traceback())
 	self:_exceptionClear()
 
 	local classpath = self:_getObjClassPath(e)
-print('exception classpath', classpath)
-print(debug.traceback())
+
+--DEBUG:print('exception classpath', classpath)
+--DEBUG:print(debug.traceback())
+
 	local result = JavaObject._createObjectForClassPath(
 		classpath,
 		{

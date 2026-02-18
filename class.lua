@@ -50,118 +50,131 @@ function JavaClass:_setupReflection()
 
 	-- do I need to save these?
 	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
+		or false	-- dont' let these set to nil so that __index wont get angry
 	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
+		or false
 	self._javaObjConstructors = java_lang_Class._java_lang_Class_getConstructors(self)
+		or false
 --DEBUG:print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
 
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
-	for i=0,#self._javaObjFields-1 do
-		local field = self._javaObjFields[i]
+	if self._javaObjFields == false then
+		io.stderr:write(' !!! DANGER !!! failed to get fields from class '..self._classpath..'\n')
+	else
+		for i=0,#self._javaObjFields-1 do
+			local field = self._javaObjFields[i]
 
-		local name = tostring(java_lang_reflect_Field
-			._java_lang_reflect_Field_getName(
-				field
-			))
+			local name = tostring(java_lang_reflect_Field
+				._java_lang_reflect_Field_getName(
+					field
+				))
 
-		-- fieldType is a jobject ... of a java.lang.Class
-		-- can I just treat it like a jclass?
-		-- can I just call java.lang.Class.getName() on it?
-		-- I guess I can also just do _javaToString and get the same results?
-		local fieldType = java_lang_reflect_Field
-			._java_lang_reflect_Field_getType(
-				field
-			)
+			-- fieldType is a jobject ... of a java.lang.Class
+			-- can I just treat it like a jclass?
+			-- can I just call java.lang.Class.getName() on it?
+			-- I guess I can also just do _javaToString and get the same results?
+			local fieldType = java_lang_reflect_Field
+				._java_lang_reflect_Field_getType(
+					field
+				)
 
-		local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getName(fieldType))
+			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getName(fieldType))
 
-		fieldClassPath = sigStrToObj(fieldClassPath) or fieldClassPath -- convert from sig-name to name-name
+			fieldClassPath = sigStrToObj(fieldClassPath) or fieldClassPath -- convert from sig-name to name-name
 --DEBUG:print('fieldType', fieldType, fieldClassPath)
 
-		local fieldModifiers = java_lang_reflect_Field
-			._java_lang_reflect_Field_getModifiers(
-				field
-			)
+			local fieldModifiers = java_lang_reflect_Field
+				._java_lang_reflect_Field_getModifiers(
+					field
+				)
 --DEBUG:print('fieldModifiers', fieldModifiers)
 
-		-- ok now switch this reflect field obj to a jni jfieldID
-		local jfieldID = env._ptr[0].FromReflectedField(env._ptr, field._ptr)
+			-- ok now switch this reflect field obj to a jni jfieldID
+			local jfieldID = env._ptr[0].FromReflectedField(env._ptr, field._ptr)
 
 --DEBUG:print('jfieldID', jfieldID)
-		assert(jfieldID ~= nil, "couldn't get jfieldID from reflect field for "..tostring(name))
+			assert(jfieldID ~= nil, "couldn't get jfieldID from reflect field for "..tostring(name))
 
-		local fieldObj = JavaField{
-			env = env,
-			ptr = jfieldID,
-			sig = fieldClassPath,
-			static = 0 ~= bit.band(fieldModifiers, 8),	-- java.lang.reflect.Modifier.STATIC
-		}
+			local fieldObj = JavaField{
+				env = env,
+				ptr = jfieldID,
+				sig = fieldClassPath,
+				static = 0 ~= bit.band(fieldModifiers, 8),	-- java.lang.reflect.Modifier.STATIC
+			}
 
-		self._members[name] = self._members[name] or table()
-		self._members[name]:insert(fieldObj)
+			self._members[name] = self._members[name] or table()
+			self._members[name]:insert(fieldObj)
 --DEBUG:print('field['..i..'] = '..name, fieldClassPath)
+		end
 	end
 
 	-- TODO how does name resolution go? fields or methods first?
 	-- I think they shouldn't ever overlap?
-	for i=0,#self._javaObjMethods-1 do
-		local method = self._javaObjMethods[i]
+	if self._javaObjMethods == false then
+		io.stderr:write(' !!! DANGER !!! failed to get methods from class '..self._classpath..'\n')
+	else
+		for i=0,#self._javaObjMethods-1 do
+			local method = self._javaObjMethods[i]
 
-		local name = tostring(java_lang_reflect_Method
-			._java_lang_reflect_Method_getName(
-				method
-			))
+			local name = tostring(java_lang_reflect_Method
+				._java_lang_reflect_Method_getName(
+					method
+				))
 
-		local sig = table()
+			local sig = table()
 
-		local methodReturnType = java_lang_reflect_Method
-			._java_lang_reflect_Method_getReturnType(
-				method
-			)
+			local methodReturnType = java_lang_reflect_Method
+				._java_lang_reflect_Method_getReturnType(
+					method
+				)
 
-		local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodReturnType))
+			local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodReturnType))
 
-		returnTypeClassPath = sigStrToObj(returnTypeClassPath) or returnTypeClassPath -- convert from sig-name to name-name
-		sig:insert(returnTypeClassPath)
+			returnTypeClassPath = sigStrToObj(returnTypeClassPath) or returnTypeClassPath -- convert from sig-name to name-name
+			sig:insert(returnTypeClassPath)
 
-		local paramType = java_lang_reflect_Method
-			._java_lang_reflect_Method_getParameterTypes(
-				method
-			)
+			local paramType = java_lang_reflect_Method
+				._java_lang_reflect_Method_getParameterTypes(
+					method
+				)
 
-		for j=0,#paramType-1 do
-			local methodParamType = paramType[j]
+			for j=0,#paramType-1 do
+				local methodParamType = paramType[j]
 
-			local paramClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodParamType))
+				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodParamType))
 
-			paramClassPath = sigStrToObj(paramClassPath) or paramClassPath -- convert from sig-name to name-name
-			sig:insert(paramClassPath)
-		end
+				paramClassPath = sigStrToObj(paramClassPath) or paramClassPath -- convert from sig-name to name-name
+				sig:insert(paramClassPath)
+			end
 
-		local modifiers = java_lang_reflect_Method
-			._java_lang_reflect_Method_getModifiers(
-				method
-			)
+			local modifiers = java_lang_reflect_Method
+				._java_lang_reflect_Method_getModifiers(
+					method
+				)
 
-		local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
+			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
 
 --DEBUG:print('jmethodID', jmethodID)
-		assert(jmethodID ~= nil, "couldn't get jmethodID from reflect method for "..tostring(name))
+			assert(jmethodID ~= nil, "couldn't get jmethodID from reflect method for "..tostring(name))
 
-		local methodObj = JavaMethod{
-			env = env,
-			ptr = jmethodID,
-			name = name,
-			sig = sig,
-			static = 0 ~= bit.band(modifiers, 8),
-		}
+			local methodObj = JavaMethod{
+				env = env,
+				ptr = jmethodID,
+				name = name,
+				sig = sig,
+				static = 0 ~= bit.band(modifiers, 8),
+			}
 
-		self._members[name] = self._members[name] or table()
-		self._members[name]:insert(methodObj)
+			self._members[name] = self._members[name] or table()
+			self._members[name]:insert(methodObj)
 --DEBUG:print('method['..i..'] = '..name, require'ext.tolua'(sig))
+		end
 	end
 
 	-- can constructors use JNIEnv.FromReflectedMethod ?
-	do
+	if self._javaObjConstructors == false then
+		io.stderr:write(' !!! DANGER !!! failed to get constructors from class '..self._classpath..'\n')
+	else
 		local name = '<init>'	-- all constructors have the same name
 		self._members[name] = self._members[name] or table()	-- honestly there shouldn't be one here ... unless a constructor got listed as a method, and that would be atypical
 		local ctors = self._members[name]
