@@ -145,8 +145,8 @@ function JavaObject:__index(k)
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
-print('JavaObject.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
-print(debug.traceback())
+		print('JavaObject.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
+		print(debug.traceback())
 		return
 	end
 
@@ -167,7 +167,10 @@ assert.gt(#membersForName, 0, k)
 			return member:_get(self)	-- call the getter of the field
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve(membersForName)
+			return JavaCallResolve{
+				caller = self,
+				options = membersForName,
+			}
 		else
 			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 		end

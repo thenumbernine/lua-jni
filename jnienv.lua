@@ -366,8 +366,8 @@ function JNIEnv:__index(k)
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
-print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
-print(debug.traceback())
+		print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
+		print(debug.traceback())
 		return
 	end
 

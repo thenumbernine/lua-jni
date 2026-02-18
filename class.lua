@@ -131,6 +131,7 @@ function JavaClass:_setupReflection()
 		local methodObj = JavaMethod{
 			env = env,
 			ptr = jmethodID,
+			name = name,
 			sig = sig,
 			static = 0 ~= bit.band(modifiers, 8),
 		}
@@ -166,6 +167,9 @@ function JavaClass:_setupReflection()
 				._java_lang_reflect_Constructor_getModifiers(
 					method
 				)
+--print('modifiers', modifiers)
+			-- NOTICE, ctors do NOT have 'static' flag,
+			-- even though  they are supposed to be called with the jclass as the argument (since the object does not yet exist)
 
 			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
 --DEBUG:print('jmethodID', jmethodID)
@@ -178,6 +182,7 @@ function JavaClass:_setupReflection()
 			local methodObj = JavaMethod{
 				env = env,
 				ptr = jmethodID,
+				name = name,
 				sig = sig,
 				static = 0 ~= bit.band(modifiers, 8),
 			}
@@ -233,6 +238,7 @@ function JavaClass:_method(args)
 		env = self._env,
 		class = self,
 		ptr = method,
+		name = funcname,
 		sig = sig,
 		static = static,
 	}
@@ -332,8 +338,8 @@ function JavaClass:__index(k)
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
-print('JavaClass.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
-print(debug.traceback())
+		print('JavaClass.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
+		print(debug.traceback())
 		return
 	end
 
@@ -342,8 +348,18 @@ print(debug.traceback())
 --DEBUG:print(require'ext.table'.keys(self._members):sort():concat', ')
 	local membersForName = self._members[k]
 	if membersForName then
-assert.gt(#membersForName, 0, k)
+		assert.gt(#membersForName, 0, k)	-- otherwise the entry shouldn't be there...
 --DEBUG:print('#membersForName', k, #membersForName)
+		--[[ filter out non-static methods?
+		-- no not yet, we want classes to be able to reference their object methods as JavaMethod-objects,
+		-- even when not calling them
+		membersForName = membersForName:filteri(function(method)
+			return method.static
+		end)
+		if #membersForName == 0 then
+			error("tried to call a non-static method from a class: "..k)
+		end
+		--]]
 		-- how to resolve
 		-- now if its a field vs a method ...
 		local member = membersForName[1]
@@ -354,7 +370,10 @@ assert.gt(#membersForName, 0, k)
 			return member:_get(self)	-- call the getter of the field
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve(membersForName)
+			return JavaCallResolve{
+				caller = self,
+				options = membersForName,
+			}
 		else
 			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 		end
