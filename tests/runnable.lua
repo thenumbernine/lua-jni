@@ -74,10 +74,10 @@ print('Runnable:_name()', Runnable:_name())	-- "java.lang.Runnable" ... wait is 
 print('Runnable:_class():getName()', Runnable:_class():getName())	-- same
 --print('Runnable:getName()', Runnable:getName())	-- doesn't work
 --print('Runnable:_class():_name()', Runnable:_class():_name())	-- doesn't work because there is no Object.getName() ? 
-print('Runnable:_class():_class()', Runnable:_class():_class())
-print('Runnable:_class():_class():_class()', Runnable:_class():_class():_class())
---print('Runnable:_class():_class():getName()', Runnable:_class():_class():getName()) -- error, because the underlying Lua object is a JavaClass, which cannot access object member methods ... TODO straighten this out ...
-print('Runnable:_class():_class():_class():getName()', Runnable:_class():_class():_class():getName())
+print('Runnable:_class():_getClass()', Runnable:_class():_getClass())
+print('Runnable:_class():_getClass():_class()', Runnable:_class():_getClass():_class())
+--print('Runnable:_class():_getClass():getName()', Runnable:_class():_getClass():getName()) -- error, because the underlying Lua object is a JavaClass, which cannot access object member methods ... TODO straighten this out ...
+print('Runnable:_class():_getClass():_class():getName()', Runnable:_class():_getClass():_class():getName())
 os.exit()
 print('Runnable:_class():isInterface()', Runnable:_class():isInterface())
 -- but it's not finding this ...
@@ -87,6 +87,10 @@ local Proxy = J.java.lang.reflect.Proxy
 print('Proxy', Proxy)
 
 --[[
-local proxyRunnable = Proxy:newProxyInstance()
+local proxyRunnable = Proxy:newProxyInstance(
+	Runnable:_class():getClassLoader(),
+	J:_newArray(J.java.lang.Class, 1, Runnable:_class()),
+	handler
+)
 print('proxyRunnable', proxyRunnable)
 --]]

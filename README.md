@@ -110,7 +110,7 @@ local J = jvm.jniEnv
 
 - `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
 
-- `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the `java.lang.Class` instance object representing this class.
+- `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
 
 - `cl:_new(...)` = create a new JavaObject.
 
@@ -129,9 +129,9 @@ local J = jvm.jniEnv
 
 - `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
 
-- `cl = obj:_class()` = get class
+- `cl = obj:_getClass()` = get class
 
-- `method = obj:_method(args)` = shorthand for `obj:_class():method(args)`.
+- `method = obj:_method(args)` = shorthand for `obj:_getClass():method(args)`.
 
 - `field = obj:_field(args)` = shorthand
 

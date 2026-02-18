@@ -29,7 +29,7 @@ function JavaObject:init(args)
 			if type(k) == 'string'
 			and not k:match'^_'
 			then
-				local classObj = self:_class()
+				local classObj = self:_getClass()
 				local membersForName = classObj._members[k]
 				if membersForName then
 assert.gt(#membersForName, 0, k)
@@ -72,17 +72,16 @@ function JavaObject._createObjectForClassPath(classpath, args)
 	return JavaObject._getLuaClassForClassPath(classpath)(args)
 end
 
--- gets a JavaClass wrapping the java call `obj._class()`
+-- gets a JavaClass wrapping the java call `obj._getClass()`
 -- equivalent to java object.getClass(), 
 -- but that function returns a java.lang.Object instance of a java.lang.Class class, generic subclass of the class you're looking for
 -- while this returns the class that you're looking for
--- TODO rename this to :_getClass()?
 -- though technically obj:getClass() == obj:_getClass():_class() is equivalent to java's `object.getClass()`
-function JavaObject:_class()
---DEBUG:print('JavaObject:_class()')
+function JavaObject:_getClass()
+--DEBUG:print('JavaObject:_getClass()')
 	local env = self._env
 	local classpath, jclass = env:_getObjClassPath(self._ptr)
---DEBUG:print('JavaObject:_class classpath='..classpath)
+--DEBUG:print('JavaObject:_getClass classpath='..classpath)
 	--[[ always make a new one
 	local classObj = env:_saveJClassForClassPath{ptr=jclass, classpath=classpath}
 	--]]
@@ -92,7 +91,7 @@ function JavaObject:_class()
 --DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
 --DEBUG:print('classObj', classObj)
 	if not classObj then
---DEBUG:print('!!! JavaObject._class creating JavaClass for classpath='..classpath)
+--DEBUG:print('!!! JavaObject._getClass creating JavaClass for classpath='..classpath)
 		local JavaClass = require 'java.class'
 		classObj = JavaClass{
 			env = env,
@@ -100,7 +99,7 @@ function JavaObject:_class()
 			classpath = classpath,
 		}
 		classObj:_setupReflection()
---DEBUG:print('!!! JavaObject._class overwriting '..classpath..' with classObj '..classObj)
+--DEBUG:print('!!! JavaObject._getClass overwriting '..classpath..' with classObj '..classObj)
 		env._classesLoaded[classpath] = classObj
 assert.eq(classObj._classpath, classpath)
 	end
@@ -108,14 +107,15 @@ assert.eq(classObj._classpath, classpath)
 	return classObj
 end
 
--- shorthand for self:_class():_method(args)
+-- shorthand for self:_getClass():_method(args)
+-- then again, can I pass a jobject to JNIEnv's GetMethodID ?
 function JavaObject:_method(args)
-	return self:_class():_method(args)
+	return self:_getClass():_method(args)
 end
 
 -- shorthand
 function JavaObject:_field(args)
-	return self:_class():_field(args)
+	return self:_getClass():_field(args)
 end
 
 -- calls in java `obj.toString()`
@@ -156,7 +156,7 @@ function JavaObject:__index(k)
 	end
 
 	-- now check fields/methods
-	local classObj = self:_class()
+	local classObj = self:_getClass()
 --DEBUG:print('here', classObj._classpath)
 --DEBUG:print(require'ext.table'.keys(classObj._members):sort():concat', ')
 	local membersForName = classObj._members[k]

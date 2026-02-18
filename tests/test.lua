@@ -103,9 +103,9 @@ print('Test:test()', Test:test())
 local s = J:_str'new string'
 print('new string', s)
 print('#(new string)', #s)
-print('new string class', s:_class())
-print('new string class', s:_class():_getDebugStr())
-print('new string class', s:_class():_name())
+print('new string class', s:_getClass())
+print('new string class', s:_getClass():_getDebugStr())
+print('new string class', s:_getClass():_name())
 
 print('J', J)
 print('J.java', J.java)
@@ -116,7 +116,7 @@ print('java.lang.String', String)
 -- can I make an array of Strings?
 local arr = J:_newArray('java.lang.String', 3)
 print('arr String[3]', arr)
-print('arr:_class():_name()', arr:_class():_name())	-- [Ljava/lang/String; ... i.e. String[]
+print('arr:_getClass():_name()', arr:_getClass():_name())	-- [Ljava/lang/String; ... i.e. String[]
 -- can I get its length?
 print('#(arr String[3])', #arr)
 
@@ -134,8 +134,8 @@ print('arr[2]', arr[2])
 
 local doubleArr = J:_newArray('double', 5)
 print('doubleArr', doubleArr)
-print('doubleArr._class()._name()',
-	doubleArr:_class():_name()	-- '[D' ... just like the signature
+print('doubleArr._getClass()._name()',
+	doubleArr:_getClass():_name()	-- '[D' ... just like the signature
 )
 
 doubleArr:_set(3, 3.14)

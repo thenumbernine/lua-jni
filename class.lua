@@ -207,9 +207,15 @@ end
 -- equivalent of .class
 -- converts this from a JavaClass to a java.lang.Class JavaObject
 -- TODO - can I just make JavaClass a subclass of JavaObject?
--- but if I did, what would I do about JavaObject:_class() returning the JavaClass of an object, versus this?
+-- but if I did, what would I do about JavaObject:_getClass() returning the JavaClass of an object, versus this?
 function JavaClass:_class()
 	local JavaObject = require 'java.object'
+
+	-- BIG NOTICE
+	-- this will produce multiple distinct "java.lang.Class" JavaClass's
+	--  which, apart from this method, courtesy of the jniEnv._classesLoaded[] cache,
+	--  there is no other way in the API to do
+	--  (besides instanciating your own JavaClass{} around your own jclass ptr
 	return JavaObject{
 		env = self._env,
 		ptr = self._ptr,
