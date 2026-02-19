@@ -251,7 +251,12 @@ function JNIEnv:_newArray(jtype, length, objInit)
 		end
 		-- TODO objInit as JavaObject, but how to encode null?
 		-- am I going to need a java.null placeholder object?
-		obj = self._ptr[0].NewObjectArray(self._ptr, length, jclassObj._ptr, objInit)
+		obj = self._ptr[0].NewObjectArray(
+			self._ptr,
+			length,
+			jclassObj._ptr,
+			self:_luaToJavaArg(objInit, jclassObj._classpath)
+		)
 	else
 		obj = self._ptr[0][field](self._ptr, length)
 	end
@@ -359,6 +364,9 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		-- TODO will vararg know how to convert things?
 		-- TODO assert sig is a primitive
 		return ffi.new('j'..sig, arg)
+	elseif t == 'nil' then
+		-- objects can be nil
+		if not isPrimitive[sig] then return nil end
 	end
 	error("idk how to convert arg from Lua type "..t.." to Java type "..tostring(sig))
 end

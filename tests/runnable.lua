@@ -78,18 +78,17 @@ print('Runnable:_name()', Runnable:_name())	-- "java.lang.Runnable" ... wait is 
 -- sure enough,  there's no "getName" in Runnable
 --print('Runnable._members.getName', Runnable._members.getName)
 
+-- but Runnable jclass can be treated as a jobject and called by java.lang.Class's member methods ...
 print('java.lang.Class.getName(Runnable)', J.java.lang.Class.getName(Runnable))	-- "java.lang.Runnable"
 
-
+-- the "_class()" method just reassigns the same pointer as a JavaObject with its ._classname as java.lang.Class ... trying to emulate java's .class syntax-sugar
 print('Runnable:_class():getName()', Runnable:_class():getName())	-- works, same, "java.lang.Runnable"
 
---print('Runnable:getName()', Runnable:getName())	-- doesn't work
---print('Runnable:_class():_name()', Runnable:_class():_name())	-- doesn't work because there is no Object.getName() ? 
-print('Runnable:_class():_getClass()', Runnable:_class():_getClass())
-print('Runnable:_class():_getClass():_class()', Runnable:_class():_getClass():_class())
---print('Runnable:_class():_getClass():getName()', Runnable:_class():_getClass():getName()) -- error, because the underlying Lua object is a JavaClass, which cannot access object member methods ... TODO straighten this out ...
-print('Runnable:_class():_getClass():_class():getName()', Runnable:_class():_getClass():_class():getName())
-os.exit()
+--print('Runnable:_class():_name()', Runnable:_class():_name())	-- doesn't work because JavaObject doesn't have :_name()
+print('Runnable:_class():_getClass()', Runnable:_class():_getClass())	-- JavaClass of java.lang.Class
+print('Runnable:_class():_getClass():_class()', Runnable:_class():_getClass():_class())	-- JavaObject of java.lang.Class
+print('Runnable:_class():_getClass():getName()', Runnable:_class():_getClass():getName()) 	-- "java.lang.Class"
+print('Runnable:_class():_getClass():_class():getName()', Runnable:_class():_getClass():_class():getName())	-- "java.lang.Class"
 print('Runnable:_class():isInterface()', Runnable:_class():isInterface())
 -- but it's not finding this ...
 print('Runnable:_class():getClassLoader()', Runnable:_class():getClassLoader())	-- wait ... .class exists in Java, right?
@@ -97,10 +96,12 @@ print('Runnable:_class():getClassLoader()', Runnable:_class():getClassLoader())	
 local Proxy = J.java.lang.reflect.Proxy
 print('Proxy', Proxy)
 
+--[=[ and last the handler , ... which has to be a subclass anyways ...
 local proxyRunnable = Proxy:newProxyInstance(
 	Runnable:_class():getClassLoader(),
 	J:_newArray(J.java.lang.Class, 1, Runnable:_class()),
 	handler
 )
 print('proxyRunnable', proxyRunnable)
+--]=]
 --]]
