@@ -19,6 +19,8 @@ local ffiTypesForPrim = prims:mapi(function(name)
 	o.ctype = ffi.typeof('j'..name)
 	o.array1Type = ffi.typeof('$[1]', o.ctype)
 	o.ptrType = ffi.typeof('$*', o.ctype)
+	o.sizeof = ffi.sizeof(o.ctype)
+	o.log2sizeof = math.log(ffi.sizeof(o.ctype), 2)
 	return o, name
 end):setmetatable(nil)
 

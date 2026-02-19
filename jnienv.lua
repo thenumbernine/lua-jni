@@ -11,9 +11,23 @@ local getJNISig = require 'java.util'.getJNISig
 local sigStrToObj = require 'java.util'.sigStrToObj
 local ffiTypesForPrim = require 'java.util'. ffiTypesForPrim
 
+-- some of these overlap ctypes
+local jboolean = ffi.typeof'jboolean'	-- uint8_t
+local jbyte = ffi.typeof'jbyte'			-- int8_t
+local jshort = ffi.typeof'jshort'		-- int16_t
+local jchar = ffi.typeof'jchar'			-- uint16_t
+local jint = ffi.typeof'jint'			-- int32_t
+local jlong = ffi.typeof'jlong'			-- int64_t
+local jfloat = ffi.typeof'jfloat'		-- float
+local jdouble = ffi.typeof'jdouble'		-- double
 
-local int64_t = ffi.typeof'int64_t'
-local uint64_t = ffi.typeof'uint64_t'
+for i=1,#prims-1 do
+	local pi = ffiTypesForPrim[prims[i]].ctype
+	for j=i+1,#prims do
+		local pj = ffiTypesForPrim[prims[j]].ctype
+		assert.ne(pi, pj)
+	end
+end
 
 local isPrimitive = prims:mapi(function(name) return true, name end):setmetatable(nil)
 
@@ -143,8 +157,7 @@ function JNIEnv:init(args)
 	-- and this way the J.whatever classname maps to what the Lua args expect, including ffi data
 	-- so J.int will be a jint ffi ctype
 	for _,prim in ipairs(prims) do
-		local ffiTypes = ffiTypesForPrim[prim]
-		self._classesLoaded[prim] = ffiTypes.ctype
+		self._classesLoaded[prim] = ffiTypesForPrim[prim].ctype
 	end
 end
 
@@ -415,13 +428,15 @@ end
 -- used for call resolution / overload matching
 function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	local t = type(arg)
-	if t == 'table' then
+	if t == 'boolean' then
+		return sig == 'boolean'
+	elseif t == 'table' then
 		if isPrimitive[sig] then return false end
 		local nonarraybase = sig:match'^(.*)%['
 		if nonarraybase then
 			if isPrimitive[nonarraybase] then return false end
 		end
-		return arg:_instanceof(sig)
+		return (arg:_instanceof(sig))
 	elseif t == 'string' then
 		if isPrimitive[sig] then
 			return false
@@ -430,28 +445,81 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 		if nonarraybase then
 			if isPrimitive[nonarraybase] then return false end
 		end
---DEBUG:print('type is string, comparing sig class', sig)
-		local isinstanceof = self._java_lang_String:_isAssignableFrom(sig)
---DEBUG:print('...got', isinstanceof)
-		return isinstanceof
+		return (self._java_lang_String:_isAssignableFrom(sig))
 	elseif t == 'cdata' then
 
 		-- convert ffi jni jprim to java prim
 		local ct = ffi.typeof(arg)
-		local ctname = tostring(ct)
-		local argJPrimname = primNameForCTypes[ctname]
-		local argFFIType = argJPrimname and ffiTypesForPrim[argJPrimname]
-		local sigFFIType = ffiTypesForPrim[sig]
-		if argFFIType and sigFFIType then
-			-- implicit cast only from smaller to larger types
-			return ffi.sizeof(argFFIType.ctype)
-				<= ffi.sizeof(sigFFIType.ctype)
+		-- I'm going to spell this all out until I get it down, then I will replace it with faster rules (or would rules be faster?)
+		if ct == jbyte then
+			if sig == 'byte' then return true, 0
+			elseif sig == 'short' then return true, 1
+			elseif sig == 'int' then return true, 2
+			elseif sig == 'long' then return true, 3
+			elseif sig == 'float' then return true, 4
+			elseif sig == 'double' then return true, 5
+			else
+				-- TODO convert to boxed types?
+				return false
+			end
+		elseif ct == jshort then
+			if sig == 'short' then return true, 0
+			elseif sig == 'int' then return true, 1
+			elseif sig == 'long' then return true, 2
+			elseif sig == 'float' then return true, 3
+			elseif sig == 'double' then return true, 4
+			else
+				-- TODO convert to boxed types?
+				return false
+			end
+		elseif ct == jchar then
+			if sig == 'char' then return true, 0
+			elseif sig == 'int' then return true, 1
+			elseif sig == 'long' then return true, 2
+			elseif sig == 'float' then return true, 3
+			elseif sig == 'double' then return true, 4
+			else
+				-- boxed types?
+				return false
+			end
+		elseif ct == jint then
+			if sig == 'int' then return true, 0
+			elseif sig == 'long' then return true, 1
+			elseif sig == 'float' then return true, 2
+			elseif sig == 'double' then return true, 3
+			else
+				return false
+			end
+		elseif ct == jlong then
+			if sig == 'long' then return true, 0
+			elseif sig == 'float' then return true, 1
+			elseif sig == 'double' then return true, 2
+			else
+				return false
+			end
+		elseif ct == jfloat then
+			if sig == 'float' then return true, 0
+			elseif sig == 'double' then return true, 1
+			else
+				return false
+			end
+		elseif ct == jdouble then
+			if sig == 'double' then return true, 0
+			else
+				return false
+			end
+		elseif ct == jboolean then
+			if sig == 'boolean' then return true, 0
+			else
+				return false
+			end
 		end
 
 		-- TODO if it's a ffi jni prim
 		-- converted to a java.lang. primitive box class
 		-- then true & convert below
 
+		local ctname = tostring(ct)
 		if ctname:match'%*' then
 			-- TODO casting from boxed types to prims? is that a thing?
 			if isPrimitive[sig] then return false end
@@ -487,7 +555,13 @@ end
 
 function JNIEnv:_luaToJavaArg(arg, sig)
 	local t = type(arg)
-	if t == 'table' then
+	if t == 'boolean'  then
+		if sig == 'boolean' then
+			return jboolean(arg)
+		else
+			error("can't cast boolean to "..sig)
+		end
+	elseif t == 'table' then
 		if sig then
 			-- TODO who is calling this without sig anyways?
 			if isPrimitive[sig] then
@@ -539,7 +613,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 
 		-- cross our fingers, what's one more segfault?
 		return arg
-	elseif t == 'number' or t == 'boolean' then
+	elseif t == 'number' then
 		local ffiTypes = ffiTypesForPrim[sig]
 		if not ffiTypes then
 			error("can't convert number to "..sig)

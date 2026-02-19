@@ -5,7 +5,7 @@ local J = require 'java'
 
 print('boolean', J.boolean)
 print('byte', J.byte)
-print('char', J.int)
+print('char', J.char)
 print('short', J.short)
 print('int', J.int)
 print('long', J.long)

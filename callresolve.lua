@@ -29,7 +29,7 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 
 	local numArgs = 1 + select('#', ...)
 	local bestOption
-	local bestScore = math.huge
+	local bestSigDist = math.huge
 	for i,option in ipairs(options) do
 		local sig = option._sig
 		-- sig[1] is the return type
@@ -38,16 +38,20 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 		if #sig == numArgs then
 			-- now test if casting works ...
 			-- TODO calc score from dist of classes
-			local canUse = true
+			local sigDist = 0
 			for i=2,numArgs do
 --DEBUG:print('arg #'..(i-1)..' = '..tostring((select(i-1, ...))))
 --DEBUG:print('vs sig', sig[i])
-				if not env:_canConvertLuaToJavaArg(
+				local canConvert, argDist = env:_canConvertLuaToJavaArg(
 					select(i-1, ...),
 					sig[i]
-				) then
-					canUse = false
+				)
+				if not canConvert then
+					sigDist = nil
 					break
+				end
+				if argDist then
+					sigDist = sigDist + argDist
 				end
 			end
 
@@ -55,12 +59,11 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 			-- but I should be scoring them by how far apart in the class tree the type coercion is
 			-- and somehow I should factor in differences of prim types
 
-			if canUse then
+			if sigDist then
 				-- TODO calculate score based on how far away coercion is
 				-- score by difference-in-size of prim args or difference-in-class-tree of classes
-				local score = 0
-				if score < bestScore then
-					bestScore = score
+				if bestSigDist > sigDist then
+					bestSigDist = sigDist 
 					bestOption = option
 				end
 			end
