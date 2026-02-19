@@ -49,17 +49,17 @@ local testObj = Test:_new()
 print('testObj', testObj)
 
 -- overloading lookup
-print('testObj:ol(true)', testObj:ol(true))							-- TODO matches to long 
+print('testObj:ol(true)', testObj:ol(true))							-- TODO matches to long
 print('testObj:ol(J.boolean())', testObj:ol(J.boolean()))			-- TODO matches to long.  boolean is uchar, so ...
 print('testObj:ol((short)1)', testObj:ol(J.short(1)))				-- TODO matches to long
 print('testObj:ol((int)1)', testObj:ol(J.int(1)))					-- TODO matches to long
 print('testObj:ol((float)1)', testObj:ol(J.double(1)))				-- TODO matches to long
 print('testObj:ol((double)1)', testObj:ol(J.double(1)))				-- TODO matches to long
 print('testObj:ol(1)', testObj:ol(J.long(1)))						-- correct
-print('testObj:ol("foo")', testObj:ol('foo'))
-print('testObj:ol("foo")', testObj:ol(J:_str'foo'))
-print('testObj:ol(Object())', testObj:ol( J.java.lang.Object:_new() ))
-print('testObj:ol(char[]{})', testObj:ol( J:_newArray('char', 1) ))
+print('testObj:ol("foo")', testObj:ol('foo'))						-- correct
+print('testObj:ol("foo")', testObj:ol(J:_str'foo'))					-- correct
+print('testObj:ol(Object())', testObj:ol( J.java.lang.Object:_new() ))	-- correct
+print('testObj:ol(char[]{})', testObj:ol( J:_newArray('char', 1) ))		-- TODO this matches to Object, not prim-of-array
 
 
 -- test J:_new(classpath, args)
