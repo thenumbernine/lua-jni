@@ -229,5 +229,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - some automatic way to call Java to LuaJIT without providing my own class (tho that works)
 - I think since JavaArray overloads `__index` that I need to have it call through to its parents `__index`
 - - also, prim-arrays need to be told their parent is java.lang.Array ...
-- use JNIEnv.IsAssignableFrom in the call-resolver?
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
+- call resolve accept jobject pointers
+- call resolve to correctly resolve ffi-cdata-jint/jchar/etc primitives
