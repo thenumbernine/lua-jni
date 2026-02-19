@@ -11,17 +11,18 @@ JavaCallResolve.__name = 'JavaCallResolve'
 -- otherwise 1st arg mst be an object
 -- if you try to pass a class to a non-static method then JNI just segfaults
 function JavaCallResolve:init(args)
+	self._name = assert.index(args, 'name')
 	self._caller = assert.index(args, 'caller')
 	self._options = assert.index(args, 'options')
 end
 
 function JavaCallResolve:__call(...)
 	-- TODO don't convert ... twice from Lua to Java
-	return assert(JavaCallResolve.resolve(self._options, ...))(...)
+	return assert(JavaCallResolve.resolve(self._name, self._options, ...))(...)
 end
 
 -- static method, used by JavaClass.__new also
-function JavaCallResolve.resolve(options, thisOrClass, ...)
+function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	local env = thisOrClass._env
 
 	-- ok now ...
@@ -71,7 +72,7 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 	end
 
 	if not bestOption then
-		return nil, "failed to find a matching prototype"
+		return nil, "failed to find a matching signature for function "..name
 	end
 
 	return bestOption

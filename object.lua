@@ -206,6 +206,7 @@ assert.gt(#membersForName, 0, k)
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
 			return JavaCallResolve{
+				name = k,
 				caller = self,
 				options = membersForName,
 			}

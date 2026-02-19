@@ -2,7 +2,7 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
-local ffiTypesForPrim = require 'java.util'.ffiTypesForPrim
+local infoForPrims = require 'java.util'.infoForPrims
 
 
 local JavaArray = JavaObject:subclass()
@@ -26,12 +26,12 @@ function JavaArray:init(args)
 		or _classpath:match'^(.*)%[%]$'
 		or error("didn't provide JavaArray .elemClassPath, and .classpath "..tostring(_classpath).." did not end in []")
 
-	local ffiTypes = ffiTypesForPrim[self._elemClassPath]
-	if ffiTypes then
+	local primInfo = infoForPrims[self._elemClassPath]
+	if primInfo then
 		-- or TODO just save this up front for primitives
-		self.elemFFIType = ffiTypes.ctype
-		self.elemFFIType_1 = ffiTypes.array1Type
-		self.elemFFIType_ptr = ffiTypes.ptrType
+		self.elemFFIType = primInfo.ctype
+		self.elemFFIType_1 = primInfo.array1Type
+		self.elemFFIType_ptr = primInfo.ptrType
 	end
 
 	-- do super last because it write-protects the object for java namespace lookup __newindex

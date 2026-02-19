@@ -14,14 +14,13 @@ local prims = table{
 	'double',
 }
 
-local ffiTypesForPrim = prims:mapi(function(name)
-	local o = {}
-	o.ctype = ffi.typeof('j'..name)
-	o.array1Type = ffi.typeof('$[1]', o.ctype)
-	o.ptrType = ffi.typeof('$*', o.ctype)
-	o.sizeof = ffi.sizeof(o.ctype)
-	o.log2sizeof = math.log(ffi.sizeof(o.ctype), 2)
-	return o, name
+local infoForPrims = prims:mapi(function(name)
+	local info = {}
+	info.name = name
+	info.ctype = ffi.typeof('j'..name)
+	info.array1Type = ffi.typeof('$[1]', info.ctype)
+	info.ptrType = ffi.typeof('$*', info.ctype)
+	return info, name
 end):setmetatable(nil)
 
 local primSigStrForName = {
@@ -110,7 +109,7 @@ end
 
 return {
 	prims = prims,
-	ffiTypesForPrim = ffiTypesForPrim,
+	infoForPrims = infoForPrims,
 	getJNISig = getJNISig,
 	sigStrToObj = sigStrToObj,
 }

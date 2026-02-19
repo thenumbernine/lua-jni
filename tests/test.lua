@@ -48,19 +48,38 @@ print('testObj', testObj)
 local testObj = Test:_new()
 print('testObj', testObj)
 
--- overloading lookup
-print('testObj:ol(true)', testObj:ol(true))									-- correct 
+-- overload from Lua types
+print'from lua prims'
+print('testObj:ol(true)', testObj:ol(true))							-- correct
+print('testObj:ol(1)', testObj:ol(1))
+print('testObj:ol("foo")', testObj:ol('foo'))						-- correct
+
+-- overload from ctypes
+print'from ffi prims'
 print('testObj:ol(J.boolean())', testObj:ol(J.boolean()))					-- correct
-print('testObj:ol((short)1)', testObj:ol(J.short(1)))						-- correct 
+print('testObj:ol((short)1)', testObj:ol(J.short(1)))						-- correct
 print('testObj:ol((int)1)', testObj:ol(J.int(1)))							-- correct
 print('testObj:ol((float)1)', testObj:ol(J.float(1)))						-- correct
 print('testObj:ol((double)1)', testObj:ol(J.double(1)))						-- correct
 print('testObj:ol((long)1)', testObj:ol(J.long(1)))							-- correct
-print('testObj:ol("foo")', testObj:ol('foo'))								-- correct
+
+-- overload of boxed types
+print'from boxed prims'
+print('testObj:ol(new Boolean(true))', testObj:ol(J.java.lang.Boolean:_new(true)))									-- correct
+print('testObj:ol(new Short(1))', testObj:ol(J.java.lang.Short:_new(1)))						-- correct
+print('testObj:ol(new Int(1))', testObj:ol(J.java.lang.Integer:_new(1)))							-- correct
+print('testObj:ol(new Float(1))', testObj:ol(J.java.lang.Float:_new(1)))						-- correct
+print('testObj:ol(new Double(1))', testObj:ol(J.java.lang.Double:_new(1)))						-- correct
+print('testObj:ol(new Long(1))', testObj:ol(J.java.lang.Long:_new(1)))							-- correct
+
+-- overload from objects
+print'from objects'
 print('testObj:ol(String("foo"))', testObj:ol(J:_str'foo'))					-- correct
 print('testObj:ol(Object())', testObj:ol( J.java.lang.Object:_new() ))		-- correct
-print('testObj:ol(char[]{})', testObj:ol( J:_newArray('char', 1) ))			-- TODO this matches to Object, not prim-of-array
 
+-- overload from arrays
+print'from arrays'
+print('testObj:ol(char[]{})', testObj:ol( J:_newArray('char', 1) ))			-- TODO this matches to Object, not prim-of-array
 
 -- test J:_new(classpath, args)
 -- test J:_new(classobj, args)

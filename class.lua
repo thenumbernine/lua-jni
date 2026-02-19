@@ -5,9 +5,9 @@ local tolua = require 'ext.tolua'
 local JavaObject = require 'java.object'
 local JavaMethod = require 'java.method'
 local JavaField = require 'java.field'
+local JavaCallResolve = require 'java.callresolve'
 local getJNISig = require 'java.util'.getJNISig
 local sigStrToObj = require 'java.util'.sigStrToObj
-local JavaCallResolve = require 'java.callresolve'
 
 
 -- is a Java class a Java object?
@@ -347,7 +347,7 @@ function JavaClass:_new(...)
 	else
 		-- TODO here and JavaCallResolve, we are translating args multiple times
 		-- TODO just do it once
-		local ctor = JavaCallResolve.resolve(ctors, self, ...)
+		local ctor = JavaCallResolve.resolve('<init>', ctors, self, ...)
 		if not ctor then
 			error("couldn't match args to any ctors of "..self._classpath..":\n"
 				..'\t'..ctors:mapi(function(x) return tolua(x._sig) end)
@@ -452,6 +452,7 @@ function JavaClass:__index(k)
 		elseif JavaMethod:isa(member) then
 			-- now our choice of membersForName[] will depend on the calling args...
 			return JavaCallResolve{
+				name = k,
 				caller = self,
 				options = membersForName,
 			}
