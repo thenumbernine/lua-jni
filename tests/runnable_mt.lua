@@ -31,8 +31,8 @@ local J = jvm.jniEnv
 
 local threadArgTypeCode = [[
 typedef struct ThreadArg {
-	JNIEnv * jniEnv;
-	JavaVM * jvm;
+	JNIEnv * jniEnvPtr;
+	JavaVM * jvmPtr;
 	pthread_t parentThread;
 } ThreadArg;
 ]]
@@ -42,8 +42,8 @@ local pthread = require 'ffi.req' 'c.pthread'
 print('parent thread pthread_self', pthread.pthread_self())
 
 local threadArg = ffi.new'ThreadArg[1]'
-threadArg[0].jniEnv = J._ptr
-threadArg[0].jvm = J._vm._ptr
+threadArg[0].jniEnvPtr = J._ptr
+threadArg[0].jvmPtr = J._vm._ptr
 threadArg[0].parentThread = pthread.pthread_self()
 
 local LiteThread = require 'thread.lite'
@@ -61,29 +61,45 @@ local childThread = pthread.pthread_self()
 print('child thread, pthread_self', childThread)
 
 print('hello from child thread Lua, arg', arg)
-local jvm = arg.jvm
-print('jvm', jvm)
-local jniEnv = arg.jniEnv
-print('jniEnv', jniEnv)
+local jvmPtr = arg.jvmPtr
+print('jvmPtr', jvmPtr)
+local jniEnvPtr = arg.jniEnvPtr
+print('jniEnvPtr', jniEnvPtr)
 local parentThread = arg.parentThread
 print('parentThread', parentThread)
 
+
+-- does jvm.GetEnv give the old or new env?
+-- the new env
+-- so there's no need to AttachThread
+-- (so long as its a thread made by Java)
+-- and there's no need to pass the JNIEnv ...
+do
+	local jniEnvPtrArr = ffi.new('JNIEnv*[1]', nil)
+	assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast('void**', jniEnvPtrArr), ffi.C.JNI_VERSION_1_6))
+	print('jvmPtr GetEnv', jniEnvPtrArr[0])
+end
+
+-- does the old env's GetJavaVM work?
+-- does the new env's GetJavaVM work?
+
+
 if parentThread ~= childThread then
 print("attaching JVM to new thread...")
-	local jniEnvPtrArr = ffi.new('JNIEnv*[1]', jniEnv)
-	assert.eq(ffi.C.JNI_OK, jvm[0].AttachCurrentThread(jvm, jniEnvPtrArr, nil))
-print('jniEnv after AttachCurrentThread', jniEnvPtrArr[0])
-	jniEnv = jniEnvPtrArr[0]	-- I have to use the new one
+	local jniEnvPtrArr = ffi.new('JNIEnv*[1]', jniEnvPtr)
+	assert.eq(ffi.C.JNI_OK, jvmPtr[0].AttachCurrentThread(jvmPtr, jniEnvPtrArr, nil))
+print('jniEnvPtr after AttachCurrentThread', jniEnvPtrArr[0])
+	jniEnvPtr = jniEnvPtrArr[0]	-- I have to use the new one
 end
 
 local J = require 'java.jnienv'{
-	ptr = jniEnv,
-	vm = jvm,
+	ptr = jniEnvPtr,
+	vm = jvmPtr,
 }
 -- reverse-order, create the JVM object from the JNIEnv object
 J._vm = setmetatable({
 	jniEnv = J,
-	_ptr = jvm,
+	_ptr = jvmPtr,
 	destroy = function() end,
 }, require 'java.vm')
 
@@ -100,7 +116,7 @@ print('J.java.lang.System', J.java.lang.System)
 print('J.java.lang.System.out', J.java.lang.System.out)
 
 J.java.lang.System.out:println("LuaJIT -> Java -> JNI -> (new thread) -> LuaJIT -> Java -> printing here")
-print('exceptions so far?', jniEnv[0].ExceptionOccurred(jniEnv))
+print('exceptions so far?', jniEnvPtr[0].ExceptionOccurred(jniEnvPtr))
 ]=],
 }
 

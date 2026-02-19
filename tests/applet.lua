@@ -47,6 +47,7 @@ threadArg[0].jvm = J._vm._ptr
 threadArg[0].parentThread = pthread.pthread_self()
 
 local LiteThread = require 'thread.lite'
+--[===[
 local thread = LiteThread{
 	arg = threadArg,
 	code = [=[
@@ -74,6 +75,7 @@ local J = require 'java.jnienv'{ptr=jniEnv, vm=jvm}
 
 -- finally, our Java thread code:
 
+
 local JFrame = J.javax.swing.JFrame
 local frame = JFrame:_new'HelloWorldSwing'
 frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
@@ -90,31 +92,30 @@ frame:setVisible(true)
 print'THREAD DONE'
 ]=],
 }
-
 local runnable = J.TestNativeRunnable:_new(
 	ffi.cast('jlong', thread.funcptr),
 	ffi.cast('jlong', ffi.cast('void*', threadArg+0))
 )
---[[ run in same thread and quit - for testing
+--[[ run in same thread ... blocks and doesn't show a window.  just shows a preview of one in alt+tab...
 runnable:run()
 thread:showErr()
 --]]
---[[ run on a new Java thread
+--[[ run on a new Java thread.  same.
 local th = J.java.lang.Thread:_new(runnable)
 print('thread', th)
 th:start()
 th:join()
 thread:showErr()
 --]]
--- [[ do invokeLater, but that doesnt block, and I am not Java who waits for all threads to finish ...
+--[[ do invokeLater, but that doesnt block, and I am not Java who waits for all threads to finish ...
 --J.javax.swing.SwingUtilities:invokeLater(runnable)
 -- does this block until ui quit?
 -- no?
-print('invokeAndWait')
-J.javax.swing.SwingUtilities:invokeAndWait(runnable)
-print'invokeLater finished'
+J.javax.swing.SwingUtilities:invokeAndWait(runnable)	-- segfaults
 thread:showErr()
 --]]
+--]===]
+
 
 -- TODO TODO OK OK
 -- https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingUtilities.html#invokeAndWait-java.lang.Runnable-
@@ -122,5 +123,104 @@ thread:showErr()
 -- 1) make the new thread,
 -- 2) jump into it, then call invokeAndWait on our new Runnable
 -- 3) Runnable goes inside the thread
+-- that means one Lua/C callback for the new thread creation, and one callback for the runnable ... two callbacks ...
+local thread = LiteThread{
+	arg = threadArg,
+	code = [=[
+
+	local ffi = require 'ffi'
+	local assert = require 'ext.assert'
+	local pthread = require 'ffi.req' 'c.pthread'
+	require 'java.ffi.jni'	-- needed before ffi.cdef
+
+	ffi.cdef[[]=]..threadArgTypeCode..[=[]]
+	arg = ffi.cast('ThreadArg*', arg)
+	local childThread = pthread.pthread_self()
+
+	local jvm = arg.jvm
+	local jniEnv = arg.jniEnv
+	local parentThread = arg.parentThread
+
+	if parentThread ~= childThread then
+		local jniEnvPtrArr = ffi.new('JNIEnv*[1]', jniEnv)
+		assert.eq(ffi.C.JNI_OK, jvm[0].AttachCurrentThread(jvm, jniEnvPtrArr, nil))
+		jniEnv = jniEnvPtrArr[0]	-- I have to use the new one
+	end
+
+	local J = require 'java.jnienv'{ptr=jniEnv, vm=jvm}
+
+
+	-- finally, our Java thread code:
+
+
+	local swingThreadArg = ffi.new'ThreadArg[1]'
+	swingThreadArg[0].jniEnv = J._ptr
+	swingThreadArg[0].jvm = J._vm._ptr
+	swingThreadArg[0].parentThread = pthread.pthread_self()
+
+	local swingThread = LiteThread{
+		arg = swingThreadArg,
+		code = [==[
+
+		local ffi = require 'ffi'
+		local assert = require 'ext.assert'
+		local pthread = require 'ffi.req' 'c.pthread'
+		require 'java.ffi.jni'	-- needed before ffi.cdef
+
+		ffi.cdef[[]=]..threadArgTypeCode..[=[]]
+		arg = ffi.cast('ThreadArg*', arg)
+		local childThread = pthread.pthread_self()
+
+		local jvm = arg.jvm
+		local jniEnv = arg.jniEnv
+		local parentThread = arg.parentThread
+
+		if parentThread ~= childThread then
+			local jniEnvPtrArr = ffi.new('JNIEnv*[1]', jniEnv)
+			assert.eq(ffi.C.JNI_OK, jvm[0].AttachCurrentThread(jvm, jniEnvPtrArr, nil))
+			jniEnv = jniEnvPtrArr[0]	-- I have to use the new one
+		end
+
+		local J = require 'java.jnienv'{ptr=jniEnv, vm=jvm}
+
+
+		-- finally, our Java thread code:
+
+
+		local JFrame = J.javax.swing.JFrame
+		local frame = JFrame:_new'HelloWorldSwing'
+		frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
+
+		--[[
+		local JLabel = J.javax.swing.JLabel
+		local label = JLabel:_new'Hello, World!'
+		frame:getContentPane():add(label)
+		--]]
+
+		frame:pack()	-- causes "IncompatibleClassChangeError"
+		frame:setVisible(true)
+
+		print'SWING UI SETUP THREAD DONE'
+	]==],
+	}
+	local swingRunnable = J.TestNativeRunnable:_new(
+		ffi.cast('jlong', swingThread.funcptr),
+		ffi.cast('jlong', ffi.cast('void*', swingThreadArg+0))
+	)
+	J.javax.swing.SwingUtilities:invokeAndWait(swingRunnable)
+	swingThread:showErr()
+
+	print'INVOKE AND WAIT THREAD DONE'
+]=],
+}
+local runnable = J.TestNativeRunnable:_new(
+	ffi.cast('jlong', thread.funcptr),
+	ffi.cast('jlong', ffi.cast('void*', threadArg+0))
+)
+local th = J.java.lang.Thread:_new(runnable)
+print('thread', th)
+th:start()
+th:join()
+thread:showErr()
 
 print'DONE'
