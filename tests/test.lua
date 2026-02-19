@@ -22,7 +22,7 @@ print('java.lang.String', J:_findClass'java.lang.String')
 
 local String = J.java.lang.String
 print('String', String)
-os.exit()
+print('String:_isAssignableFrom(String)', String:_isAssignableFrom(String))
 
 --public class Test {
 local Test = J:_findClass'Test'

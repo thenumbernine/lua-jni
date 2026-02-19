@@ -40,8 +40,8 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 			-- TODO calc score from dist of classes
 			local canUse = true
 			for i=2,numArgs do
-print('arg #'..(i-1)..' = '..tostring((select(i-1, ...))))
-print('vs sig', sig[i])
+--DEBUG:print('arg #'..(i-1)..' = '..tostring((select(i-1, ...))))
+--DEBUG:print('vs sig', sig[i])
 				if not env:_canConvertLuaToJavaArg(
 					select(i-1, ...),
 					sig[i]

@@ -386,10 +386,10 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 		if nonarraybase then
 			if isPrimitive[nonarraybase] then return false end
 		end
-print('type is string, comparing sig class', sig)
-		local isinstanceof = self:_findClass'java.lang.String':_instanceof(sig)
-print('...got', isinstanceof)		
-		return isinstanceof 
+--DEBUG:print('type is string, comparing sig class', sig)
+		local isinstanceof = self:_findClass'java.lang.String':_isAssignableFrom(sig)
+--DEBUG:print('...got', isinstanceof)
+		return isinstanceof
 	elseif t == 'cdata' then
 		-- TODO test for all j* prim types
 		local ct = ffi.typeof(arg)
@@ -414,12 +414,12 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	if t == 'table' then
 		if sig then
 			-- TODO who is calling this without sig anyways?
-			if isPrimitive[sig] then 
+			if isPrimitive[sig] then
 				error("can't cast object to primitive")
 			end
 			local nonarraybase = sig:match'^(.*)%['
 			if nonarraybase then
-				if isPrimitive[nonarraybase] then 
+				if isPrimitive[nonarraybase] then
 					error("can't cast object to primitive array")
 				end
 			end
@@ -427,12 +427,12 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		-- assert it is a cdata
 		return arg._ptr
 	elseif t == 'string' then
-		if isPrimitive[sig] then 
+		if isPrimitive[sig] then
 			error("can't cast string to primitive")
 		end
 		local nonarraybase = sig:match'^(.*)%['
 		if nonarraybase then
-			if isPrimitive[nonarraybase] then 
+			if isPrimitive[nonarraybase] then
 				error("can't cast object to primitive array")
 			end
 		end
