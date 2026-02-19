@@ -1,24 +1,7 @@
 #!/usr/bin/env luajit
-local ffi = require 'ffi'
-local os = require 'ext.os'
 
--- build the jni
-require 'make.targets'():add{
-	dsts = {'librunnable_lib.so'},
-	srcs = {'runnable_lib.c'},
-	rule = function(r)
-		assert(os.exec('gcc -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -shared -fPIC -o '..r.dsts[1]..' '..r.srcs[1]))
-	end,
-}:runAll()
-
--- build java
-require 'make.targets'():add{
-	dsts = {'TestNativeRunnable.class'},
-	srcs = {'TestNativeRunnable.java'},
-	rule = function(r)
-		assert(os.exec('javac '..r.srcs[1]))
-	end,
-}:runAll()
+-- build
+require 'java.tests.nativerunnable'
 
 local JVM = require 'java.vm'
 local jvm = JVM{
@@ -51,7 +34,7 @@ local thread = LiteThread{
 ]=],
 }
 local ffi = require 'ffi'
-local runnable = J.TestNativeRunnable:_new(
+local runnable = J.io.github.thenumbernine.NativeRunnable:_new(
 	ffi.cast('jlong', thread.funcptr),
 	ffi.cast('jlong', J._vm._ptr)
 )

@@ -2,12 +2,12 @@
 #include <jni.h>
 #include <stdio.h>
 
-JNIEXPORT jlong JNICALL Java_TestNativeRunnable_runNative(JNIEnv * env, jobject this_, jlong jfuncptr, jlong jarg) {
+JNIEXPORT jlong JNICALL Java_io_github_thenumbernine_NativeRunnable_runNative(JNIEnv * env, jobject this_, jlong jfuncptr, jlong jarg) {
 	void* vfptr = (void*)jfuncptr;
 	void* arg = (void*)jarg;
 	jlong results = 0;
 	if (!vfptr) {
-		fprintf(stderr, "!!! DANGER !!! TestNativeRunnable called with null function pointer !!!\n");
+		fprintf(stderr, "!!! DANGER !!! NativeRunnable called with null function pointer !!!\n");
 	} else {
 		void *(*fptr)(void*) = (void*(*)(void*))vfptr;
 		results = (jlong)fptr(arg);

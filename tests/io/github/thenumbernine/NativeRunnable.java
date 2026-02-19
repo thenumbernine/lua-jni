@@ -1,8 +1,10 @@
-class TestNativeRunnable implements java.lang.Runnable {
+package io.github.thenumbernine;
+
+class NativeRunnable implements java.lang.Runnable {
     static { System.loadLibrary("runnable_lib"); }
 	long funcptr, arg;	//bitness of the systems ... is there 128-bit addressing anywhere?
-	public TestNativeRunnable(long funcptr) { this(funcptr, 0); }
-	public TestNativeRunnable(long funcptr, long arg) { this.funcptr = funcptr; this.arg = arg; }
+	public NativeRunnable(long funcptr) { this(funcptr, 0); }
+	public NativeRunnable(long funcptr, long arg) { this.funcptr = funcptr; this.arg = arg; }
 
 	// this is our Runnable interface, and Runnable has not results, so this has no result
 	public void run() { runNative(funcptr, arg); }

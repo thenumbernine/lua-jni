@@ -8,18 +8,7 @@ local io = require 'ext.io'
 local JNIEnv = require 'java.jnienv'
 
 
-local javaHome = os.getenv'JAVA_HOME'
-if not javaHome then
-	-- how to know which jvm to load?
-	-- this needs to be done only once per app, where to do it?
-	local javaLinkPath = io.readproc'which java'
-	-- TODO what if it's not a symlink ... ?
-	local javaBinaryPath = io.readproc('readlink -f '..javaLinkPath)
---DEBUG:print('javaBinaryPath', javaBinaryPath)
-	local path = require 'ext.path'
-	local javabindir = path(javaBinaryPath):getdir()	-- java ... /bin/
-	javaHome = javabindir:getdir().path				-- java ...
-end
+local javaHome = require 'java.build'.javaHome
 local jni = ffi.load(javaHome..'/lib/server/libjvm.so')
 
 

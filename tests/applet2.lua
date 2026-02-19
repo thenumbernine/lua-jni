@@ -7,25 +7,8 @@
 -- 3) Runnable goes inside the thread
 -- that means one Lua/C callback for the new thread creation, and one callback for the runnable ... two callbacks ...
 
-local os = require 'ext.os'
-
--- build the jni
-require 'make.targets'():add{
-	dsts = {'librunnable_lib.so'},
-	srcs = {'runnable_lib.c'},
-	rule = function(r)
-		assert(os.exec('gcc -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -shared -fPIC -o '..r.dsts[1]..' '..r.srcs[1]))
-	end,
-}:runAll()
-
--- build java
-require 'make.targets'():add{
-	dsts = {'TestNativeRunnable.class'},
-	srcs = {'TestNativeRunnable.java'},
-	rule = function(r)
-		assert(os.exec('javac '..r.srcs[1]))
-	end,
-}:runAll()
+-- build
+require 'java.tests.nativerunnable'
 
 local JVM = require 'java.vm'
 local jvm = JVM{
@@ -75,11 +58,11 @@ local thread = LiteThread{
 	]==],
 	}
 
-	print('creating TestNativeRunnable for swing ui setup thread...')
+	print('creating NativeRunnable for swing ui setup thread...')
 	assert(swingThread.funcptr, 'swingThread.funcptr')
 	assert(J._vm._ptr, 'J._vm._ptr')
 	local ffi = require 'ffi'
-	local swingUISetupRunnable = J.TestNativeRunnable:_new(
+	local swingUISetupRunnable = J.io.github.thenumbernine.NativeRunnable:_new(
 		ffi.cast('jlong', swingThread.funcptr),
 		ffi.cast('jlong', J._vm._ptr)
 	)
@@ -92,11 +75,11 @@ local thread = LiteThread{
 ]=],
 }
 
-print('creating TestNativeRunnable for swing invoke thread...')
+print('creating NativeRunnable for swing invoke thread...')
 assert(thread.funcptr, 'thread.funcptr')
 assert(J._vm._ptr, 'J._vm._ptr')
 local ffi = require 'ffi'
-local swingInvokeAndWaitRunnable = J.TestNativeRunnable:_new(
+local swingInvokeAndWaitRunnable = J.io.github.thenumbernine.NativeRunnable:_new(
 	ffi.cast('jlong', thread.funcptr),
 	ffi.cast('jlong', J._vm._ptr)
 )
