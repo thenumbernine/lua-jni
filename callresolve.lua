@@ -33,6 +33,10 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 		-- call args #1 is the this-or-class
 		-- the rest will match up
 		if #option._sig == numArgs then
+
+			-- now test if casting works ...
+
+
 			-- TODO calculate score based on how far away coercion is
 			local score = 0
 			if score < bestScore then

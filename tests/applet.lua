@@ -32,22 +32,22 @@ local J = jvm.jniEnv
 local LiteThread = require 'thread.lite'
 local thread = LiteThread{
 	code = [=[
-local J = require 'java.vm'{ptr=arg}.jniEnv
+	local J = require 'java.vm'{ptr=arg}.jniEnv
 
-local JFrame = J.javax.swing.JFrame
-local frame = JFrame:_new'HelloWorldSwing'
-frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
+	local JFrame = J.javax.swing.JFrame
+	local frame = JFrame:_new'HelloWorldSwing'
+	frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
 
---[[
-local JLabel = J.javax.swing.JLabel
-local label = JLabel:_new'Hello, World!'
-frame:getContentPane():add(label)
---]]
+	--[[
+	local JLabel = J.javax.swing.JLabel
+	local label = JLabel:_new'Hello, World!'
+	frame:getContentPane():add(label)
+	--]]
 
-frame:pack()	-- causes "IncompatibleClassChangeError"
-frame:setVisible(true)
+	frame:pack()	-- causes "IncompatibleClassChangeError"
+	frame:setVisible(true)
 
-print'THREAD DONE'
+	print'THREAD DONE'
 ]=],
 }
 local runnable = J.TestNativeRunnable:_new(thread.funcptr, J._vm._ptr)

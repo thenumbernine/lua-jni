@@ -174,6 +174,13 @@ end
 
 JavaObject.__concat = string.concat
 
+function JavaObject:__eq(o)
+	if type(o) == 'cdata' then
+		return self._ptr == o
+	end
+	return self._ptr == o
+end
+
 function JavaObject:__index(k)
 	-- if self[k] exists then this isn't called
 	local cl = getmetatable(self)

@@ -72,6 +72,7 @@ function JavaMethod:__call(thisOrClass, ...)
 		returnObject = callNameForReturnType.object
 		callName = callNameForReturnType[self._sig[1]] or returnObject
 	end
+
 --print('callName', callName)
 	-- if it's a static method then a class comes first
 	-- otherwise an object comes first

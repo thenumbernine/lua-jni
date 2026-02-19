@@ -44,8 +44,12 @@ function JavaVM:init(args)
 	if args.ptr then
 		-- reattach to an old JavaVM*
 		local jvmPtr = ffi.cast('JavaVM*', args.ptr)
+		self._ptr = jvmPtr
 		-- assert/assume it is cdata of JavaVM*
 		assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast('void**', jniEnvPtrArr), version))
+
+		-- if we are creating from an old pointer then we don't want __gc to cleanup so
+		function self:destroy() end
 	else
 		-- create a new JavaVM:
 
@@ -69,12 +73,12 @@ function JavaVM:init(args)
 		jvmargs.options = self.options
 		jvmargs.ignoreUnrecognized = ffi.C.JNI_FALSE
 
-		local jvmPtr = ffi.new'JavaVM*[1]'
-		local result = jni.JNI_CreateJavaVM(jvmPtr, jniEnvPtrArr, jvmargs)
+		local jvmPtrArr = ffi.new'JavaVM*[1]'
+		local result = jni.JNI_CreateJavaVM(jvmPtrArr, jniEnvPtrArr, jvmargs)
 		assert.eq(result, 0, 'JNI_CreateJavaVM')
 
-		if jvmPtr[0] == nil then error("failed to find a JavaVM*") end
-		self._ptr = jvmPtr[0]
+		if jvmPtrArr[0] == nil then error("failed to find a JavaVM*") end
+		self._ptr = jvmPtrArr[0]
 	end
 
 	if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end

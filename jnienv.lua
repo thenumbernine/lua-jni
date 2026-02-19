@@ -383,6 +383,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	elseif t == 'nil' then
 		-- objects can be nil
 		if not isPrimitive[sig] then return nil end
+		return ffi.new('j'..sig)
 	end
 	error("idk how to convert arg from Lua type "..t.." to Java type "..tostring(sig))
 end
