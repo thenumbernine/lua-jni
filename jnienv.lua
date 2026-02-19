@@ -126,6 +126,9 @@ function JNIEnv:init(args)
 	self._java_lang_reflect_Field:_setupReflection()
 	self._java_lang_reflect_Method:_setupReflection()
 	self._java_lang_reflect_Constructor:_setupReflection()
+
+	-- now that we're done bootloading, just cache String because it is useful
+	self._java_lang_String = self:_findClass'java.lang.String'
 end
 
 function JNIEnv:_findClass(classpath)
@@ -242,6 +245,7 @@ function JNIEnv:_str(s, len)
 	if jstring == nil
 		then error("NewString failed")
 	end
+--[[
 	local resultClassPath = 'java.lang.String'
 	return JavaObject._createObjectForClassPath(
 		resultClassPath,
@@ -251,6 +255,15 @@ function JNIEnv:_str(s, len)
 			classpath = resultClassPath,
 		}
 	)
+--]]
+-- [[ same
+	local JavaString = require 'java.string'
+	return JavaString{
+		env = self,
+		ptr = jstring,
+		classpath = 'java.lang.String',
+	}
+--]]
 end
 
 local newArrayForType = prims:mapi(function(name)
@@ -387,7 +400,7 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 			if isPrimitive[nonarraybase] then return false end
 		end
 --DEBUG:print('type is string, comparing sig class', sig)
-		local isinstanceof = self:_findClass'java.lang.String':_isAssignableFrom(sig)
+		local isinstanceof = self._java_lang_String:_isAssignableFrom(sig)
 --DEBUG:print('...got', isinstanceof)
 		return isinstanceof
 	elseif t == 'cdata' then
