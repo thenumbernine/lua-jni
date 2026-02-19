@@ -59,7 +59,9 @@ function JavaField:__call(...)
 end
 
 function JavaField:_get(thisOrClass)
-	self._env:_checkExceptions()
+	local env = self._env
+
+	env:_checkExceptions()
 
 	local getName, returnObject
 	if self._static then
@@ -70,20 +72,20 @@ function JavaField:_get(thisOrClass)
 		getName = getNameForType[self._sig] or returnObject
 	end
 
-	local result = self._env._ptr[0][getName](
-		self._env._ptr,
-		assert(self._env:_luaToJavaArg(thisOrClass)),
+	local result = env._ptr[0][getName](
+		env._ptr,
+		assert(env:_luaToJavaArg(thisOrClass)),
 		self._ptr
 	)
 
-	self._env:_checkExceptions()
+	env:_checkExceptions()
 
 	if getName ~= returnObject then return result end
 
 	return JavaObject._createObjectForClassPath(
 		self._sig,
 		{
-			env = self._env,
+			env = env,
 			ptr = result,
 			classpath = self._sig,
 		}
@@ -91,7 +93,9 @@ function JavaField:_get(thisOrClass)
 end
 
 function JavaField:_set(thisOrClass, value)
-	self._env:_checkExceptions()
+	local env = self._env
+
+	env:_checkExceptions()
 
 	local setName, returnObject
 	if self._static then
@@ -102,14 +106,14 @@ function JavaField:_set(thisOrClass, value)
 		setName = setNameForType[self._sig] or returnObject
 	end
 
-	local result = self._env._ptr[0][setName](
-		self._env._ptr,
-		assert(self._env:_luaToJavaArg(thisOrClass)),
+	local result = env._ptr[0][setName](
+		env._ptr,
+		assert(env:_luaToJavaArg(thisOrClass)),
 		self._ptr,
-		self._env:_luaToJavaArg(value, self._sig)
+		env:_luaToJavaArg(value, self._sig)
 	)
 
-	self._env:_checkExceptions()
+	env:_checkExceptions()
 end
 
 function JavaField:__tostring()

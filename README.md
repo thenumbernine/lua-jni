@@ -72,6 +72,10 @@ local J = jvm.jniEnv
 
 - `J:_findClass(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
 
+- `cl = J:_getClassForJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
+
+- `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getName to determine the classname of the JNI jclass pointer.
+
 - `J:_exceptionClear()` = clears the exception in JNIEnv via JNIEnv.ExceptionClear.
 
 - `ex = J:_exceptionOccurred()` = if an exception occurred then returns the exception JavaObject.
@@ -85,38 +89,6 @@ local J = jvm.jniEnv
 - - ex: `J.java` retrieves the namespace `java.*`
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
 - - ex: `J.java.lang.String` retrieves the JavaClass `java.lang.String`
-- - TODO still need to incorporate lookups for methods and members
-
-### JavaClass
-`JavaClass = require 'java.class'`
-
-- `cl = JavaClass(args)` = `jclass` wrapper
-- args:
-- - `env` = the `JNIEnv` Lua object
-- - `ptr` = the `jclass`
-- - `classpath` = the classpath of this class
-
-- `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
-- args:
-- - `name` = the method name
-- - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
-- - `static` = set to `true` to retrieve a static method.
-
-- `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
-- args:
-- - `env` = `JNIEnv` object.
-- - `ptr` = `jfieldID`.
-- - `name` = field name.
-- - `sig` = signature string of the field.
-- - `static` = true for static fields.
-
-- `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
-
-- `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
-
-- `cl:_new(...)` = create a new JavaObject.
-
-- `cl._members[name][index]` = either JavaMethod or JavaField of a member with that name.
 
 ### JavaObject
 `JavaObject = require 'java.object'`
@@ -140,6 +112,41 @@ local J = jvm.jniEnv
 - `str = obj:_javaToString()` = returns a Lua string based on the Java `toString()` method.
 
 - `str = obj:_getDebugStr()` = useful internal string with a few things like the Lua class name, Java classpath, and pointer.
+
+
+### JavaClass
+`JavaClass = require 'java.class'`
+- `JavaClass = JavaObject:subclass()`
+
+- `cl = JavaClass(args)` = `jclass` wrapper
+- args:
+- - `env` = the `JNIEnv` Lua object
+- - `ptr` = the `jclass`
+- - `classpath` = the classpath of this class
+
+- `cl:_new(...)` = create a new JavaObject.
+
+- `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
+
+- `cl:_super()` = returns a JavaClass of the superclass.
+
+- `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
+
+- `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
+- args:
+- - `name` = the method name
+- - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
+- - `static` = set to `true` to retrieve a static method.
+
+- `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
+- args:
+- - `env` = `JNIEnv` object.
+- - `ptr` = `jfieldID`.
+- - `name` = field name.
+- - `sig` = signature string of the field.
+- - `static` = true for static fields.
+
+- `cl._members[name][index]` = either JavaMethod or JavaField of a member with that name.
 
 ### JavaField
 `JavaField = require 'java.field'`
@@ -168,6 +175,7 @@ local J = jvm.jniEnv
 
 ### JavaString
 `JavaString = require 'java.string'`
+- `JavaString = JavaObject:subclass()`
 
 - `s = JavaString(args)` = inherited from JavaObject.
 
@@ -177,6 +185,7 @@ local J = jvm.jniEnv
 
 ### JavaArray
 `JavaArray = require 'java.array'`
+- `JavaArray = JavaObject:subclass()`
 
 - `ar = JavaArray(args)` = inherited from JavaObject, and:
 - args:
@@ -213,3 +222,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - functions / lambdas
 - threads , esp with [`lua-thread`](http://github.com/thenumbernine/lua-thread) so that things don't segfault.
 - some automatic way to call Java to LuaJIT without providing my own class (tho that works)
+- I think since JavaArray overloads `__index` that I need to have it call through to its parents `__index`
+- - also, prim-arrays need to be told their parent is java.lang.Array ...
+- use JNIEnv.IsAssignableFrom in the call-resolver?

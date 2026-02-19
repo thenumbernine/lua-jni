@@ -45,7 +45,8 @@ function JavaArray:init(args)
 end
 
 function JavaArray:__len()
-	return self._env._ptr[0].GetArrayLength(self._env._ptr, self._ptr)
+	local env = self._env
+	return env._ptr[0].GetArrayLength(env._ptr, self._ptr)
 end
 
 
@@ -55,12 +56,14 @@ end):setmetatable(nil)
 
 -- I'd override __index, but that will bring with it a world of hurt....
 function JavaArray:_get(i)
-	self._env:_checkExceptions()
+	local env = self._env
+
+	env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
 	local getArrayElements = getArrayElementsField[self._elemClassPath]
 	if getArrayElements then
-		local arptr = self._env._ptr[0][getArrayElements](self._env._ptr, self._ptr, nil)
+		local arptr = env._ptr[0][getArrayElements](env._ptr, self._ptr, nil)
 		if arptr == nil then error("array index null pointer exception") end
 		-- TODO throw a real Java out of bounds exception
 		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
@@ -68,13 +71,13 @@ function JavaArray:_get(i)
 	else
 		local elemClassPath = self._elemClassPath
 		return JavaObject._createObjectForClassPath(elemClassPath, {
-			env = self._env,
-			ptr = self._env._ptr[0].GetObjectArrayElement(self._env._ptr, self._ptr, i),
+			env = env,
+			ptr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i),
 			classpath = elemClassPath,
 		})
 	end
 
-	self._env:_checkExceptions()
+	env:_checkExceptions()
 end
 
 local setArrayRegionField = prims:mapi(function(name)
@@ -83,30 +86,33 @@ end):setmetatable(nil)
 
 
 function JavaArray:_set(i, v)
-	self._env:_checkExceptions()
+	local env = self._env
+
+	env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
 	local setArrayRegion = setArrayRegionField[self._elemClassPath]
 	if setArrayRegion then
 --DEBUG:print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
 		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
-		self._env._ptr[0][setArrayRegion](self._env._ptr, self._ptr, i, 1,
+		env._ptr[0][setArrayRegion](env._ptr, self._ptr, i, 1,
 			self.elemFFIType_1(v)
 		)
 	else
 		-- another one of these primitive array problems
 		-- the setter will depend on what the underlying primitive type is.
-		self._env._ptr[0].SetObjectArrayElement(
-			self._env._ptr,
+		env._ptr[0].SetObjectArrayElement(
+			env._ptr,
 			self._ptr,
 			i,
-			self._env:_luaToJavaArg(v, self._elemClassPath)
+			env:_luaToJavaArg(v, self._elemClassPath)
 		)
 	end
 
-	self._env:_checkExceptions()
+	env:_checkExceptions()
 end
 
+-- TODO fallthrough to array fields in JavaObject's __index?
 function JavaArray:__index(k)
 	local v = JavaArray[k]
 	if v ~= nil then return v end

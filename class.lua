@@ -16,7 +16,6 @@ JavaClass.__name = 'JavaClass'
 
 function JavaClass:init(args)
 	self._env = assert.index(args, 'env')
---DEBUG:assert(require 'java.jnienv':isa(self._env))
 	self._ptr = assert.index(args, 'ptr')
 	self._classpath = assert.index(args, 'classpath')
 
@@ -280,9 +279,9 @@ args:
 	static = boolean
 --]]
 function JavaClass:_method(args)
---DEBUG:assert(require 'java.jnienv':isa(self._env))
+	local env = self._env
 
-	self._env:_checkExceptions()
+	env:_checkExceptions()
 
 	assert.type(args, 'table')
 	local funcname = assert.type(assert.index(args, 'name'), 'string')
@@ -293,17 +292,17 @@ function JavaClass:_method(args)
 
 	local method
 	if static then
-		method = self._env._ptr[0].GetStaticMethodID(self._env._ptr, self._ptr, funcname, sigstr)
+		method = env._ptr[0].GetStaticMethodID(env._ptr, self._ptr, funcname, sigstr)
 	else
-		method = self._env._ptr[0].GetMethodID(self._env._ptr, self._ptr, funcname, sigstr)
+		method = env._ptr[0].GetMethodID(env._ptr, self._ptr, funcname, sigstr)
 	end
 	-- will this throw an exception? probably.
 	if method == nil then
-		local ex = self._env:_exceptionOccurred()
+		local ex = env:_exceptionOccurred()
 		return nil, "failed to find method "..tostring(funcname)..' '..tostring(sigstr)..(static and ' static' or ''), ex
 	end
 	return JavaMethod{
-		env = self._env,
+		env = env,
 		class = self,
 		ptr = method,
 		name = funcname,
@@ -313,7 +312,9 @@ function JavaClass:_method(args)
 end
 
 function JavaClass:_field(args)
-	self._env:_checkExceptions()
+	local env = self._env
+
+	env:_checkExceptions()
 
 	assert.type(args, 'table')
 	local fieldname = assert.type(assert.index(args, 'name'), 'string')
@@ -322,45 +323,20 @@ function JavaClass:_field(args)
 	local static = args.static
 	local jfieldID
 	if static then
-		jfieldID = self._env._ptr[0].GetStaticFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = env._ptr[0].GetStaticFieldID(env._ptr, self._ptr, fieldname, sigstr)
 	else
-		jfieldID = self._env._ptr[0].GetFieldID(self._env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = env._ptr[0].GetFieldID(env._ptr, self._ptr, fieldname, sigstr)
 	end
 	if jfieldID == nil then
-		local ex = self._env:_exceptionOccurred()
+		local ex = env:_exceptionOccurred()
 		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(static and ' static' or ''), ex
 	end
 	return JavaField{
-		env = self._env,
+		env = env,
 		ptr = jfieldID,
 		sig = sig,
 		static = static,
 	}
-end
-
--- calls in java `class.getName()`
--- notice, this matches getJNISig(classpath)
--- so java.lang.String will be Ljava/lang/String;
--- and double[] will be [D
-function JavaClass:_name()
---DEBUG:print('JavaClass:_name')
---DEBUG:print("getting env:_findClass'java.lang.Class'")
-	local classObj = self._env:_findClass'java.lang.Class'
-assert('got', classObj)
-assert.eq(classObj._classpath, 'java.lang.Class')
---DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
-assert(classObj._java_lang_Class_getName)
-	local classpath = classObj._java_lang_Class_getName(self)
---[[ wait, is this a classpath or a signature?
--- how come double[] arrays return [D ?
--- how come String[] arrays return [Ljava/lang/String;
--- but String returns java/lang/String ? ?!?!?!??!?
--- HOW ARE YOU SUPPOSED TO TELL A SIGNATURE VS A CLASSPATH?
-print('JavaClass:_name', type(classpath), classpath)
---]]
-	classpath = tostring(classpath)
-	classpath = sigStrToObj(classpath) or classpath
-	return classpath
 end
 
 function JavaClass:_new(...)
@@ -376,6 +352,37 @@ function JavaClass:_new(...)
 		end
 		return ctor:_new(self, ...)
 	end
+end
+
+function JavaClass:_super()
+	local env = self._env
+	local jsuper = env._ptr[0].GetSuperclass(env._ptr, self._ptr)
+	return env:_getClassForJClass(jsuper)
+end
+
+-- calls in java `class.getName()`
+-- notice, this matches getJNISig(classpath)
+-- so java.lang.String will be Ljava/lang/String;
+-- and double[] will be [D
+function JavaClass:_name()
+--DEBUG:print('JavaClass:_name')
+--DEBUG:print("getting env:_findClass'java.lang.Class'")
+	local classObj = self._env._java_lang_Class
+assert('got', classObj)
+assert.eq(classObj._classpath, 'java.lang.Class')
+--DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
+assert(classObj._java_lang_Class_getName)
+	local classpath = classObj._java_lang_Class_getName(self)
+--[[ wait, is this a classpath or a signature?
+-- how come double[] arrays return [D ?
+-- how come String[] arrays return [Ljava/lang/String;
+-- but String returns java/lang/String ? ?!?!?!??!?
+-- HOW ARE YOU SUPPOSED TO TELL A SIGNATURE VS A CLASSPATH?
+print('JavaClass:_name', type(classpath), classpath)
+--]]
+	classpath = tostring(classpath)
+	classpath = sigStrToObj(classpath) or classpath
+	return classpath
 end
 
 function JavaClass:_getDebugStr()

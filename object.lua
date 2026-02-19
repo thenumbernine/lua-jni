@@ -19,7 +19,7 @@ function JavaObject:init(args)
 -- but for the bootstrap classes, they need to call java functions, which wrap Java object results
 -- and those would reach here before the bootstrapping of classes is done,
 -- so env:_findClass() wouldn't work
---	self._jclass = self._env:_findClass(self._classpath)
+--	self._classObj = self._env:_findClass(self._classpath)
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
@@ -78,33 +78,9 @@ end
 -- while this returns the class that you're looking for
 -- though technically obj:getClass() == obj:_getClass():_class() is equivalent to java's `object.getClass()`
 function JavaObject:_getClass()
---DEBUG:print('JavaObject:_getClass()')
 	local env = self._env
-	local classpath, jclass = env:_getObjClassPath(self._ptr)
---DEBUG:print('JavaObject:_getClass classpath='..classpath)
-	--[[ always make a new one
-	local classObj = env:_saveJClassForClassPath{ptr=jclass, classpath=classpath}
-	--]]
-	-- [[ write only if it exists
--- TODO problems FIXME
-	local classObj = env._classesLoaded[classpath]
---DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
---DEBUG:print('classObj', classObj)
-	if not classObj then
---DEBUG:print('!!! JavaObject._getClass creating JavaClass for classpath='..classpath)
-		local JavaClass = require 'java.class'
-		classObj = JavaClass{
-			env = env,
-			ptr = jclass,
-			classpath = classpath,
-		}
-		classObj:_setupReflection()
---DEBUG:print('!!! JavaObject._getClass overwriting '..classpath..' with classObj '..classObj)
-		env._classesLoaded[classpath] = classObj
-assert.eq(classObj._classpath, classpath)
-	end
-	--]]
-	return classObj
+	local jclass = env:_getObjClass(self._ptr)
+	return env:_getClassForJClass(jclass)
 end
 
 -- shorthand for self:_getClass():_method(args)

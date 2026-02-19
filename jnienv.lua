@@ -126,14 +126,10 @@ function JNIEnv:init(args)
 end
 
 function JNIEnv:_findClass(classpath)
---DEBUG:print('JNIEnv:_findClass', classpath)
 	self:_checkExceptions()
 
 	local classObj = self._classesLoaded[classpath]
---DEBUG:if classObj then assert.eq(classObj._classpath, classpath) end
---DEBUG:print('for', classpath, 'got', classObj)
 	if not classObj then
---DEBUG:print('***JNIENV*** _findClass making new', classpath)
 		-- FindClass wants /-separator
 		local slashClassPath = classpath:gsub('%.', '/')
 		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
@@ -154,12 +150,31 @@ function JNIEnv:_findClass(classpath)
 	return classObj
 end
 
+-- accepts a JNI jclass cdata
+-- looks up the classname
+-- looks up if its loaded in Lua yet
+-- ... loads it in Lua if not
+-- returns the JavaClass
+function JNIEnv:_getClassForJClass(jclass)
+	if jclass == nil then return nil end
+	local classpath = self:_getJClassClasspath(jclass)
+
+	local classObj = self._classesLoaded[classpath]
+	if not classObj then
+		classObj = self:_saveJClassForClassPath{
+			ptr = jclass,
+			classpath = classpath,
+		}
+assert.eq(classObj._classpath, classpath)
+	end
+	return classObj
+end
+
 -- makes a JavaClass object for a jclass pointer
 -- saves it in _classesLoaded
--- used by JNIENV:_findClass and JavaObject:_findClass
+-- used by _findClass and _getClassForJClass
 function JNIEnv:_saveJClassForClassPath(args)
 	local classpath = args.classpath
---DEBUG:print('*** JNIEnv saving '..classpath)
 	args.env = self
 	local classObj = JavaClass(args)
 
@@ -179,23 +194,24 @@ function JNIEnv:_getObjClass(objPtr)
 	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
 end
 
--- get a classpath for a jobject pointer
+-- Get a classpath for a jobject pointer
+-- Only used in _exceptionOccurred
+-- This is just obj:_getClass():getName()
+-- but with maybe a few less calls
 function JNIEnv:_getObjClassPath(objPtr)
 	local jclass = self:_getObjClass(objPtr)
-	local sigstr = self._java_lang_Class._java_lang_Class_getName(jclass)
--- wait
--- are you telling me
--- when its a prim or an array, getName returns it as a signature-qualified string
--- but when it's not, getName just returns the classpath?
--- isn't that ambiguous?
-	sigstr = tostring(sigstr)
---DEBUG:print('JNIEnv:_getObjClassPath', sigstr)
-	-- opposite of util.getJNISig
-	local classpath = sigStrToObj(sigstr) or sigstr
---DEBUG:print('JNIEnv:_getObjClassPath', classpath)
-	return classpath, jclass
+	return self:_getJClassClasspath(jclass), jclass
 end
 
+-- Accepts JNI jclass cdata
+-- returns classpath
+-- uses java.lang.Class.getName
+function JNIEnv:_getJClassClasspath(jclass)
+	local sigstr = self._java_lang_Class._java_lang_Class_getName(jclass)
+	if sigstr == nil then return nil end
+	sigstr = tostring(sigstr)
+	return sigStrToObj(sigstr) or sigstr	-- opposite of util.getJNISig
+end
 
 function JNIEnv:_version()
 	return self._ptr[0].GetVersion(self._ptr)
@@ -290,8 +306,8 @@ function JNIEnv:_exceptionOccurred()
 	local e = self._ptr[0].ExceptionOccurred(self._ptr)
 	if e == nil then return nil end
 
-print('got exception', e)
-print(debug.traceback())
+--DEBUG:print('got exception', e)
+--DEBUG:print(debug.traceback())
 
 	if self._dontCheckExceptions then
 		error("java exception in exception handler")
@@ -303,8 +319,8 @@ print(debug.traceback())
 
 	local classpath = self:_getObjClassPath(e)
 
-print('exception classpath', classpath)
-print(debug.traceback())
+--DEBUG:print('exception classpath', classpath)
+--DEBUG:print(debug.traceback())
 
 	local result = JavaObject._createObjectForClassPath(
 		classpath,

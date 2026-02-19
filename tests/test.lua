@@ -91,6 +91,8 @@ print('testObj:test()', testObj:test())
 
 print('Test:test()', Test:test())
 
+print('Test:_super()', Test:_super())
+
 -- can I make a new String?
 -- chicken-and-egg, you have to use JNIEnv
 local s = J:_str'new string'
@@ -127,9 +129,10 @@ print('arr[2]', arr[2])
 
 local doubleArr = J:_newArray('double', 5)
 print('doubleArr', doubleArr)
-print('doubleArr._getClass()._name()',
-	doubleArr:_getClass():_name()	-- '[D' ... just like the signature
-)
+print('doubleArr:_getClass()', doubleArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
+print('doubleArr._getClass()._name()', doubleArr:_getClass():_name())	-- "double[]"
+print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
+print('doubleArr:_super()', doubleArr:_super())
 
 doubleArr:_set(3, 3.14)
 print('doubleArr[3]', doubleArr:_get(3))
@@ -142,5 +145,12 @@ print('charArr[0]', charArr:_get(0))
 print('charArr[1]', charArr:_get(1))
 print('charArr[0]', charArr[0])
 print('charArr[1]', charArr[1])
+
+print('charArr.length', charArr.length)
+print('charArr:_getClass()._members.length', charArr:_getClass()._members.length)
+print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
+print('charArr:_getClass():_name()', charArr:_getClass():_name())
+print('charArr:_getClass():_super()', charArr:_getClass():_super())
+--print('J.java.lang.Array', J.java.lang.Array)
 
 print'DONE'
