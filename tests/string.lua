@@ -40,7 +40,6 @@ print('s:_getClass():_name()', s:_getClass():_name())
 
 print('s.join',  s.join)
 
-
 print('#s', #s)
 print('s.length', s.length)	-- turns out string.length is syntactic sugar for string.length()
 print('s:length()', s:length())

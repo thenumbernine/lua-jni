@@ -61,7 +61,7 @@ local J = jvm.jniEnv
 
 - `J:_newArray(javaType, length, [objInit])`
 - - creates a Java array using one of the C API `JNIEnv.New*Array` methods.
-- - `javaType` can be a primitive string, a classpath string, or a `JavaClass` object.
+- - `javaType` can be a primitive string, a classpath string, a ffi ctype of a primitive, or a `JavaClass` object.
 - - see `JavaArray`
 
 - `jclass = J:_getObjClass(objPtr)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
@@ -89,6 +89,14 @@ local J = jvm.jniEnv
 - - ex: `J.java` retrieves the namespace `java.*`
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
 - - ex: `J.java.lang.String` retrieves the JavaClass `java.lang.String`
+
+I put primitives in the root namespace to map to LuaJIT FFI cdata types.
+This way it is consistent that the J.path.to.class matches with whatever the Lua functions expect as input/output.
+And this is so that you can more easily cast your data for calling Java functions using `J.int(x), J.char(y), J.double(z)` etc for correct function overload resolution matching.
+
+If you want the actual primitive `java.lang.Class` classes, use `java.lang.Integer.TYPE` etc.
+
+Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, so if you are passing `J.char` as a type for `_newArray` or for an arugment overload, the call resolver can't tell char from int.
 
 ### JavaObject
 `JavaObject = require 'java.object'`

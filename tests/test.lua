@@ -49,10 +49,17 @@ local testObj = Test:_new()
 print('testObj', testObj)
 
 -- overloading lookup
-print('testObj:ol(1)', testObj:ol(1ULL))	-- TODO this registers as a jdouble when it should register as a jlong
-print('testObj:ol(1)', testObj:ol(1))
+print('testObj:ol(true)', testObj:ol(true))							-- TODO matches to long 
+print('testObj:ol(J.boolean())', testObj:ol(J.boolean()))			-- TODO matches to long.  boolean is uchar, so ...
+print('testObj:ol((short)1)', testObj:ol(J.short(1)))				-- TODO matches to long
+print('testObj:ol((int)1)', testObj:ol(J.int(1)))					-- TODO matches to long
+print('testObj:ol((float)1)', testObj:ol(J.double(1)))				-- TODO matches to long
+print('testObj:ol((double)1)', testObj:ol(J.double(1)))				-- TODO matches to long
+print('testObj:ol(1)', testObj:ol(J.long(1)))						-- correct
 print('testObj:ol("foo")', testObj:ol('foo'))
 print('testObj:ol("foo")', testObj:ol(J:_str'foo'))
+print('testObj:ol(Object())', testObj:ol( J.java.lang.Object:_new() ))
+print('testObj:ol(char[]{})', testObj:ol( J:_newArray('char', 1) ))
 
 
 -- test J:_new(classpath, args)
@@ -104,31 +111,5 @@ local testObjAsObject = testObj:_cast(J.java.lang.Object)
 print('(Object)testObj', testObjAsObject)
 local testObjAsObjectAsTest = testObjAsObject:_cast(Test)
 print('(Test)(Object)testObj', testObjAsObjectAsTest)
-
-local doubleArr = J:_newArray('double', 5)
-print('doubleArr', doubleArr)
-print('doubleArr:_getClass()', doubleArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
-print('doubleArr._getClass()._name()', doubleArr:_getClass():_name())	-- "double[]"
-print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
---print('doubleArr:_super()', doubleArr:_super())
-
-doubleArr:_set(3, 3.14)
-print('doubleArr[3]', doubleArr:_get(3))
-
-local charArr = J:_newArray('char', 2)
-charArr:_set(0, 100)
-charArr:_set(1, 101)
---print('charArr[2]', charArr:_get(2))	-- exception
-print('charArr[0]', charArr:_get(0))
-print('charArr[1]', charArr:_get(1))
-print('charArr[0]', charArr[0])
-print('charArr[1]', charArr[1])
-
-print('charArr.length', charArr.length)
-print('charArr:_getClass()._members.length', charArr:_getClass()._members.length)
-print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
-print('charArr:_getClass():_name()', charArr:_getClass():_name())
-print('charArr:_getClass():_super()', charArr:_getClass():_super())
---print('J.java.lang.Array', J.java.lang.Array)
 
 print'DONE'

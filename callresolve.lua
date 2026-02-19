@@ -51,6 +51,10 @@ function JavaCallResolve.resolve(options, thisOrClass, ...)
 				end
 			end
 
+			-- alright at this point it just picks the last matching signature
+			-- but I should be scoring them by how far apart in the class tree the type coercion is
+			-- and somehow I should factor in differences of prim types
+
 			if canUse then
 				-- TODO calculate score based on how far away coercion is
 				local score = 0

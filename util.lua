@@ -1,3 +1,4 @@
+local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'
 
@@ -13,6 +14,14 @@ local prims = table{
 	'double',
 }
 
+local ffiTypesForPrim = prims:mapi(function(name)
+	local o = {}
+	o.ctype = ffi.typeof('j'..name)
+	o.array1Type = ffi.typeof('$[1]', o.ctype)
+	o.ptrType = ffi.typeof('$*', o.ctype)
+	return o, name
+end):setmetatable(nil)
+
 local primSigStrForName = {
 	boolean = 'Z',
 	byte = 'B',
@@ -25,8 +34,10 @@ local primSigStrForName = {
 	void = 'V',
 }
 
-local primNameForSigStr = table.map(primSigStrForName, function(v,k) return k,v end)
-	:setmetatable(nil)
+local primNameForSigStr = {}
+for _,name in ipairs(prims) do
+	primNameForSigStr[primSigStrForName[name]] = name
+end
 
 --[[
 getJNISig accepts string for a single arg
@@ -97,6 +108,7 @@ end
 
 return {
 	prims = prims,
+	ffiTypesForPrim = ffiTypesForPrim,
 	getJNISig = getJNISig,
 	sigStrToObj = sigStrToObj,
 }

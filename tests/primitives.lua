@@ -3,6 +3,16 @@ local assert = require 'ext.assert'
 local table = require 'ext.table'
 local J = require 'java'
 
+print('boolean', J.boolean)
+print('byte', J.byte)
+print('char', J.int)
+print('short', J.short)
+print('int', J.int)
+print('long', J.long)
+print('float', J.float)
+print('double', J.double)
+
+
 print('java.lang.Class.forName"java.lang.Class"', J.java.lang.Class:forName'java.lang.Class')
 assert.eq(J.java.lang.Class:forName'java.lang.Class', J.java.lang.Class:forName'java.lang.Class')
 print('java.lang.Class.forName"java.lang.Void"', J.java.lang.Class:forName'java.lang.Void')
@@ -34,7 +44,7 @@ print('J.void', J.void)
 
 -- so Class.forPrimitiveName'int' == Integer.TYPE ...
 local Class = J.java.lang.Class
-assert(rawequal(J.java.lang.Class, J._java_lang_Class))
+assert(rawequal(J.java.lang.Class, J._java_lang_Class))	-- make sure the cache works
 
 --print(Class:forPrimitiveName'int')
 --[[ TODO this is static, why can't I see it?
@@ -47,3 +57,34 @@ end
 -- because it's a Java v22 method
 -- and I'm using Java v21
 --]]
+
+
+-- array tests
+
+local doubleArr = J:_newArray('double', 5)
+print('doubleArr', doubleArr)
+print('doubleArr:_getClass()', doubleArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
+print('doubleArr._getClass()._name()', doubleArr:_getClass():_name())	-- "double[]"
+print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
+--print('doubleArr:_super()', doubleArr:_super())
+
+doubleArr:_set(3, 3.14)
+print('doubleArr[3]', doubleArr:_get(3))
+
+local charArr = J:_newArray('char', 2)
+charArr:_set(0, 100)
+charArr:_set(1, 101)
+--print('charArr[2]', charArr:_get(2))	-- exception
+print('charArr[0]', charArr:_get(0))
+print('charArr[1]', charArr:_get(1))
+print('charArr[0]', charArr[0])
+print('charArr[1]', charArr[1])
+
+print('charArr.length', charArr.length)
+print('charArr:_getClass()._members.length', charArr:_getClass()._members.length)
+print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
+print('charArr:_getClass():_name()', charArr:_getClass():_name())
+print('charArr:_getClass():_super()', charArr:_getClass():_super())
+--print('J.java.lang.Array', J.java.lang.Array)
+
+

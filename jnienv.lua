@@ -9,12 +9,17 @@ local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
 local getJNISig = require 'java.util'.getJNISig
 local sigStrToObj = require 'java.util'.sigStrToObj
+local ffiTypesForPrim = require 'java.util'. ffiTypesForPrim
 
 
 local int64_t = ffi.typeof'int64_t'
 local uint64_t = ffi.typeof'uint64_t'
 
 local isPrimitive = prims:mapi(function(name) return true, name end):setmetatable(nil)
+
+
+-- TODO store these
+
 
 local bootstrapClasses = {
 	['java.lang.Class'] = true,
@@ -129,6 +134,18 @@ function JNIEnv:init(args)
 
 	-- now that we're done bootloading, just cache String because it is useful
 	self._java_lang_String = self:_findClass'java.lang.String'
+
+
+	-- TODO in the J namespace, for the primitive names,
+	-- should I put ffi cdata types?
+	-- or the equivalent .class's in Java?
+	-- I think I'll put the ffi types , because you can get to the Java classes through java.lang.Integer etc
+	-- and this way the J.whatever classname maps to what the Lua args expect, including ffi data
+	-- so J.int will be a jint ffi ctype
+	for _,prim in ipairs(prims) do
+		local ffiTypes = ffiTypesForPrim[prim]
+		self._classesLoaded[prim] = ffiTypes.ctype
+	end
 end
 
 function JNIEnv:_findClass(classpath)
@@ -270,8 +287,22 @@ local newArrayForType = prims:mapi(function(name)
 	return 'New'..name:sub(1,1):upper()..name:sub(2)..'Array', name
 end):setmetatable(nil)
 
+-- use mapi from prims so it is deterministic
+
+local primNameForCTypes = {}
+for _,name in ipairs(prims) do
+	local ffiTypes = ffiTypesForPrim[name]
+	primNameForCTypes[tostring(assert(ffiTypes.ctype))] = name
+end
+
 -- jtype is a primitive or a classpath
 function JNIEnv:_newArray(jtype, length, objInit)
+
+	-- if jtype is a ffi ctype then convert it back to its name
+	if type(jtype) == 'cdata' then
+		jtype = primNameForCTypes[tostring(jtype)] or jtype
+	end
+
 	local field = newArrayForType[jtype] or 'NewObjectArray'
 	local obj
 	if field == 'NewObjectArray' then
@@ -404,15 +435,26 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 --DEBUG:print('...got', isinstanceof)
 		return isinstanceof
 	elseif t == 'cdata' then
-		-- TODO test for all j* prim types
+
+		-- convert ffi jni jprim to java prim
 		local ct = ffi.typeof(arg)
-		if ct == int64_t
-		or ct == uint64_t
+		local ctname = tostring(ct)
+		if primNameForCTypes[ctname]
+		and isPrimitive[sig]
 		then
 			return true
 		end
-		error("idk how to check conversion for namespace matching from pointers yet ... but it should start with converting the pointer to a JavaObject ...")
-		return arg
+
+		-- TODO if it's a ffi jni prim
+		-- converted to a java.lang. primitive box class
+		-- then true & convert below
+
+		if ctname:match'%*' then
+			-- TODO if it's a pointer then try to convert it to a JavaObject and then try to match it ...
+io.stderr:write("idk how to check conversion for namespace matching from pointers yet ... but it should start with converting the pointer to a JavaObject ...\n")
+		end
+
+		return false
 	elseif t == 'number' or t == 'boolean' then
 		return isPrimitive[sig]
 	elseif t == 'nil' then
@@ -461,16 +503,18 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		end
 		return arg
 	elseif t == 'number' or t == 'boolean' then
-		if not isPrimitive[sig] then
+		local ffiTypes = ffiTypesForPrim[sig]
+		if not ffiTypes then
 			error("can't convert number to "..sig)
 		end
 		-- TODO will vararg know how to convert things?
 		-- TODO assert sig is a primitive
-		return ffi.new('j'..sig, arg)
+		return ffi.new(ffiTypes.ctype, arg)
 	elseif t == 'nil' then
+		local ffiTypes = ffiTypesForPrim[sig]
 		-- objects can be nil
-		if not isPrimitive[sig] then return nil end
-		return ffi.new('j'..sig)
+		if not ffiTypes then return nil end
+		return ffi.new(ffiTypes.ctype)
 	end
 	error("idk how to convert arg from Lua type "..t.." to Java type "..tostring(sig))
 end
