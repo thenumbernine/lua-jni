@@ -219,8 +219,7 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # TODO
 
-- I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
-- how about `primitive`.class interoperability?
+- how about `primitive`.class interoperability?  That is the same as java.lang.$PrimitiveBoxedType.TYPE
 - generics
 - I'm not building proper reflection for arrays ...
 - functions / lambdas
@@ -229,3 +228,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - I think since JavaArray overloads `__index` that I need to have it call through to its parents `__index`
 - - also, prim-arrays need to be told their parent is java.lang.Array ...
 - use JNIEnv.IsAssignableFrom in the call-resolver?
+- I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
