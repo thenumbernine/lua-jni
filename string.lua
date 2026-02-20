@@ -1,3 +1,8 @@
+--[[
+tempting to get rid of this.
+
+just merge __len and __tostring with JavaObject ...
+--]]
 local ffi = require 'ffi'
 local JavaObject = require 'java.object'
 

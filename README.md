@@ -119,7 +119,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `obj:_throw()` = throw this object.
 
-- `method = obj:_method(args)` = shorthand for `obj:_getClass():method(args)`.
+- `method = obj:_method(args)` = shorthand for `obj:_getClass():_method(args)`.
 
 - `field = obj:_field(args)` = shorthand
 
@@ -130,6 +130,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classpath.
 
 - `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
+
+- `for ch in obj:_iter() do ... end` = iterate across elements of a Java object.  Made to be equivalent to `for (element : collection) { ... }`.
 
 ### JavaClass
 `JavaClass = require 'java.class'`
@@ -158,6 +160,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `name` = the method name
 - - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
 - - `static` = set to `true` to retrieve a static method.
+- - `nonvirtual` = forwards to `JavaMethod`
 
 - `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
 - args:
@@ -189,6 +192,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `ptr` = `jmethodID`
 - - `sig` = signature table, first argument is the return type (default `void`), rest are method arguments.
 - - `static` = whether this method is static or not.
+- - `nonvirtual` = whether this method call will be nonvirtual or not.  Useful for `super.whatever` in Java which relies on non-polymorphic explicit class calls.
 
 - `result = method(...)` = invoke ` call on the method using C API `JNIEnv.Call*Method`.
 
@@ -243,7 +247,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - functions / lambdas
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - call resolve score should consider subclass distances instead of just IsAssignableFrom
-- iterator support
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
-- some automatic way to call Java to LuaJIT without providing my own class (tho that works)
+- some automatic way to call Java to LuaJIT without providing my own class (tho that works) ... bytecode / runtime-class creation
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.

@@ -226,4 +226,22 @@ end
 -- if it's not a field then meh.
 -- .class will retain its original Lua class meaning
 
+function JavaObject:_iter()
+	-- if we are an Array type then ...
+	if self._classpath:match'%[%]$' then
+		return coroutine.wrap(function()
+			for i=0,#self-1 do
+				coroutine.yield(self:_get(i))
+			end
+		end)
+	else
+		return coroutine.wrap(function()
+			local i = self:iterator()
+			while i:hasNext() do
+				coroutine.yield(i:next())
+			end
+		end)
+	end
+end
+
 return JavaObject

@@ -71,6 +71,9 @@ print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
 doubleArr:_set(3, 3.14)
 print('doubleArr[3]', doubleArr:_get(3))
 
+print'double iter:'
+for x in doubleArr:_iter() do print(x) end
+
 local charArr = J:_newArray('char', 2)
 charArr:_set(0, 100)
 charArr:_set(1, 101)
