@@ -153,17 +153,7 @@ function JavaObject:_getDebugStr()
 end
 
 function JavaObject:__tostring()
-	if self._classpath == 'java.lang.String' then
-do return 'here' end
-		local envptr = self._env._ptr
-		local str = envptr[0].GetStringUTFChars(envptr, self._ptr, nil)
-		if str == nil then return '(null)' end
-		local luastr = ffi.string(str)
-		envptr[0].ReleaseStringUTFChars(envptr, self._ptr, str)
-		return luastr
-	else
-		return self:_javaToString()
-	end
+	return self:_javaToString()
 end
 
 JavaObject.__concat = string.concat
