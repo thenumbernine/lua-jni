@@ -278,6 +278,7 @@ args:
 		= table of args as slash-separated classpaths,
 		first arg is return type
 	static = boolean
+	nonvirtual = boolean
 --]]
 function JavaClass:_method(args)
 	local env = self._env
@@ -287,6 +288,7 @@ function JavaClass:_method(args)
 	assert.type(args, 'table')
 	local funcname = assert.type(assert.index(args, 'name'), 'string')
 	local static = args.static
+	local nonvirtual = args.nonvirtual
 	local sig = assert.type(assert.index(args, 'sig'), 'table')
 	local sigstr = getJNISig(sig)
 --DEBUG:print('sigstr', sigstr)
@@ -300,7 +302,10 @@ function JavaClass:_method(args)
 	-- will this throw an exception? probably.
 	if method == nil then
 		local ex = env:_exceptionOccurred()
-		return nil, "failed to find method "..tostring(funcname)..' '..tostring(sigstr)..(static and ' static' or ''), ex
+		return nil, "failed to find method "..tostring(funcname)..' '..tostring(sigstr)
+			..(static and ' static' or '')
+			..(nonvirtual and ' nonvirtual' or ''),
+			ex
 	end
 	return JavaMethod{
 		env = env,
@@ -309,6 +314,7 @@ function JavaClass:_method(args)
 		name = funcname,
 		sig = sig,
 		static = static,
+		nonvirtual = nonvirtual,
 	}
 end
 
@@ -416,6 +422,10 @@ print('JavaClass:_name', type(classpath), classpath)
 	classpath = tostring(classpath)
 	classpath = sigStrToObj(classpath) or classpath
 	return classpath
+end
+
+function JavaClass:_throwNew()
+	self._env:_throwNew(self)
 end
 
 function JavaClass:__index(k)

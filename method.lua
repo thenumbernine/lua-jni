@@ -49,6 +49,9 @@ function JavaMethod:init(args)
 	-- and you need to know if its static to call the method
 	-- ... seems that is something that shoudlve been saved with the  method itself ...
 	self._static = not not args.static
+
+	-- this is used in java wrt super.call ... is that the only time?
+	self._nonvirtual = not not args.nonvirtual
 end
 
 function JavaMethod:__call(thisOrClass, ...)
@@ -65,6 +68,9 @@ function JavaMethod:__call(thisOrClass, ...)
 	if self._static then
 		callName = callStaticNameForReturnType[returnType] 
 			or callStaticNameForReturnType.object
+	elseif self._nonvirtual then
+		callName = callNonvirtualNameForReturnType[returnType] 
+			or callNonvirtualNameForReturnType.object
 	else
 		callName = callNameForReturnType[returnType] 
 			or callNameForReturnType.object

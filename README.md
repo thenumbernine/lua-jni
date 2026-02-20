@@ -80,6 +80,10 @@ local J = jvm.jniEnv
 
 - `ex = J:_exceptionOccurred()` = if an exception occurred then returns the exception JavaObject.
 
+- `J:_throw(obj)` = throw in the JNI a exception jobject.
+
+- `J:_throwNew(cl)` = throw in the JNI a exception from a new'd jclass.
+
 - `J:_checkExceptions()` = if an exception occurred, throw it as an error.
 
 - `J:_luaToJavaArg(arg, sig)` = convert a Lua object `arg` to a JNI pointer object. Preparation for the JNI API.  `sig` is a Java type to help in conversion, namely when `arg` is a number.
@@ -107,15 +111,13 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `ptr` = `jobject`
 - - `classpath` = string
 
-- `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classpath.
-
-- `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
-
 - `cl = obj:_getClass()` = get class
+
+- `bool = obj:_instanceof(classTo)` = tests if it can cast, returns boolean.
 
 - `castObj = obj:_cast(classTo)` = cast obj to class `classTo`.  Accepts a JavaClass, a string for a classpath, or a cdata of a jclass.
 
-- `bool = obj:_instanceof(classTo)` = tests if it can cast, returns boolean.
+- `obj:_throw()` = throw this object.
 
 - `method = obj:_method(args)` = shorthand for `obj:_getClass():method(args)`.
 
@@ -125,6 +127,9 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `str = obj:_getDebugStr()` = useful internal string with a few things like the Lua class name, Java classpath, and pointer.
 
+- `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classpath.
+
+- `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
 
 ### JavaClass
 `JavaClass = require 'java.class'`
@@ -141,6 +146,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
 
 - `cl:_super()` = returns a JavaClass of the superclass.
+
+- `cl:_throwNew()` = throw a new instance of this class.
 
 - `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
 
@@ -231,14 +238,12 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # TODO
 
-- how about `primitive`.class interoperability?  That is the same as java.lang.$PrimitiveBoxedType.TYPE
 - generics
-- I'm not building proper reflection for arrays ...
+- I'm not building proper reflection for arrays I think ...
 - functions / lambdas
-- threads , esp with [`lua-thread`](http://github.com/thenumbernine/lua-thread) so that things don't segfault.
-- some automatic way to call Java to LuaJIT without providing my own class (tho that works)
-- I think since JavaArray overloads `__index` that I need to have it call through to its parents `__index`
-- - also, prim-arrays need to be told their parent is java.lang.Array ...
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
-- call resolve accept jobject pointers
-- call resolve to correctly resolve ffi-cdata-jint/jchar/etc primitives
+- call resolve score should consider subclass distances instead of just IsAssignableFrom
+- iterator support
+- some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
+- some automatic way to call Java to LuaJIT without providing my own class (tho that works)
+- maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.

@@ -140,6 +140,10 @@ function JavaObject:_cast(classTo)
 	}
 end
 
+function JavaObject:_throw()
+	self._env:_throw(self)
+end
+
 function JavaObject:_getDebugStr()
 	return self.__name..'('
 		..tostring(self._classpath)

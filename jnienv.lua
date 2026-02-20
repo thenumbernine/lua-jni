@@ -373,6 +373,15 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	)
 end
 
+function JNIEnv:_throw(e)
+	self._ptr[0].Throw(self._ptr, e._ptr)
+end
+
+-- for classes
+function JNIEnv:_throwNew(cl)
+	self._ptr[0].ThrowNew(self._ptr, cl._ptr)
+end
+
 function JNIEnv:_exceptionClear()
 	self._ptr[0].ExceptionClear(self._ptr)
 end
