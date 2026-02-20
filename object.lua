@@ -244,4 +244,27 @@ function JavaObject:_iter()
 	end
 end
 
+function JavaObject:__len()
+	local envptr = self._env._ptr
+	-- TODO a better array detection
+	if self._classpath:match'%[%]$' then
+		return envptr[0].GetArrayLength(envptr, self._ptr)
+	elseif self._classpath == 'java.lang.String' then
+		-- String is final, so it's ok
+		return envptr[0].GetStringLength(envptr, self._ptr)
+	else
+		-- TODO member vs method detect
+		local classObj = self:_getClass()
+		local length = classObj._members.length
+		if not length then return 0 end
+		if JavaField:isa(length[1]) then
+			return self.length
+		elseif JavaMethod:isa(length[1]) then
+			return self:length()
+		else
+			error'???'
+		end
+	end
+end
+
 return JavaObject

@@ -45,12 +45,6 @@ function JavaArray:init(args)
 	end
 end
 
-function JavaArray:__len()
-	local env = self._env
-	return env._ptr[0].GetArrayLength(env._ptr, self._ptr)
-end
-
-
 local getArrayElementsField = prims:mapi(function(name)
 	return 'Get'..name:sub(1,1):upper()..name:sub(2)..'ArrayElements', name
 end):setmetatable(nil)

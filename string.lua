@@ -18,11 +18,4 @@ function JavaString:__tostring()
 	return luastr
 end
 
--- This is equivalent to Java's String.length fake-field which hides its String.length() member-method
--- but I guess it's a few less calls?
-function JavaString:__len()
-	local envptr = self._env._ptr
-	return envptr[0].GetStringLength(envptr, self._ptr)
-end
-
 return JavaString

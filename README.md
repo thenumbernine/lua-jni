@@ -133,6 +133,12 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `for ch in obj:_iter() do ... end` = iterate across elements of a Java object.  Made to be equivalent to `for (element : collection) { ... }`.
 
+- `#obj` aka `obj:__len()` 
+- - if it is a `java.lang.String` then this returns the Java string length.
+- - if tt is an array then this return the length.
+- - otherwise it will return the Java field `obj.length` or Java method `obj.length()` depending on which is present.
+
+
 ### JavaClass
 `JavaClass = require 'java.class'`
 - `JavaClass = JavaObject:subclass()`
@@ -206,8 +212,6 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `tostring(s)` aka `s:__tostring()` = returns the Java string contents.
 
-- `#s` aka `s:__len()` = returns the Java string length.
-
 - `s:length()` also returns the length.  This isn't by my design.  Java registers the `java.lang.String`'s `.length` as a *method*, not a *field*.
 
 ### JavaArray
@@ -221,8 +225,6 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `ar.elemFFIType` = for primitives, LuaJIT FFI ctype of the JNI primitive type.
 - `ar.elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
 - `ar.elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
-
-- `#ar` aka `ar:__len()` = return the length of the Java array.
 
 - `ar[i]` aka `ar:_get(i)` = get the i'th index of the array
 - `ar[i]=v` aka `ar:_set(i, v)` = set the i'th index of the array
