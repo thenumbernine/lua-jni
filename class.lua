@@ -367,6 +367,10 @@ function JavaClass:_new(...)
 	end
 end
 
+function JavaClass:__call(...)
+	return self:_new(...)
+end
+
 function JavaClass:_super()
 	local env = self._env
 	local jsuper = env._ptr[0].GetSuperclass(env._ptr, self._ptr)

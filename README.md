@@ -38,6 +38,7 @@ local J = jvm.jniEnv
 
 - `J = jvm.jniEnv` = a JNIEnv object
 
+
 ### JNIEnv
 `JNIEnv = require 'java.jnienv'`
 
@@ -102,6 +103,7 @@ If you want the actual primitive `java.lang.Class` classes, use `java.lang.Integ
 
 Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, so if you are passing `J.char` as a type for `_newArray` or for an arugment overload, the call resolver can't tell char from int.
 
+
 ### JavaObject
 `JavaObject = require 'java.object'`
 
@@ -151,6 +153,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_new(...)` = create a new JavaObject.
 
+- `cl(...)` aka `cl:__call(...)` = shorthand for `cl:_new(...)`
+
 - `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
 
 - `cl:_super()` = returns a JavaClass of the superclass.
@@ -178,6 +182,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl._members[name][index]` = either JavaMethod or JavaField of a member with that name.
 
+
 ### JavaField
 `JavaField = require 'java.field'`
 
@@ -188,6 +193,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `result = field:_get(thisOrClass)` = gets the Java object's field's value, or Java class's static field's value.
 - `field:_set(thisOrClass, value)` = sets the Java object's field's value, or Java class's static field's value.
+
 
 ### JavaMethod
 `JavaMethod = require 'java.method'`
@@ -204,6 +210,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `obj = method:_new(...)` = for constructor methods, calls C API `JNIEnv.NewObject` on this method.
 
+
 ### JavaString
 `JavaString = require 'java.string'`
 - `JavaString = JavaObject:subclass()`
@@ -213,6 +220,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `tostring(s)` aka `s:__tostring()` = returns the Java string contents.
 
 - `s:length()` also returns the length.  This isn't by my design.  Java registers the `java.lang.String`'s `.length` as a *method*, not a *field*.
+
 
 ### JavaArray
 `JavaArray = require 'java.array'`
