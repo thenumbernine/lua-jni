@@ -82,14 +82,11 @@ function JavaField:_get(thisOrClass)
 
 	if getName ~= returnObject then return result end
 
-	return JavaObject._createObjectForClassPath(
-		self._sig,
-		{
-			env = env,
-			ptr = result,
-			classpath = self._sig,
-		}
-	)
+	return JavaObject._createObjectForClassPath{
+		env = env,
+		ptr = result,
+		classpath = self._sig,
+	}
 end
 
 function JavaField:_set(thisOrClass, value)

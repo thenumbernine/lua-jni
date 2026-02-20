@@ -107,14 +107,11 @@ function JavaMethod:_new(classObj, ...)
 	-- fun fact, for java the ctor has return signature 'void'
 	-- which means the self._sig[1] won't hvae the expected classpath
 	-- which means we have to store/retrieve extra the classpath of the classObj
-	return JavaObject._createObjectForClassPath(
-		classpath,
-		{
-			env = env,
-			ptr = result,
-			classpath = assert(classpath),
-		}
-	)
+	return JavaObject._createObjectForClassPath{
+		env = env,
+		ptr = result,
+		classpath = assert(classpath),
+	}
 end
 
 function JavaMethod:__tostring()

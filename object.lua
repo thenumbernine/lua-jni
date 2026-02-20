@@ -68,8 +68,8 @@ function JavaObject._getLuaClassForClassPath(classpath)
 end
 
 -- static helper function for getting the correct JavaObject subclass depending on the classpath
-function JavaObject._createObjectForClassPath(classpath, args)
-	return JavaObject._getLuaClassForClassPath(classpath)(args)
+function JavaObject._createObjectForClassPath(args)
+	return JavaObject._getLuaClassForClassPath(args.classpath)(args)
 end
 
 -- gets a JavaClass wrapping the java call `obj._getClass()`
@@ -153,7 +153,17 @@ function JavaObject:_getDebugStr()
 end
 
 function JavaObject:__tostring()
-	return self:_javaToString()
+	if self._classpath == 'java.lang.String' then
+do return 'here' end
+		local envptr = self._env._ptr
+		local str = envptr[0].GetStringUTFChars(envptr, self._ptr, nil)
+		if str == nil then return '(null)' end
+		local luastr = ffi.string(str)
+		envptr[0].ReleaseStringUTFChars(envptr, self._ptr, str)
+		return luastr
+	else
+		return self:_javaToString()
+	end
 end
 
 JavaObject.__concat = string.concat

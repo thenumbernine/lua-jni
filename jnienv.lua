@@ -297,25 +297,12 @@ function JNIEnv:_str(s, len)
 	if jstring == nil
 		then error("NewString failed")
 	end
---[[
 	local resultClassPath = 'java.lang.String'
-	return JavaObject._createObjectForClassPath(
-		resultClassPath,
-		{
-			env = self,
-			ptr = jstring,
-			classpath = resultClassPath,
-		}
-	)
---]]
--- [[ same
-	local JavaString = require 'java.string'
-	return JavaString{
+	return JavaObject._createObjectForClassPath{
 		env = self,
 		ptr = jstring,
-		classpath = 'java.lang.String',
+		classpath = resultClassPath,
 	}
---]]
 end
 
 local newArrayForType = prims:mapi(function(name)
@@ -360,17 +347,14 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	end
 
 	local resultClassPath = jtype..'[]'
-	return JavaObject._createObjectForClassPath(
-		resultClassPath,
-		{
-			env = self,
-			ptr = obj,
-			classpath = resultClassPath,
-			-- how to handle classpaths of primitives ....
-			-- java as a langauge is a bit of a mess
-			elemClassPath = jtype,
-		}
-	)
+	return JavaObject._createObjectForClassPath{
+		env = self,
+		ptr = obj,
+		classpath = resultClassPath,
+		-- how to handle classpaths of primitives ....
+		-- java as a langauge is a bit of a mess
+		elemClassPath = jtype,
+	}
 end
 
 function JNIEnv:_throw(e)
@@ -413,14 +397,11 @@ function JNIEnv:_exceptionOccurred()
 --DEBUG:print('exception classpath', classpath)
 --DEBUG:print(debug.traceback())
 
-	local result = JavaObject._createObjectForClassPath(
-		classpath,
-		{
-			env = self,
-			ptr = e,
-			classpath = classpath,
-		}
-	)
+	local result = JavaObject._createObjectForClassPath{
+		env = self,
+		ptr = e,
+		classpath = classpath,
+	}
 
 	self._dontCheckExceptions = false
 
@@ -736,14 +717,11 @@ function JNIEnv:_javaToLuaArg(value, returnType)
 	if value == nil then return nil end
 
 	-- convert / wrap the result
-	return JavaObject._createObjectForClassPath(
-		returnType,
-		{
-			env = self,
-			ptr = value,
-			classpath = returnType,
-		}
-	)
+	return JavaObject._createObjectForClassPath{
+		env = self,
+		ptr = value,
+		classpath = returnType,
+	}
 end
 
 function JNIEnv:__tostring()

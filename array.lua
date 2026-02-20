@@ -65,11 +65,11 @@ function JavaArray:_get(i)
 		return ffi.cast(self.elemFFIType_ptr, arptr)[i]
 	else
 		local elemClassPath = self._elemClassPath
-		return JavaObject._createObjectForClassPath(elemClassPath, {
+		return JavaObject._createObjectForClassPath{
 			env = env,
 			ptr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i),
 			classpath = elemClassPath,
-		})
+		}
 	end
 
 	env:_checkExceptions()

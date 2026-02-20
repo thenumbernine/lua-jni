@@ -129,11 +129,11 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `str = obj:_getDebugStr()` = useful internal string with a few things like the Lua class name, Java classpath, and pointer.
 
+- `for ch in obj:_iter() do ... end` = iterate across elements of a Java object.  Made to be equivalent to `for (element : collection) { ... }`.
+
 - `cl = JavaObject._getLuaClassForClassPath(classpath)` = helper to get the Lua class for the Java classpath.
 
-- `obj = JavaObject._createObjectForClassPath(classpath, args)` = helper to create the appropriate Lua wrapper object, with arguments, for the Java classpath.
-
-- `for ch in obj:_iter() do ... end` = iterate across elements of a Java object.  Made to be equivalent to `for (element : collection) { ... }`.
+- `obj = JavaObject._createObjectForClassPath(args)` = helper to create the appropriate Lua wrapper object, with arguments, depending on `args.classpath`.
 
 - `#obj` aka `obj:__len()` 
 - - if it is a `java.lang.String` then this returns the Java string length.
