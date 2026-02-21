@@ -75,7 +75,7 @@ args:
 --]]
 function JNIEnv:init(args)
 	self._ptr = assert.type(assert.index(args, 'ptr'), 'cdata', "expected a JNIEnv*")
-	self._vm = args.vm		-- jnienv will hold the vm just so the vm doesn't gc
+	self._vm = args.vm or false		-- jnienv will hold the vm just so the vm doesn't gc
 	if not self._vm then
 		-- make a JavaVM object around the pointer
 		local jvmPtrArr = ffi.new'JavaVM*[1]'
