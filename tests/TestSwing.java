@@ -13,9 +13,9 @@ public class TestSwing implements Runnable {
 		frame.add(label);
 
 		// you need to call one or the other, or else the frame doesn't show
-		//frame.setSize(300, 200);		
-		frame.pack();
-		
+		frame.setSize(300, 200);
+		//frame.pack();
+
 		frame.setLocationRelativeTo(null);
 		frame.setVisible(true);
 	}

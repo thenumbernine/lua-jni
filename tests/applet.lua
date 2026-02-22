@@ -1,12 +1,10 @@
 #!/usr/bin/env luajit
-
 require 'java.tests.nativerunnable'	-- build
 
 local JVM = require 'java.vm'
 local jvm = JVM{
 	props = {
-		['java.class.path'] = '.',
-		['java.library.path'] = '.',
+		['java.library.path'] = '.',	-- needed for NativeRunnable
 	}
 }
 
@@ -34,10 +32,7 @@ local thread = LiteThread{
 }
 
 local J = jvm.jniEnv
-print('J._ptr', J._ptr)
-local runnable = J.io.github.thenumbernine.NativeRunnable:_new(thread.funcptr, J._vm._ptr)
--- looks like the Runnable sees a different JNIEnv,
--- meaning 'invokeAndWait' is probably creating a new thread underneath,
--- even if it is blocking until the thread finishes.
-J.javax.swing.SwingUtilities:invokeAndWait(runnable)
+J.javax.swing.SwingUtilities:invokeAndWait(
+	J.io.github.thenumbernine.NativeRunnable(thread.funcptr, J._vm._ptr)
+)
 thread:showErr()
