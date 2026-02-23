@@ -1,28 +1,11 @@
 #!/usr/bin/env luajit
 --[[
 here's an attempt at the FFM (what the rest of the world calls "FFI" since the dawn of time, but I guess the folks at Java had to be special and call it "Project Panama".
+
+Oops, I only have Java 21, but this requires Java 22, but it still shows up in the class search because Java 21 provided it as a "preview feature", which means it lies and says it's there when it's really not there.  Great java, Great.
 --]]
 local J = require 'java'
 assert(require 'java.class':isa(J.java.lang.foreign.Linker), "your Java doesn't have FFI, I mean, FFM")
-
---[[ needs this to work
-print('java.lang.String', J:_findClass'java.lang.String')
---[=[ so FindClass accepts signature based Ljava/lang/String; and just regular slash-separated java/lang/String ...
-local String1 = J._ptr[0].FindClass(J._ptr, 'Ljava/lang/String;')
-print('java.lang.String[] from JNIEnv->FindClass("Ljava/lang/String;")', String1)
-local String2 = J._ptr[0].FindClass(J._ptr, 'java/lang/String')
-print('java.lang.String[] from JNIEnv->FindClass("java/lang/String")', String2)
-print('same?', J._ptr[0].IsSameObject(J._ptr, String1, String2))
---]=]
-print('java.lang.String[] from String.class.arrayType()', J.java.lang.String:_class():arrayType())
-print('java.lang.String[] from J:_findClass()', J:_findClass'java.lang.String[]')
-print('java.lang.String[] from JNIEnv->FindClass("[Ljava/lang/String;")', J._ptr[0].FindClass(J._ptr, '[Ljava/lang/String;'))
---print('JNIEnv->FindClass("I")', J._ptr[0].FindClass(J._ptr, 'I'))
---print('JNIEnv->FindClass("int")', J._ptr[0].FindClass(J._ptr, 'int'))
-print(J:_newArray('java.lang.String[][][]', 0))
-os.exit()
---]]
-
 
 -- [====[ wholly separate demo, since FFM can't find strlen from libc
 
@@ -32,6 +15,20 @@ end
 local ffi = require 'ffi'
 closure = ffi.cast('void *(*)(void*)', callback)
 
+
+local FunctionDescriptor = J.java.lang.foreign.FunctionDescriptor
+print('FunctionDescriptor', FunctionDescriptor)
+local FunctionDescriptor_of = FunctionDescriptor._members.of[1]
+print('FunctionDescriptor.of', FunctionDescriptor_of)
+local ValueLayout = J.java.lang.foreign.ValueLayout
+print('ValueLayout',  ValueLayout)
+print('ValueLayout.ADDRESS',  ValueLayout.ADDRESS)
+local signature = FunctionDescriptor_of(
+	FunctionDescriptor,
+	ValueLayout.ADDRESS,
+	ValueLayout.ADDRESS
+)
+os.exit()
 
 --]====]
 

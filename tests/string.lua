@@ -66,4 +66,21 @@ print('arr[0]', arr[0])
 print('arr[1]', arr[1])
 print('arr[2]', arr[2])
 
+-- [[ needs this to work
+print('java.lang.String', J:_findClass'java.lang.String')
+-- [=[ so FindClass accepts signature based Ljava/lang/String; and just regular slash-separated java/lang/String ...
+local String1 = J._ptr[0].FindClass(J._ptr, 'Ljava/lang/String;')
+print('java.lang.String[] from JNIEnv->FindClass("Ljava/lang/String;")', String1)
+local String2 = J._ptr[0].FindClass(J._ptr, 'java/lang/String')
+print('java.lang.String[] from JNIEnv->FindClass("java/lang/String")', String2)
+print('same?', J._ptr[0].IsSameObject(J._ptr, String1, String2))
+--]=]
+print('java.lang.String[] from String.class.arrayType()', J.java.lang.String:_class():arrayType())
+print('java.lang.String[] from J:_findClass()', J:_findClass'java.lang.String[]')
+print('java.lang.String[] from JNIEnv->FindClass("[Ljava/lang/String;")', J._ptr[0].FindClass(J._ptr, '[Ljava/lang/String;'))
+--print('JNIEnv->FindClass("I")', J._ptr[0].FindClass(J._ptr, 'I'))
+--print('JNIEnv->FindClass("int")', J._ptr[0].FindClass(J._ptr, 'int'))
+print(J:_newArray('java.lang.String[][][]', 0))
+--]]
+
 print'DONE'
