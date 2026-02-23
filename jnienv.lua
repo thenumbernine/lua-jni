@@ -270,7 +270,7 @@ end
 
 -- Get a classpath for a jobject pointer
 -- Only used in _exceptionOccurred
--- This is just obj:_getClass():getName()
+-- This is just obj:_getClass():getTypeName()
 -- but with maybe a few less calls
 function JNIEnv:_getObjClassPath(objPtr)
 	local jclass = self:_getObjClass(objPtr)
@@ -279,7 +279,7 @@ end
 
 -- Accepts JNI jclass cdata
 -- returns classpath
--- uses java.lang.Class.getName
+-- uses java.lang.Class.getTypeName
 function JNIEnv:_getJClassClasspath(jclass)
 	local javaTypeName = self._java_lang_Class._java_lang_Class_getTypeName(jclass)
 	if javaTypeName == nil then return nil end

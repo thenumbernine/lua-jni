@@ -70,7 +70,7 @@ function JavaClass:_setupReflection()
 
 			-- fieldType is a jobject ... of a java.lang.Class
 			-- can I just treat it like a jclass?
-			-- can I just call java.lang.Class.getName() on it?
+			-- can I just call java.lang.Class.getTypeName() on it?
 			-- I guess I can also just do _javaToString and get the same results?
 			local fieldType = java_lang_reflect_Field
 				._java_lang_reflect_Field_getType(
@@ -394,15 +394,9 @@ function JavaClass:_isAssignableFrom(classTo)
 	return canCast ~= 0, classTo
 end
 
--- calls in java `class.getName()`
--- notice, this matches getJNISig(classpath)
--- so java.lang.String will be Ljava/lang/String;
--- and double[] will be [D
+-- calls in java `class.getTypeName()`
 function JavaClass:_name()
---DEBUG:print('JavaClass:_name')
---DEBUG:print("getting env:_findClass'java.lang.Class'")
 	local classObj = self._env._java_lang_Class
---DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
 	local classpath = classObj._java_lang_Class_getTypeName(self)
 	if classpath == nil then return nil end
 	return tostring(classpath)
