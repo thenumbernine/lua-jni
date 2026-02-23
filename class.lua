@@ -7,7 +7,6 @@ local JavaMethod = require 'java.method'
 local JavaField = require 'java.field'
 local JavaCallResolve = require 'java.callresolve'
 local getJNISig = require 'java.util'.getJNISig
-local sigStrToObj = require 'java.util'.sigStrToObj
 
 
 -- is a Java class a Java object?
@@ -78,9 +77,7 @@ function JavaClass:_setupReflection()
 					field
 				)
 
-			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getName(fieldType))
-
-			fieldClassPath = sigStrToObj(fieldClassPath) or fieldClassPath -- convert from sig-name to name-name
+			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(fieldType))
 --DEBUG:print('fieldType', fieldType, fieldClassPath)
 
 			local fieldModifiers = java_lang_reflect_Field
@@ -128,9 +125,7 @@ function JavaClass:_setupReflection()
 					method
 				)
 
-			local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodReturnType))
-
-			returnTypeClassPath = sigStrToObj(returnTypeClassPath) or returnTypeClassPath -- convert from sig-name to name-name
+			local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodReturnType))
 			sig:insert(returnTypeClassPath)
 
 			local paramType = java_lang_reflect_Method
@@ -141,9 +136,7 @@ function JavaClass:_setupReflection()
 			for j=0,#paramType-1 do
 				local methodParamType = paramType[j]
 
-				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodParamType))
-
-				paramClassPath = sigStrToObj(paramClassPath) or paramClassPath -- convert from sig-name to name-name
+				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodParamType))
 				sig:insert(paramClassPath)
 			end
 
@@ -193,9 +186,7 @@ function JavaClass:_setupReflection()
 			for j=0,#paramType-1 do
 				local methodParamType = paramType[j]
 
-				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getName(methodParamType))
-
-				paramClassPath = sigStrToObj(paramClassPath) or paramClassPath -- convert from sig-name to name-name
+				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodParamType))
 				sig:insert(paramClassPath)
 			end
 
@@ -411,21 +402,10 @@ function JavaClass:_name()
 --DEBUG:print('JavaClass:_name')
 --DEBUG:print("getting env:_findClass'java.lang.Class'")
 	local classObj = self._env._java_lang_Class
-assert('got', classObj)
-assert.eq(classObj._classpath, 'java.lang.Class')
 --DEBUG:print('JavaClass:_name, classObj for java.lang.Class', classObj)
-assert(classObj._java_lang_Class_getName)
-	local classpath = classObj._java_lang_Class_getName(self)
---[[ wait, is this a classpath or a signature?
--- how come double[] arrays return [D ?
--- how come String[] arrays return [Ljava/lang/String;
--- but String returns java/lang/String ? ?!?!?!??!?
--- HOW ARE YOU SUPPOSED TO TELL A SIGNATURE VS A CLASSPATH?
-print('JavaClass:_name', type(classpath), classpath)
---]]
-	classpath = tostring(classpath)
-	classpath = sigStrToObj(classpath) or classpath
-	return classpath
+	local classpath = classObj._java_lang_Class_getTypeName(self)
+	if classpath == nil then return nil end
+	return tostring(classpath)
 end
 
 function JavaClass:_throwNew()

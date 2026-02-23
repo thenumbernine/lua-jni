@@ -15,14 +15,49 @@ end
 targets:runAll()
 
 local J = require 'java'
-local A, B, C = J.A, J.B, J.C
+
+print("J:_findClass'A'", J:_findClass'A')
+print("J:_findClass'B'", J:_findClass'B')
+print("J:_findClass'C'", J:_findClass'C')
+
+local A = J.A
+local B = J.B
+local C = J.C
+print('J:_getJClassClasspath(A._ptr)', J:_getJClassClasspath(A._ptr))
+print('J:_getJClassClasspath(B._ptr)', J:_getJClassClasspath(B._ptr))
+print('J:_getJClassClasspath(C._ptr)', J:_getJClassClasspath(C._ptr))
+
 local Object = J.java.lang.Object
 
 print('Object', Object)
 print('A', A)
 print('B', B)	-- JNIEnv->FindClass("B") comes back as 'char', because 'B' is the signature for 'byte', whose ctype is 'jbyte' which is typedef'd to 'char'
 print('C', C)	-- JNIEnv->FindClass("C") comes back as 'unsigned short', because 'C' is the signature for 'char', whose ctype is 'jchar' which is typedef'd to 'unsigned short'
-os.exit()
+
+local a = A()
+local b = B()
+local c = C()
+
+-- J.A is our A class
+-- J.B
+local jclass_a = J:_getObjClass(a._ptr)
+local jclass_b = J:_getObjClass(b._ptr)
+local jclass_c = J:_getObjClass(c._ptr)
+print('J:_getObjClass(a._ptr)', jclass_a)
+print('J:_getObjClass(b._ptr)', jclass_b)
+print('J:_getObjClass(c._ptr)', jclass_c)
+
+local jclass_a_sig = J:_getJClassClasspath(jclass_a)
+local jclass_b_sig = J:_getJClassClasspath(jclass_b)
+local jclass_c_sig = J:_getJClassClasspath(jclass_c)
+
+print('J:_getJClassClasspath(J:_getObjClass(a._ptr))', jclass_a_sig)
+print('J:_getJClassClasspath(J:_getObjClass(b._ptr))', jclass_b_sig)
+print('J:_getJClassClasspath(J:_getObjClass(c._ptr))', jclass_c_sig)
+
+print('a:_getClass()', a:_getClass())
+print('b:_getClass()', b:_getClass())
+print('c:_getClass()', c:_getClass())
 
 print('A isAssignableFrom A', A:_isAssignableFrom(A))
 print('A isAssignableFrom B', A:_isAssignableFrom(B))
@@ -36,9 +71,6 @@ print('C isAssignableFrom A', C:_isAssignableFrom(A))
 print('C isAssignableFrom B', C:_isAssignableFrom(B))
 print('C isAssignableFrom C', C:_isAssignableFrom(C))
 
-local a = A()
-local b = B()
-local c = C()
 
 print()
 print(require 'java.object':isa(a), require 'java.class':isa(a))
@@ -57,7 +89,6 @@ print(require 'java.object':isa(c), require 'java.class':isa(c))
 print('want true:', J._ptr[0].IsSameObject(J._ptr, J._ptr[0].GetObjectClass(J._ptr, c._ptr), C._ptr))
 print(c:_getClass())
 print('want true:', c:_getClass() == C)
-os.exit()
 
 print('a:toString()', a:toString())
 print('b:toString()', b:toString())	-- "char" has no member named _members

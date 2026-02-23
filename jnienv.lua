@@ -6,8 +6,6 @@ local table = require 'ext.table'
 local JavaClass = require 'java.class'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
-local getJNISig = require 'java.util'.getJNISig
-local sigStrToObj = require 'java.util'.sigStrToObj
 local infoForPrims = require 'java.util'. infoForPrims
 
 -- some of these overlap ctypes
@@ -106,8 +104,8 @@ function JNIEnv:init(args)
 	-- we need these for later:
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
 	self._java_lang_Class = self:_findClass'java.lang.Class'
-	self._java_lang_Class._java_lang_Class_getName = assert(self._java_lang_Class:_method{
-		name = 'getName',
+	self._java_lang_Class._java_lang_Class_getTypeName = assert(self._java_lang_Class:_method{
+		name = 'getTypeName',
 		sig = {'java.lang.String'},
 	})
 	self._java_lang_Class._java_lang_Class_getFields = assert(self._java_lang_Class:_method{
@@ -206,7 +204,8 @@ function JNIEnv:_findClass(classpath)
 	if not classObj then
 		-- FindClass wants /-separator
 		local slashClassPath = classpath:gsub('%.', '/')
-		local jclass = self._ptr[0].FindClass(self._ptr, slashClassPath)
+		local envptr = self._ptr
+		local jclass = envptr[0].FindClass(envptr, slashClassPath)
 		if jclass == nil then
 			-- I think this throws an exception?
 			local ex = self:_exceptionOccurred()
@@ -282,10 +281,9 @@ end
 -- returns classpath
 -- uses java.lang.Class.getName
 function JNIEnv:_getJClassClasspath(jclass)
-	local sigstr = self._java_lang_Class._java_lang_Class_getName(jclass)
-	if sigstr == nil then return nil end
-	sigstr = tostring(sigstr)
-	return sigStrToObj(sigstr) or sigstr	-- opposite of util.getJNISig
+	local javaTypeName = self._java_lang_Class._java_lang_Class_getTypeName(jclass)
+	if javaTypeName == nil then return nil end
+	return tostring(javaTypeName)
 end
 
 function JNIEnv:_version()
