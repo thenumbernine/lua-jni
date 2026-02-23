@@ -2,6 +2,7 @@ local assert = require 'ext.assert'
 local class = require 'ext.class'
 local string = require 'ext.string'
 local table = require 'ext.table'
+local tolua = require 'ext.tolua'
 
 
 local JavaCallResolve = class()
@@ -28,7 +29,7 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	-- ok now ...
 	-- we gotta match up ... args with all the method option arsg
 
-	local numArgs = select('#', ...)
+	local numLuaArgs = select('#', ...)
 	local bestOption
 	local bestSigDist = math.huge
 	for i,option in ipairs(options) do
@@ -40,22 +41,26 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 		-- if it's a vararg then it still has a list of all non-varargs to match
 		-- then it has to match the varargs as whatever type the vararg should be
 		if option._isVarArgs then
-			if numArgs >= #sig-2 then	-- #sig-2 is the # of non-varargs that we need to match
+--DEBUG:print('option is vararg')
+--DEBUG:print('num lua args', numLuaArgs)
+--DEBUG:print('old sig:', tolua(sig))
+			if numLuaArgs >= #sig-2 then	-- #sig-2 is the # of non-varargs that we need to match
 				local sigLast = sig[#sig]
 				local sigVarArgBase = sigLast:match'^(.*)%[%]$'
 				sig = table(sig)
-				for i=#sig,numArgs+1 do
+				for i=#sig,numLuaArgs+1 do
 					sig[i] = sigVarArgBase
 				end
 				doMatch = true
 				-- TODO eventually test each vararg type to the underlying vararg array type
+--DEBUG:print('new sig:', tolua(sig))
 			end
 		else
-			if #sig-1 == numArgs then
+			if #sig-1 == numLuaArgs then
 				doMatch = true
 			end
 		end
-			
+
 		-- sig[1] is the return type
 		-- call args #1 is the this-or-class
 		-- the rest will match up
@@ -63,13 +68,14 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 			-- now test if casting works ...
 			-- TODO calc score from dist of classes
 			sigDist = 0
-			for i=1,numArgs do
+			for i=1,numLuaArgs do
 --DEBUG:print('arg #'..i..' = '..tostring((select(i, ...))))
 --DEBUG:print('vs sig', sig[i+1])
 				local canConvert, argDist = env:_canConvertLuaToJavaArg(
 					select(i, ...),
 					sig[i+1]
 				)
+--DEBUG:print('can convert to', sig[i+1], canConvert, argDist)
 				if not canConvert then
 					sigDist = nil
 					break
@@ -95,7 +101,12 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	end
 
 	if not bestOption then
-		return nil, "failed to find a matching signature for function "..name
+		return nil,
+			"failed to find a matching signature for function "..name..'\n'
+			..'options are:\n'
+			..options:mapi(function(option)
+				return '\t'..tolua(option._sig)
+			end):concat'\n'
 	end
 
 	return bestOption
