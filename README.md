@@ -75,7 +75,7 @@ local J = jvm.jniEnv
 
 - `cl = J:_getClassForJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
 
-- `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getName to determine the classname of the JNI jclass pointer.
+- `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getTypeName() to determine the classname of the JNI jclass pointer.
 
 - `J:_exceptionClear()` = clears the exception in JNIEnv via JNIEnv.ExceptionClear.
 
@@ -155,7 +155,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl(...)` aka `cl:__call(...)` = shorthand for `cl:_new(...)`
 
-- `cl:_name()` = returns the classpath of the object, using Java's `class.getName()` method, and then attempt to reverse-translate signature-encoded names, i.e. a `double[]` Java object would have a `class.getName()` of `[D`, but this would decode it back to `double[]`.
+- `cl:_name()` = returns the classpath of the object, using Java's `class.getTypeName()` method.
 
 - `cl:_super()` = returns a JavaClass of the superclass.
 
@@ -253,10 +253,10 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 # TODO
 
 - generics
-- I'm not building proper reflection for arrays I think ...
 - functions / lambdas
+- I'm not building proper reflection for arrays I think ... I'm using getFields()/getMethods(), but then I still have to explicitly grab the default ctor or the toString(), so maybe I should use getDeclaredFields()/getDeclaredMethods() and then manaully search inheritence myself? But then should I be caching the class tree refs to parent myself too?
+- call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
-- call resolve score should consider subclass distances instead of just IsAssignableFrom
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - some automatic way to call Java to LuaJIT without providing my own class (tho that works) ... bytecode / runtime-class creation
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
