@@ -32,41 +32,47 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	local bestOption
 	local bestSigDist = math.huge
 	for i,option in ipairs(options) do
-		local sig = option._sig
-		-- sig[1] is the return type
-		-- call args #1 is the this-or-class
-		-- the rest will match up
-		if #sig == numArgs then
-			-- now test if casting works ...
-			-- TODO calc score from dist of classes
-			local sigDist = 0
-			for i=2,numArgs do
+		local sigDist
+		if option._isVarArgs then
+			sigDist = 0
+			-- TODO eventually test each vararg type to the underlying vararg array type
+		else
+			local sig = option._sig
+			-- sig[1] is the return type
+			-- call args #1 is the this-or-class
+			-- the rest will match up
+			if #sig == numArgs then
+				-- now test if casting works ...
+				-- TODO calc score from dist of classes
+				sigDist = 0
+				for i=2,numArgs do
 --DEBUG:print('arg #'..(i-1)..' = '..tostring((select(i-1, ...))))
 --DEBUG:print('vs sig', sig[i])
-				local canConvert, argDist = env:_canConvertLuaToJavaArg(
-					select(i-1, ...),
-					sig[i]
-				)
-				if not canConvert then
-					sigDist = nil
-					break
-				end
-				if argDist then
-					sigDist = sigDist + argDist
+					local canConvert, argDist = env:_canConvertLuaToJavaArg(
+						select(i-1, ...),
+						sig[i]
+					)
+					if not canConvert then
+						sigDist = nil
+						break
+					end
+					if argDist then
+						sigDist = sigDist + argDist
+					end
 				end
 			end
+		end
 
-			-- alright at this point it just picks the last matching signature
-			-- but I should be scoring them by how far apart in the class tree the type coercion is
-			-- and somehow I should factor in differences of prim types
+		-- alright at this point it just picks the last matching signature
+		-- but I should be scoring them by how far apart in the class tree the type coercion is
+		-- and somehow I should factor in differences of prim types
 
-			if sigDist then
-				-- TODO calculate score based on how far away coercion is
-				-- score by difference-in-size of prim args or difference-in-class-tree of classes
-				if bestSigDist > sigDist then
-					bestSigDist = sigDist 
-					bestOption = option
-				end
+		if sigDist then
+			-- TODO calculate score based on how far away coercion is
+			-- score by difference-in-size of prim args or difference-in-class-tree of classes
+			if bestSigDist > sigDist then
+				bestSigDist = sigDist
+				bestOption = option
 			end
 		end
 	end

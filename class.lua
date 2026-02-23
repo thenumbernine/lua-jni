@@ -68,27 +68,18 @@ function JavaClass:_setupReflection()
 		for i=0,#self._javaObjFields-1 do
 			local field = self._javaObjFields[i]
 
-			local name = tostring(java_lang_reflect_Field
-				._java_lang_reflect_Field_getName(
-					field
-				))
+			local name = tostring(java_lang_reflect_Field._java_lang_reflect_Field_getName(field))
 
 			-- fieldType is a jobject ... of a java.lang.Class
 			-- can I just treat it like a jclass?
 			-- can I just call java.lang.Class.getTypeName() on it?
 			-- I guess I can also just do _javaToString and get the same results?
-			local fieldType = java_lang_reflect_Field
-				._java_lang_reflect_Field_getType(
-					field
-				)
+			local fieldType = java_lang_reflect_Field._java_lang_reflect_Field_getType(field)
 
 			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(fieldType))
 --DEBUG:print('fieldType', fieldType, fieldClassPath)
 
-			local fieldModifiers = java_lang_reflect_Field
-				._java_lang_reflect_Field_getModifiers(
-					field
-				)
+			local fieldModifiers = java_lang_reflect_Field._java_lang_reflect_Field_getModifiers(field)
 --DEBUG:print('fieldModifiers', fieldModifiers)
 
 			-- ok now switch this reflect field obj to a jni jfieldID
@@ -118,25 +109,16 @@ function JavaClass:_setupReflection()
 		for i=0,#self._javaObjMethods-1 do
 			local method = self._javaObjMethods[i]
 
-			local name = tostring(java_lang_reflect_Method
-				._java_lang_reflect_Method_getName(
-					method
-				))
+			local name = tostring(java_lang_reflect_Method._java_lang_reflect_Method_getName(method))
 
 			local sig = table()
 
-			local methodReturnType = java_lang_reflect_Method
-				._java_lang_reflect_Method_getReturnType(
-					method
-				)
+			local methodReturnType = java_lang_reflect_Method._java_lang_reflect_Method_getReturnType(method)
 
 			local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodReturnType))
 			sig:insert(returnTypeClassPath)
 
-			local paramType = java_lang_reflect_Method
-				._java_lang_reflect_Method_getParameterTypes(
-					method
-				)
+			local paramType = java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes(method)
 
 			for j=0,#paramType-1 do
 				local methodParamType = paramType[j]
@@ -145,10 +127,9 @@ function JavaClass:_setupReflection()
 				sig:insert(paramClassPath)
 			end
 
-			local modifiers = java_lang_reflect_Method
-				._java_lang_reflect_Method_getModifiers(
-					method
-				)
+			local isVarArgs = java_lang_reflect_Method._java_lang_reflect_Method_isVarArgs(method)
+
+			local modifiers = java_lang_reflect_Method._java_lang_reflect_Method_getModifiers(method)
 
 			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
 
@@ -161,6 +142,7 @@ function JavaClass:_setupReflection()
 				name = name,
 				sig = sig,
 				static = 0 ~= bit.band(modifiers, 8),
+				isVarArgs = isVarArgs,
 			}
 
 			self._members[name] = self._members[name] or table()
@@ -183,10 +165,7 @@ function JavaClass:_setupReflection()
 			local sig = table()
 			sig:insert'void'	-- constructor signature has void return type
 
-			local paramType = java_lang_reflect_Constructor
-				._java_lang_reflect_Constructor_getParameterTypes(
-					method
-				)
+			local paramType = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes(method)
 
 			for j=0,#paramType-1 do
 				local methodParamType = paramType[j]
@@ -195,10 +174,9 @@ function JavaClass:_setupReflection()
 				sig:insert(paramClassPath)
 			end
 
-			local modifiers = java_lang_reflect_Constructor
-				._java_lang_reflect_Constructor_getModifiers(
-					method
-				)
+			local isVarArgs = java_lang_reflect_Method._java_lang_reflect_Method_isVarArgs(method)
+
+			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
 
 --print('modifiers', modifiers)
 			-- NOTICE, ctors do NOT have 'static' flag,
@@ -219,6 +197,7 @@ function JavaClass:_setupReflection()
 				name = name,
 				sig = sig,
 				static = 0 ~= bit.band(modifiers, 8),
+				isVarArgs = isVarArgs,
 			}
 
 			ctors:insert(methodObj)
@@ -275,6 +254,7 @@ args:
 		first arg is return type
 	static = boolean
 	nonvirtual = boolean
+	isVarArgs
 --]]
 function JavaClass:_method(args)
 	local env = self._env
@@ -285,6 +265,7 @@ function JavaClass:_method(args)
 	local funcname = assert.type(assert.index(args, 'name'), 'string')
 	local static = args.static
 	local nonvirtual = args.nonvirtual
+	local isVarArgs = args.isVarArgs
 	local sig = assert.type(assert.index(args, 'sig'), 'table')
 	local sigstr = getJNISig(sig)
 --DEBUG:print('sigstr', sigstr)
@@ -298,9 +279,12 @@ function JavaClass:_method(args)
 	-- will this throw an exception? probably.
 	if method == nil then
 		local ex = env:_exceptionOccurred()
-		return nil, "failed to find method "..tostring(funcname)..' '..tostring(sigstr)
+		return nil, "failed to find method "..tostring(funcname)
 			..(static and ' static' or '')
-			..(nonvirtual and ' nonvirtual' or ''),
+			..(nonvirtual and ' nonvirtual' or '')
+			..(isVarArgs and ' isVarArgs' or '')
+			..' '..tolua(sigstr)
+			,
 			ex
 	end
 	return JavaMethod{
@@ -311,6 +295,7 @@ function JavaClass:_method(args)
 		sig = sig,
 		static = static,
 		nonvirtual = nonvirtual,
+		isVarArgs = isVarArgs,
 	}
 end
 

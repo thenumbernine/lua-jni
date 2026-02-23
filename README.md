@@ -173,6 +173,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
 - - `static` = set to `true` to retrieve a static method.
 - - `nonvirtual` = forwards to `JavaMethod`
+- - `isVarArgs` = forwards to `JavaMethod`
 
 - `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
 - args:
@@ -205,6 +206,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `sig` = signature table, first argument is the return type (default `void`), rest are method arguments.
 - - `static` = whether this method is static or not.
 - - `nonvirtual` = whether this method call will be nonvirtual or not.  Useful for `super.whatever` in Java which relies on non-polymorphic explicit class calls.
+- - `isVarArgs` = true when `Method.isVarArgs()` is true, means that the call will convert the args into an array before calling. 
 
 - `result = method(...)` = invoke ` call on the method using C API `JNIEnv.Call*Method`.
 

@@ -1,6 +1,7 @@
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
+local tolua = require 'ext.tolua'
 local table = require 'ext.table'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
@@ -52,6 +53,8 @@ function JavaMethod:init(args)
 
 	-- this is used in java wrt super.call ... is that the only time?
 	self._nonvirtual = not not args.nonvirtual
+
+	self._isVarArgs = not not args.isVarArgs
 end
 
 function JavaMethod:__call(thisOrClass, ...)
@@ -66,25 +69,45 @@ function JavaMethod:__call(thisOrClass, ...)
 	local returnType = self._sig[1]
 	local callName
 	if self._static then
-		callName = callStaticNameForReturnType[returnType] 
+		callName = callStaticNameForReturnType[returnType]
 			or callStaticNameForReturnType.object
 	elseif self._nonvirtual then
-		callName = callNonvirtualNameForReturnType[returnType] 
+		callName = callNonvirtualNameForReturnType[returnType]
 			or callNonvirtualNameForReturnType.object
 	else
-		callName = callNameForReturnType[returnType] 
+		callName = callNameForReturnType[returnType]
 			or callNameForReturnType.object
 	end
 
---print('callName', callName)
-	-- if it's a static method then a class comes first
-	-- otherwise an object comes first
-	local result = env._ptr[0][callName](
-		env._ptr,
-		assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
-		self._ptr,
-		env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
-	)
+--DEBUG:print('callName', callName)
+
+	-- only table.pack our args if necessary
+	local result
+	if self._isVarArgs then
+		-- just convert it to an Object[] array, let JNI do the type matching
+		-- TODO eventually test each vararg type to the underlying vararg array type
+		local nargs = select('#', ...)
+		local javaArgsObj = env:_newArray('java.lang.Object', nargs)
+		for i=0,nargs-1 do
+			javaArgsObj[i] = env:_luaToJavaArgs((select(i+1, ...)))
+		end
+
+		-- if it's a static method then a class comes first
+		-- otherwise an object comes first
+		result = env._ptr[0][callName](
+			env._ptr,
+			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+			self._ptr,
+			env:_luaToJavaArg(javaArgsObj, self._sig[2])
+		)
+	else
+		result = env._ptr[0][callName](
+			env._ptr,
+			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+			self._ptr,
+			env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
+		)
+	end
 
 	env:_checkExceptions()
 
@@ -115,7 +138,13 @@ function JavaMethod:_new(classObj, ...)
 end
 
 function JavaMethod:__tostring()
-	return self.__name..'('..tostring(self._ptr)..')'
+	return self.__name..'('
+		..tostring(self._ptr)
+		..(self._static and ' static' or '')
+		..(self._nonvirtual and ' nonvirtual' or '')
+		..(self._isVarArgs and ' isVarArgs' or '')
+		..' '..tolua(self._sig)
+		..')'
 end
 
 JavaMethod.__concat = string.concat
