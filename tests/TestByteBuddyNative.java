@@ -51,9 +51,8 @@ public class TestByteBuddyNative {
 		}
 */	
 
-		Class<?> dynamicType = new ByteBuddy()
-			.subclass(Object.class)
-			.implement(Runnable.class)
+		Class<? extends Runnable> dynamicType = new ByteBuddy()
+			.subclass(Runnable.class)
 
 			.defineField("funcptr", long.class, Modifier.PUBLIC)
 			.defineField("arg", long.class, Modifier.PUBLIC)
@@ -72,7 +71,7 @@ public class TestByteBuddyNative {
 				.attribute(new net.bytebuddy.description.modifier.ModifierContributor.ForMethod(Modifier.NATIVE))
 */
 			.make()
-			.load(Object.class.getClassLoader())
+			.load(Runnable.class.getClassLoader())
 			.getLoaded();
 		Runnable o = (Runnable)dynamicType.getDeclaredConstructor().newInstance();
 		o.run();

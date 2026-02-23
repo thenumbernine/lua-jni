@@ -282,5 +282,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
-- some automatic way to call Java to LuaJIT without providing my own class (tho that works) ... bytecode / runtime-class creation
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.

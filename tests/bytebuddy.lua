@@ -8,19 +8,15 @@ here's the https://bytebuddy.net hello-world example:
 
 it turns out it's a big example, because my call resolver is having trouble matching generics right now
 --]]
-local table = require 'ext.table'
-local assert = require 'ext.assert'
-local jvm = require 'java.vm'{
+local J = require 'java.vm'{
 	props = {
-		['java.class.path'] = table{
+		['java.class.path'] = table.concat({
 			'byte-buddy-1.18.5.jar',
 			'.',
-		}:concat':',
-		--['java.library.path'] = '.',
+		}, ':'),
 	},
-}
-local J = jvm.jniEnv
-assert.is(J.net.bytebuddy.ByteBuddy, require 'java.class', "I can't find the ByteBuddy jar...")
+}.jniEnv
+assert(require 'java.class':isa(J.net.bytebuddy.ByteBuddy), "I can't find the ByteBuddy jar...")
 
 local objOfClass_java_lang_Object = J.java.lang.Object:_class()
 local dynamicType = J.net.bytebuddy.ByteBuddy()
