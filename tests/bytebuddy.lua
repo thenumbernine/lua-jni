@@ -5,6 +5,8 @@ https://repo1.maven.org/maven2/net/bytebuddy/byte-buddy/
 https://repo1.maven.org/maven2/net/bytebuddy/byte-buddy-android/
 
 here's the https://bytebuddy.net hello-world example:
+
+it turns out it's a big example, because my call resolver is having trouble matching generics right now
 --]]
 local table = require 'ext.table'
 local assert = require 'ext.assert'

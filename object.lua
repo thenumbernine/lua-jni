@@ -115,7 +115,8 @@ function JavaObject:_javaToString()
 	env:_checkExceptions()
 	local pushIgnore = env._ignoringExceptions
 	env._ignoringExceptions = true
-	local str = tostring(self:toString())
+	local javaToString = self.toString
+	local str = javaToString and tostring(javaToString(self)) or nil
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
 	return str
@@ -152,7 +153,7 @@ function JavaObject:_getDebugStr()
 end
 
 function JavaObject:__tostring()
-	return self:_javaToString()
+	return self:_javaToString() or self:_getDebugStr()
 end
 
 JavaObject.__concat = string.concat

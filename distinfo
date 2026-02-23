@@ -26,6 +26,8 @@ files = {
 	"tests/TestSwing.java",
 	"tests/ThreadTest.java",
 	"tests/applet.lua",
+	"tests/bytebuddy.lua",
+	"tests/ffm.lua",
 	"tests/inheritence.lua",
 	"tests/io/github/thenumbernine/NativeRunnable.java",
 	"tests/io_github_thenumbernine_NativeRunnable.c",
