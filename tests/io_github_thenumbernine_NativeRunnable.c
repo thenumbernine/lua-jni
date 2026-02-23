@@ -2,7 +2,7 @@
 #include <jni.h>
 #include <stdio.h>
 
-JNIEXPORT jlong JNICALL Java_io_github_thenumbernine_NativeRunnable_runNative(JNIEnv * env, jobject this_, jlong jfuncptr, jlong jarg) {
+JNIEXPORT jlong JNICALL Java_io_github_thenumbernine_NativeRunnable_runNative(JNIEnv * env, jclass this_, jlong jfuncptr, jlong jarg) {
 	void* vfptr = (void*)jfuncptr;
 	void* arg = (void*)jarg;
 	jlong results = 0;

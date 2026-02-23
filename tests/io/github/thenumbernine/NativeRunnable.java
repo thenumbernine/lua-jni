@@ -5,6 +5,11 @@ public class NativeRunnable implements java.lang.Runnable {
 		System.loadLibrary("io_github_thenumbernine_NativeRunnable");
 	}
 
+	// this is a wrapper for what should be an underlying pthread-style callback,
+	// i.e. void*(*)(void*)
+	// i.e. void *callback(void*) {}
+	public static native long runNative(long funcptr, long arg);
+
 	// YES THE FIELDS ARE PUBLIC
 	// GET OVER YOURSELF JAVA
 	public long funcptr, arg;	//bitness of the systems ... is there 128-bit addressing anywhere?
@@ -22,9 +27,4 @@ public class NativeRunnable implements java.lang.Runnable {
 	public void run() {
 		runNative(funcptr, arg);
 	}
-
-	// this is a wrapper for what should be an underlying pthread-style callback,
-	// i.e. void*(*)(void*)
-	// i.e. void *callback(void*) {}
-	public native long runNative(long funcptr, long arg);
 }

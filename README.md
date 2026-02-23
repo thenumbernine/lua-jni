@@ -262,7 +262,11 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/applet.lua` shows a simple Swing application demo, though it can't do much without subclassing live or with running installed `javac`.
 
-`java/tests/bytebuddy.lua` is me working on using [ByteBuddy](https://bytebuddy.net/) to create new Java classes at runtime so that I can do dynamic LuaJIT -> Java -> LuaJIT stuff without running `javac` or installing a Java SDK.
+`java/tests/bytebuddy.lua` is *INCOMPLETE*, me doing the [ByteBuddy](https://bytebuddy.net/) demo to create a new class with a new `toString()` at runtime.
+
+`java/tests/bytebuddy_native.lua` is *INCOMPLETE*, me using ByteBuddy to create new Runnable implementation to do dynamic LuaJIT -> Java -> LuaJIT stuff without running `javac` or installing a Java SDK.
+
+`java/tests/ffm.lua` is *INCOMPLETE*, an attempt at Java Foreign Function Interface, so I won't need external classes like `io.github.thenumbernine.NativeRunnable` or dependency jars like "ByteBuddy", but it requires Java 22 and I am stuck on Java 21 for now.
 
 # TODO
 

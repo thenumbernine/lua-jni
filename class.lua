@@ -279,12 +279,13 @@ function JavaClass:_method(args)
 	-- will this throw an exception? probably.
 	if method == nil then
 		local ex = env:_exceptionOccurred()
-		return nil, "failed to find method "..tostring(funcname)
-			..(static and ' static' or '')
-			..(nonvirtual and ' nonvirtual' or '')
-			..(isVarArgs and ' isVarArgs' or '')
-			..' '..tolua(sigstr)
-			,
+		return
+			nil,
+			"failed to find method "..tostring(funcname)
+				..(static and ' static' or '')
+				..(nonvirtual and ' nonvirtual' or '')
+				..(isVarArgs and ' isVarArgs' or '')
+				..' '..tolua(sigstr),
 			ex
 	end
 	return JavaMethod{

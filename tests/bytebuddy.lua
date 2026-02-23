@@ -33,5 +33,5 @@ local dynamicType = J.net.bytebuddy.ByteBuddy()
 
 -- now dynamicType is a Java object of type java.lang.Class<?>, where the ? is java.lang.Object because that's what I fed into :subclass() and :load() above
 print('dynamicType', dynamicType, dynamicType._classpath)
-print(dynamicType:getDeclaredConstructor():newInstance())
-
+local dynamicObj = dynamicType:getDeclaredConstructor():newInstance()
+print('dynamicObj', dynamicObj)
