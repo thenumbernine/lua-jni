@@ -250,6 +250,18 @@ I made this to go with my [SDL-LuaJIT](https://github.com/thenumbernine/SDLLuaJI
 
 The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/include-lua) run on `jni.h`.
 
+# Examples
+
+`java/tests/println.lua` is a simple `System.out.println` demo.
+
+`java/tests/runnable.lua` shows how to create and run a thin wrapper class in `java/tests/io/github/thenumbernine/NativeRunnable.java` to native code in `java/tests/io_github_thenumbernine_NativeRunnable.c` to run your C (or LuaJIT-cloure) callback.
+
+`java/tests/runnable_mt.lua` shows how to use this to run LuaJIT code on a new Java thread, in conjunction with my [`lua lite thread class`](https://github.com/thenumbernine/lua-thread/blob/master/lite.lua).
+
+`java/tests/applet.lua` shows a simple Swing application demo, though it can't do much without subclassing live or with running installed `javac`.
+
+`java/tests/bytebuddy.lua` is me working on using [ByteBuddy](https://bytebuddy.net/) to create new Java classes at runtime so that I can do dynamic LuaJIT -> Java -> LuaJIT stuff without running `javac` or installing a Java SDK.
+
 # TODO
 
 - generics

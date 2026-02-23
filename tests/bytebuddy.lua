@@ -18,25 +18,42 @@ local jvm = require 'java.vm'{
 	},
 }
 local J = jvm.jniEnv
-local ByteBuddy = J.net.bytebuddy.ByteBuddy
-print('ByteBuddy', ByteBuddy)
-assert.is(ByteBuddy, require 'java.class', "I can't find the ByteBuddy jar...")
+assert.is(J.net.bytebuddy.ByteBuddy, require 'java.class', "I can't find the ByteBuddy jar...")
 
-local _java_lang_Object = J.java.lang.Object:_class()
-print('java.lang.Object', _java_lang_Object)
+local class_java_lang_Object = J.java.lang.Object
+local objOfClass_java_lang_Object = class_java_lang_Object:_class()
+local dynamicType = J.net.bytebuddy.ByteBuddy()
+	:subclass(objOfClass_java_lang_Object)
+	:method(J.net.bytebuddy.matcher.ElementMatchers:named'toString')
+	:intercept(J.net.bytebuddy.implementation.FixedValue:value'Hello World!')
+	:make()
+	:load(objOfClass_java_lang_Object:getClassLoader())
+	:getLoaded()
 
-local bb = ByteBuddy()
-print('bb', bb)
-assert.is(bb, require 'java.object', "failed to instanciate ByteBuddy")
+-- now dynamicType is a Java object of type java.lang.Class<java.lang.Object>
+print('dynamicType', dynamicType, dynamicType._classpath)
 
-print('bb.subclass', bb.subclass)
-os.exit()
-
-bb = bb:subclass(_java_lang_Object)
-
-bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'toString')
-bb = bb:intercept(J.net.bytebuddy.implementation.FixedValue:value'Hello World!')
-bb = bb:make()
-bb = bb:load(_java_lang_Object:getClassLoader())
-local dynamicType = bb:getLoaded()
+--[[ "failed to find a matching signature for function getDeclaredConstructor"
+--print(dynamicType:_getClass()._members.getDeclaredConstructor[1]) -- works
+--print(dynamicType.getDeclaredConstructor) -- works
 print(dynamicType:getDeclaredConstructor():newInstance():toString())
+--]]
+-- [[
+local dynamicTypeClass = dynamicType:_getClass()
+--print(table.keys(dynamicTypeClass._members):sort():concat', ')
+--print(dynamicTypeClass._members.getDeclaredConstructor)
+--print(#dynamicTypeClass._members.getDeclaredConstructor)
+--print(dynamicTypeClass._members.getDeclaredConstructor[1])
+-- local dynamicTypeCtor = dynamicType:getDeclaredConstructor()	 -- "failed to find a matching signature"
+-- TODO TODO TODO WHY CAN'T CALL RESOLVER MATCH THE SIGNATURES?
+local dynamicTypeCtor = dynamicTypeClass._members.getDeclaredConstructor[1](dynamicType)
+print(dynamicTypeCtor)
+print(dynamicTypeCtor._classpath)
+print(dynamicTypeCtor.newInstance)
+--print(dynamicTypeCtor:newInstance()) -- "failed to find a matching signature"
+local dynamicTypeCtorClass = dynamicTypeCtor:_getClass()
+print(dynamicTypeCtorClass)
+print(dynamicTypeCtorClass._members.newInstance[1])
+local dynamicObjInst = dynamicTypeCtorClass._members.newInstance[1](dynamicTypeCtor)
+print(dynamicObjInst)
+--]]

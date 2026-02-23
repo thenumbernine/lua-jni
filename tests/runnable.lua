@@ -77,10 +77,10 @@ print('Runnable:_class():isInterface()', Runnable:_class():isInterface())
 -- but it's not finding this ...
 print('Runnable:_class():getClassLoader()', Runnable:_class():getClassLoader())	-- wait ... .class exists in Java, right?
 
+--[=[ and last the handler , ... which has to be a subclass anyways ...
 local Proxy = J.java.lang.reflect.Proxy
 print('Proxy', Proxy)
 
---[=[ and last the handler , ... which has to be a subclass anyways ...
 local proxyRunnable = Proxy:newProxyInstance(
 	Runnable:_class():getClassLoader(),
 	J:_newArray(J.java.lang.Class, 1, Runnable:_class()),
