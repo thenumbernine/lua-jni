@@ -2,7 +2,7 @@ package io.github.thenumbernine;
 
 public class NativeRunnable implements java.lang.Runnable {
     static {
-		System.loadLibrary("runnable_lib");
+		System.loadLibrary("io_github_thenumbernine_NativeRunnable");
 	}
 
 	// YES THE FIELDS ARE PUBLIC
