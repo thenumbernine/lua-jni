@@ -32,12 +32,14 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	local bestOption
 	local bestSigDist = math.huge
 	for i,option in ipairs(options) do
+		local sig = option._sig
 		local sigDist
-		if option._isVarArgs then
+		if option._isVarArgs 
+		and numArgs-1 >= #sig-2	-- #sig-2 is the # of non-varargs that we need to match
+		then
 			sigDist = 0
 			-- TODO eventually test each vararg type to the underlying vararg array type
 		else
-			local sig = option._sig
 			-- sig[1] is the return type
 			-- call args #1 is the this-or-class
 			-- the rest will match up

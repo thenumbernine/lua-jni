@@ -4,7 +4,11 @@ here's an attempt at the FFM (what the rest of the world calls "FFI" since the d
 
 Oops, I only have Java 21, but this requires Java 22, but it still shows up in the class search because Java 21 provided it as a "preview feature", which means it lies and says it's there when it's really not there.  Great java, Great.
 --]]
-local J = require 'java'
+local J = require 'java.vm'{
+	optionList = {
+		'--enable-preview',
+	},
+}.jniEnv
 assert(require 'java.class':isa(J.java.lang.foreign.Linker), "your Java doesn't have FFI, I mean, FFM")
 
 -- [====[ wholly separate demo, since FFM can't find strlen from libc
@@ -15,7 +19,14 @@ end
 local ffi = require 'ffi'
 closure = ffi.cast('void *(*)(void*)', callback)
 
-
+-- [[
+local signature = J.java.lang.foreign.FunctionDescriptor:of(
+	J.java.lang.foreign.ValueLayout.ADDRESS,
+	J.java.lang.foreign.ValueLayout.ADDRESS
+)
+print('signature', signature)
+--]]
+--[[
 local FunctionDescriptor = J.java.lang.foreign.FunctionDescriptor
 print('FunctionDescriptor', FunctionDescriptor)
 local FunctionDescriptor_of = FunctionDescriptor._members.of[1]
@@ -28,8 +39,8 @@ local signature = FunctionDescriptor_of(
 	ValueLayout.ADDRESS,
 	ValueLayout.ADDRESS
 )
+--]]
 os.exit()
-
 --]====]
 
 

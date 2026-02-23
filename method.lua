@@ -84,13 +84,35 @@ function JavaMethod:__call(thisOrClass, ...)
 	-- only table.pack our args if necessary
 	local result
 	if self._isVarArgs then
+--DEBUG:print('_sig', tolua(self._sig))
+		-- java is a pain in the ass as always
+		-- the last arg is the array
+		-- so up until the last arg, we do require fixed args
+		local numJavaNonVarArgs = #self._sig-2	 -- -1 for return type, -1 for vararg array
+--DEBUG:print('numJavaNonVarArgs', numJavaNonVarArgs)
+		local numLuaArgs = select('#', ...)
+--DEBUG:print('numLuaArgs ', numLuaArgs )		
+		local numVarArgs = numLuaArgs - numJavaNonVarArgs
+--DEBUG:print('numVarArgs ', numVarArgs )		
+		local javaArgObjs = table()
+		for i=1,numJavaNonVarArgs do
+--DEBUG:print('converting lua arg', i, 'to java arg', i-1)
+			javaArgObjs[i] = env:_luaToJavaArg(select(i, ...), self._sig[i+1])
+		end
+		
 		-- just convert it to an Object[] array, let JNI do the type matching
 		-- TODO eventually test each vararg type to the underlying vararg array type
-		local nargs = select('#', ...)
-		local javaArgsObj = env:_newArray('java.lang.Object', nargs)
-		for i=0,nargs-1 do
-			javaArgsObj[i] = env:_luaToJavaArgs((select(i+1, ...)))
+		-- TODO use self._sig:last()'s arraytype's basetype here
+		local sigLast = table.last(self._sig)
+		local sigVarArgBase = sigLast:match'^(.*)%[%]$'
+		local javaVarArgsObj = env:_newArray(sigVarArgBase, numVarArgs)
+		for i=1,numVarArgs do
+--DEBUG:print('converting lua arg', numJavaNonVarArgs + i, 'to java vararg index', i-1)
+			javaVarArgsObj[i-1] = env:_luaToJavaArg(select(numJavaNonVarArgs + i, ...), sigVarArgBase)
 		end
+
+		javaArgObjs:insert(env:_luaToJavaArg(javaVarArgsObj, sigLast))
+
 
 		-- if it's a static method then a class comes first
 		-- otherwise an object comes first
@@ -98,7 +120,7 @@ function JavaMethod:__call(thisOrClass, ...)
 			env._ptr,
 			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
 			self._ptr,
-			env:_luaToJavaArg(javaArgsObj, self._sig[2])
+			javaArgObjs:unpack()
 		)
 	else
 		result = env._ptr[0][callName](

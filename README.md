@@ -30,7 +30,13 @@ local J = jvm.jniEnv
 - `jvm = JVM(args)` = creates a new VM
 - args:
 - - `version` = specify which version, defaults to `JNI_VERSION_1_6`
-- - `classpath` = specify an additional `-Djava.class.path=` option.
+- - and:
+- - `ptr` = specify a previously created `JavaVM*` pointer to create this `JavaVM` Lua object, retrieve its `JNIEnv*` JNI C pointer, and create a `JNIEnv` Lua object to go with it.
+- - or:
+- - `props` = specify additional key/value properties that use the `-D` prefix, i.e. `['java.class.path'] = '.'` builds the opiton `-Djava.class.path=.`.
+- - `options` = specify additional key/value properties that use no prefix, i.e. `['--module-path'] = '/usr/share/openjfx/lib'` builds the option `--module-path=/usr/share/openjfx/lib`.
+- - `optionList` = specify additional option strings in a list.
+- - `libjvm` = path to `libjvm.so`.  By default, `$JAVA_HOME/lib/server/libjvm.so` is used.
 
 - - `jvm._ptr` = the `JavaVM*` pointer
 
