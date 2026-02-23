@@ -7,6 +7,7 @@ local JavaClass = require 'java.class'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
 local infoForPrims = require 'java.util'. infoForPrims
+local getJNISig = require 'java.util'.getJNISig
 
 -- some of these overlap ctypes
 local jboolean = ffi.typeof'jboolean'	-- uint8_t
@@ -205,8 +206,7 @@ function JNIEnv:_findClass(classpath)
 
 	local classObj = self._classesLoaded[classpath]
 	if not classObj then
-		-- FindClass wants /-separator
-		local slashClassPath = classpath:gsub('%.', '/')
+		local slashClassPath = getJNISig(classpath)
 		local envptr = self._ptr
 		local jclass = envptr[0].FindClass(envptr, slashClassPath)
 		if jclass == nil then
@@ -568,8 +568,8 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 			end
 
 			-- TODO casting from boxed types to prims? is that a thing?
-			if isPrimitive[sig] then 
-				return false 
+			if isPrimitive[sig] then
+				return false
 			end
 
 			local toClassObj = self:_findClass(sig)
@@ -684,7 +684,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 
 			-- special case, auto-convert pointers to longs
 			if unboxedSig == 'long'
-			and ctname:match'%*' 
+			and ctname:match'%*'
 			then
 				return arg
 			end
