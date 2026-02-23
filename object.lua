@@ -8,6 +8,17 @@ local JavaCallResolve = require 'java.callresolve'
 local JavaObject = class()
 JavaObject.__name = 'JavaObject'
 
+-- TODO I have to break my Lua class model to make the java-interoperability layer compatible.
+--JavaObject.super exists but in Java ".super" is reserved, and I'm exposing it in my API as ":_super()"
+--JavaObject.class exists but in Java ".class" is reserved, and I'm exposing it in my API as ":_class()"
+--JavaObject.new exists but in Java "new" is reserved, and I'm exposing it in my API as ":_new()"
+JavaObject.subclass = nil	-- make room for Java instances with fields named 'subclass'
+--JavaObject.isa ... TODO this is going to hide any "isa" members in Java and get me in trouble...
+-- ... but nil-ing it here breaks my class :isa() functionality and my "assert.is" functionality...
+--JavaObject.isaSet ... TODO this is going to hide any "isaSet" members in Java ...
+
+
+
 function JavaObject:init(args)
 	self._env = assert.index(args, 'env')
 	self._ptr = assert.index(args, 'ptr')
@@ -44,7 +55,7 @@ assert.gt(#membersForName, 0, k)
 						error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
 					end
 				end
-				error("object is write-protected -- can't write private members afer creation")
+				error("JavaObject.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
 			end
 
 			-- finally do our write

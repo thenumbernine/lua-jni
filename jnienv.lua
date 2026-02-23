@@ -68,6 +68,9 @@ local bootstrapClasses = {
 
 local JNIEnv = class()
 JNIEnv.__name = 'JNIEnv'
+JNIEnv.subclass = nil
+--JNIEnv.isa = nil -- TODO
+--JNIEnv.isaSet = nil -- TODO
 
 --[[
 args:

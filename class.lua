@@ -1,4 +1,5 @@
 local assert = require 'ext.assert'
+local class = require 'ext.class'
 local string = require 'ext.string'
 local table = require 'ext.table'
 local tolua = require 'ext.tolua'
@@ -11,8 +12,12 @@ local getJNISig = require 'java.util'.getJNISig
 
 -- is a Java class a Java object?
 -- should JavaClass inherit from JavaObject?
-local JavaClass = JavaObject:subclass()
+local JavaClass = class(JavaObject)
 JavaClass.__name = 'JavaClass'
+JavaClass.subclass = nil
+--JavaClass.isa = nil -- TODO
+--JavaClass.isaSet = nil -- TODO
+
 
 function JavaClass:init(args)
 	self._env = assert.index(args, 'env')

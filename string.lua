@@ -4,11 +4,15 @@ tempting to get rid of this.
 just merge __len and __tostring with JavaObject ...
 --]]
 local ffi = require 'ffi'
+local class = require 'ext.class'
 local JavaObject = require 'java.object'
 
-local JavaString = JavaObject:subclass()
+local JavaString = class(JavaObject)
 JavaString.__name = 'JavaString'
-JavaString.__index = JavaObject.__index	-- class() / :subclass() will override this, so reset it
+JavaString.__index = JavaObject.__index	-- class() will override this, so reset it
+JavaString.subclass = nil
+--JavaString.isa = nil -- TODO
+--JavaString.isaSet = nil -- TODO
 
 function JavaString:__tostring()
 	local envptr = self._env._ptr

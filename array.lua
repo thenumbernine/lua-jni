@@ -1,13 +1,17 @@
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
+local class = require 'ext.class'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
 local infoForPrims = require 'java.util'.infoForPrims
 
 
-local JavaArray = JavaObject:subclass()
+local JavaArray = class(JavaObject)
 JavaArray.__name = 'JavaArray'
-JavaArray.__index = JavaObject.__index	-- class() / :subclass() will override this, so reset it
+JavaArray.__index = JavaObject.__index	-- class() will override this, so reset it
+JavaArray.subclass = nil
+--JavaArray.isa = nil -- TODO
+--JavaArray.isaSet = nil -- TODO
 
 --[[
 args:
