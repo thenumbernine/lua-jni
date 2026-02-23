@@ -84,6 +84,8 @@ function JavaMethod:__call(thisOrClass, ...)
 	-- only table.pack our args if necessary
 	local result
 	if self._isVarArgs then
+--DEBUG:print()
+--DEBUG:print(self._name)
 --DEBUG:print('_sig', tolua(self._sig))
 		-- java is a pain in the ass as always
 		-- the last arg is the array
@@ -96,22 +98,23 @@ function JavaMethod:__call(thisOrClass, ...)
 --DEBUG:print('numVarArgs ', numVarArgs )		
 		local javaArgObjs = table()
 		for i=1,numJavaNonVarArgs do
---DEBUG:print('converting lua arg', i, 'to java arg', i-1)
+--DEBUG:print('converting lua arg', i, 'to java arg', i-1, 'sig', self._sig[i+1])
 			javaArgObjs[i] = env:_luaToJavaArg(select(i, ...), self._sig[i+1])
 		end
 		
 		-- just convert it to an Object[] array, let JNI do the type matching
 		-- TODO eventually test each vararg type to the underlying vararg array type
 		-- TODO use self._sig:last()'s arraytype's basetype here
-		local sigLast = table.last(self._sig)
-		local sigVarArgBase = sigLast:match'^(.*)%[%]$'
-		local javaVarArgsObj = env:_newArray(sigVarArgBase, numVarArgs)
+		--local sigLast = table.last(self._sig)
+		--local sigVarArgBase = sigLast:match'^(.*)%[%]$'
+--DEBUG:print('sigVarArgBase', sigVarArgBase)		
+		local javaVarArgsObj = env:_newArray('java.lang.Object', numVarArgs) --sigVarArgBase, numVarArgs)
 		for i=1,numVarArgs do
 --DEBUG:print('converting lua arg', numJavaNonVarArgs + i, 'to java vararg index', i-1)
-			javaVarArgsObj[i-1] = env:_luaToJavaArg(select(numJavaNonVarArgs + i, ...), sigVarArgBase)
+			javaVarArgsObj[i-1] = env:_luaToJavaArg(select(numJavaNonVarArgs + i, ...)) --, sigVarArgBase)
 		end
 
-		javaArgObjs:insert(env:_luaToJavaArg(javaVarArgsObj, sigLast))
+		javaArgObjs:insert(env:_luaToJavaArg(javaVarArgsObj)) --, sigLast))
 
 
 		-- if it's a static method then a class comes first

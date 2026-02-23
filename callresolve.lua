@@ -28,39 +28,54 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 	-- ok now ...
 	-- we gotta match up ... args with all the method option arsg
 
-	local numArgs = 1 + select('#', ...)
+	local numArgs = select('#', ...)
 	local bestOption
 	local bestSigDist = math.huge
 	for i,option in ipairs(options) do
 		local sig = option._sig
 		local sigDist
-		if option._isVarArgs 
-		and numArgs-1 >= #sig-2	-- #sig-2 is the # of non-varargs that we need to match
-		then
-			sigDist = 0
-			-- TODO eventually test each vararg type to the underlying vararg array type
+
+		local doMatch
+
+		-- if it's a vararg then it still has a list of all non-varargs to match
+		-- then it has to match the varargs as whatever type the vararg should be
+		if option._isVarArgs then
+			if numArgs >= #sig-2 then	-- #sig-2 is the # of non-varargs that we need to match
+				local sigLast = sig[#sig]
+				local sigVarArgBase = sigLast:match'^(.*)%[%]$'
+				sig = table(sig)
+				for i=#sig,numArgs+1 do
+					sig[i] = sigVarArgBase
+				end
+				doMatch = true
+				-- TODO eventually test each vararg type to the underlying vararg array type
+			end
 		else
-			-- sig[1] is the return type
-			-- call args #1 is the this-or-class
-			-- the rest will match up
-			if #sig == numArgs then
-				-- now test if casting works ...
-				-- TODO calc score from dist of classes
-				sigDist = 0
-				for i=2,numArgs do
---DEBUG:print('arg #'..(i-1)..' = '..tostring((select(i-1, ...))))
---DEBUG:print('vs sig', sig[i])
-					local canConvert, argDist = env:_canConvertLuaToJavaArg(
-						select(i-1, ...),
-						sig[i]
-					)
-					if not canConvert then
-						sigDist = nil
-						break
-					end
-					if argDist then
-						sigDist = sigDist + argDist
-					end
+			if #sig-1 == numArgs then
+				doMatch = true
+			end
+		end
+			
+		-- sig[1] is the return type
+		-- call args #1 is the this-or-class
+		-- the rest will match up
+		if doMatch then
+			-- now test if casting works ...
+			-- TODO calc score from dist of classes
+			sigDist = 0
+			for i=1,numArgs do
+--DEBUG:print('arg #'..i..' = '..tostring((select(i, ...))))
+--DEBUG:print('vs sig', sig[i+1])
+				local canConvert, argDist = env:_canConvertLuaToJavaArg(
+					select(i, ...),
+					sig[i+1]
+				)
+				if not canConvert then
+					sigDist = nil
+					break
+				end
+				if argDist then
+					sigDist = sigDist + argDist
 				end
 			end
 		end
