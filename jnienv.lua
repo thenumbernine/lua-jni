@@ -3,7 +3,6 @@ local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
 local table = require 'ext.table'
-local vector = require 'stl.vector-lua'
 local JavaClass = require 'java.class'
 local JavaObject = require 'java.object'
 local prims = require 'java.util'.prims
@@ -57,6 +56,10 @@ local getUnboxedValueGetterMethod = {
 local isPrimitive = prims:mapi(function(name) return true, name end):setmetatable(nil)
 
 
+local jchar_arr = ffi.typeof'jchar[?]'	-- used by JNIEnv.NewString
+local JavaVM_ptr_1 = ffi.typeof'JavaVM*[1]'
+
+
 local bootstrapClasses = {
 	['java.lang.Class'] = true,
 	['java.lang.reflect.Field'] = true,
@@ -78,7 +81,7 @@ function JNIEnv:init(args)
 	self._vm = args.vm or false		-- jnienv will hold the vm just so the vm doesn't gc
 	if not self._vm then
 		-- make a JavaVM object around the pointer
-		local jvmPtrArr = ffi.new'JavaVM*[1]'
+		local jvmPtrArr = JavaVM_ptr_1()
 		assert.eq(ffi.C.JNI_OK, self._ptr[0].GetJavaVM(self._ptr, jvmPtrArr))
 		local jvmPtr = jvmPtrArr[0]
 		if jvmPtr == nil then
@@ -262,7 +265,8 @@ end
 
 -- get a jclass pointer for a jobject pointer
 function JNIEnv:_getObjClass(objPtr)
-	return self._ptr[0].GetObjectClass(self._ptr, objPtr)
+	local envptr = self._ptr
+	return envptr[0].GetObjectClass(envptr, objPtr)
 end
 
 -- Get a classpath for a jobject pointer
@@ -285,7 +289,8 @@ function JNIEnv:_getJClassClasspath(jclass)
 end
 
 function JNIEnv:_version()
-	return self._ptr[0].GetVersion(self._ptr)
+	local envptr = self._ptr
+	return envptr[0].GetVersion(envptr)
 end
 
 function JNIEnv:_str(s, len)
@@ -294,11 +299,11 @@ function JNIEnv:_str(s, len)
 	if len then
 		if type(s) == 'string' then
 			-- string + length, manually convert to jchar
-			local jstr = vector('jchar', len)
+			local jstr = jchar_arr(len)
 			for i=0,len-1 do
-				jstr.v[i] = s:byte(i+1)
+				jstr[i] = s:byte(i+1)
 			end
-			jstring = self._ptr[0].NewString(self._ptr, jstr.v, len)
+			jstring = self._ptr[0].NewString(self._ptr, jstr, len)
 		else
 			-- cdata + len, use as-is
 			jstring = self._ptr[0].NewString(self._ptr, s, len)

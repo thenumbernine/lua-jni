@@ -1,6 +1,6 @@
+// must be run with `java -Djava.library.path=.`
 public class TestRunRunnable {
 	public static void main(String[] args) {
-		// must be run with java -Djava.library.path=.
-		new TestNativeRunnable(0,0).run();
+		new io.github.thenumbernine.NativeRunnable(0,0).run();
 	}
 }

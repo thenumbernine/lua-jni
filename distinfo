@@ -41,10 +41,9 @@ files = {
 }
 deps = {
 	"ext",
-	"stl",
-	--"make",	-- for test
-	--"thread",	-- for test
-	--"ffi",	-- for test
+	--"make",	-- used by java.build, only if you want to invoke `javac` at runtime.
+	--"thread",	-- for tests/
+	--"ffi",	-- for tests/
 }
 generateBindings = ||{
 	{

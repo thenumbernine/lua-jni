@@ -104,10 +104,12 @@ function JavaObject:_javaToString()
 	env:_checkExceptions()
 	local pushIgnore = env._ignoringExceptions
 	env._ignoringExceptions = true
-	local str = tostring(self:_method{
+	local toStringMethod = assert(self:_method{
 		name = 'toString',
 		sig = {'java.lang.String'},
-	}(self))
+	})
+	local strJObj = toStringMethod(self)
+	local str = tostring(strJObj)
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
 	return str

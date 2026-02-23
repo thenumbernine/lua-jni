@@ -8,6 +8,16 @@ local io = require 'ext.io'
 local JNIEnv = require 'java.jnienv'
 
 
+local void_ptr_ptr = ffi.typeof'void**'
+local char_ptr = ffi.typeof'char*'
+local JavaVMOption = ffi.typeof'JavaVMOption'
+local JavaVMOption_arr = ffi.typeof'JavaVMOption[?]'
+local JavaVMInitArgs = ffi.typeof'JavaVMInitArgs'
+local JNIEnv_ptr_1 = ffi.typeof'JNIEnv*[1]'
+local JavaVM_ptr = ffi.typeof'JavaVM*'
+local JavaVM_ptr_1 = ffi.typeof'JavaVM*[1]'
+
+
 local JavaVM = class()
 JavaVM.__name = 'JavaVM'
 
@@ -24,18 +34,20 @@ args:
 	optionList = list of option strings
 	options = key/value of options to append ${k}=${v}
 	props = key/value of props to append -D${k}=${v}
+	libjvm = path to libjvm.so. By default it will look in $JAVA_HOME/lib/server/libjvm.so
+				... and if $JAVA_HOME is missing, its location will be inferred by "readlink -f `which java`"
 --]]
 function JavaVM:init(args)
 	args = args or {}
 	self.version = args.version
-	local jniEnvPtrArr = ffi.new'JNIEnv*[1]'
+	local jniEnvPtrArr = JNIEnv_ptr_1()
 
 	if args.ptr then
 		-- reattach to an old JavaVM*
-		local jvmPtr = ffi.cast('JavaVM*', args.ptr)
+		local jvmPtr = ffi.cast(JavaVM_ptr, args.ptr)
 		self._ptr = jvmPtr
 		-- assert/assume it is cdata of JavaVM*
-		assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast('void**', jniEnvPtrArr), self.version))
+		assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast(void_ptr_ptr, jniEnvPtrArr), self.version))
 
 		-- if we are creating from an old pointer then we don't want __gc to cleanup so
 		function self:destroy() end
@@ -48,8 +60,8 @@ function JavaVM:init(args)
 		local function addOption(optionStr)
 			local str = tostring(optionStr)
 			self.optionStrings:insert(str)
-			local option = ffi.new'JavaVMOption'
-			option.optionString = ffi.cast('char*', str)
+			local option = JavaVMOption()
+			option.optionString = ffi.cast(char_ptr, str)
 			self.optionTable:insert(option)
 		end
 		if args.optionList then
@@ -67,18 +79,20 @@ function JavaVM:init(args)
 				addOption('-D'..k..'='..v)
 			end
 		end
-		self.options = ffi.new('JavaVMOption[?]', #self.optionTable, self.optionTable)
+		self.options = JavaVMOption_arr(#self.optionTable, self.optionTable)
 
-		local jvmargs = ffi.new'JavaVMInitArgs'
+		local jvmargs = JavaVMInitArgs()
 		jvmargs.version = self.version
 		jvmargs.nOptions = #self.optionTable
 		jvmargs.options = self.options
 		jvmargs.ignoreUnrecognized = ffi.C.JNI_FALSE
 
 		-- will this gc and unload dload? or nah, I can make it a local?
-		self.jni = ffi.load(require 'java.build'.getJavaHome()..'/lib/server/libjvm.so')
+		local libjvmpath = args.libjvmpath
+			or require 'java.build'.getJavaHome()..'/lib/server/libjvm.so'
+		self.jni = ffi.load(libjvmpath)
 
-		local jvmPtrArr = ffi.new'JavaVM*[1]'
+		local jvmPtrArr = JavaVM_ptr_1()
 		local result = self.jni.JNI_CreateJavaVM(jvmPtrArr, jniEnvPtrArr, jvmargs)
 		assert.eq(result, 0, 'JNI_CreateJavaVM')
 
