@@ -165,6 +165,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
 
+- `cl._members[name][index]` = either JavaMethod or JavaField of a member with that name.
+
 - `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
 - args:
 - - `name` = the method name
@@ -179,8 +181,6 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `name` = field name.
 - - `sig` = signature string of the field.
 - - `static` = true for static fields.
-
-- `cl._members[name][index]` = either JavaMethod or JavaField of a member with that name.
 
 
 ### JavaField

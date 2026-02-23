@@ -68,6 +68,8 @@ print('doubleArr._getClass()._name()', doubleArr:_getClass():_name())	-- "double
 print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
 --print('doubleArr:_super()', doubleArr:_super())
 
+doubleArr[2] = 2*math.pi
+print('doubleArr[2]', doubleArr[2])
 doubleArr:_set(3, 3.14)
 print('doubleArr[3]', doubleArr:_get(3))
 
@@ -83,6 +85,7 @@ print('charArr[1]', charArr:_get(1))
 print('charArr[0]', charArr[0])
 print('charArr[1]', charArr[1])
 
+print('#charArr', #charArr)
 print('charArr.length', charArr.length)
 print('charArr:_getClass()._members.length', charArr:_getClass()._members.length)
 print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array

@@ -96,35 +96,21 @@ end
 
 -- calls in java `obj.toString()`
 function JavaObject:_javaToString()
-	-- [[ this works more often than I realize it should
-	-- NOTICE I'm going to hide exceptions for this too
+	-- [[
+	-- I'm going to hide exceptions for this too
 	-- because it's used internally, specifically, with Lua __tostring
-	-- so if you want your Java toString to throw then be sure to call obj:toString() and not tostring(obj)
+	-- so if you want your Java toString to throw then call obj:toString() and not tostring(obj)
 	local env = self._env
 	env:_checkExceptions()
 	local pushIgnore = env._ignoringExceptions
 	env._ignoringExceptions = true
-	local toStringMethod = assert(self:_method{
-		name = 'toString',
-		sig = {'java.lang.String'},
-	})
-	local strJObj = toStringMethod(self)
-	local str = tostring(strJObj)
+	local str = tostring(self:toString())
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
 	return str
 	--]]
-	--[[ check our reflection, but sometimes getting toString works even when the reflection says it's not there ... ? fallback on java.lang.Class.toString() ?
-	local classObj = self:_getClass()	-- TODO cache this?
-	local toStrings = classObj._members.toString
-	if not toStrings then return self:_getDebugStr() end
-	--[=[ TODO if _methods found toString then why can't I call it?
-	-- because my call-resolver doesn't agree that its for me to call?
+	--[[ same but throws exceptions in Java
 	return tostring(self:toString())
-	--]=]
-	-- [=[ invoke it manually ...
-	-- ... at this point why not just do the first way
-	--]=]
 	--]]
 end
 
