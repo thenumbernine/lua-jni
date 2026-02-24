@@ -77,6 +77,10 @@ JNIEnv.subclass = nil
 args:
 	ptr = JNIEnv* cdata
 	vm = vm to store (optional, to prevent it from gc'ing if we hold only the JNIEnv)
+	findClassCantHandleSignatures =
+		My old Android Java doesn't like signature for JNIEnv->FindClass
+		But signature-based lookups are the most flexible, especially for finding array classes, so I'm making it the default.
+		So Android Java has to pass this extra flag.
 --]]
 function JNIEnv:init(args)
 	self._ptr = assert.type(assert.index(args, 'ptr'), 'cdata', "expected a JNIEnv*")
@@ -97,6 +101,8 @@ function JNIEnv:init(args)
 			jniEnv = self,	-- don't make a new JNIEnv wrapper
 		}
 	end
+
+	self._findClassCantHandleSignatures = not not args.findClassCantHandleSignatures
 
 	self._classesLoaded = {}
 
@@ -178,6 +184,10 @@ function JNIEnv:init(args)
 		name = 'getModifiers',
 		sig = {'int'},
 	})
+	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_isVarArgs = assert(self._java_lang_reflect_Constructor:_method{
+		name = 'isVarArgs',
+		sig = {'boolean'},
+	})
 
 	-- now that reflection is setup, we can start JavaObject-wrapping excpetions
 	assert.eq(true, self._ignoringExceptions)
@@ -213,7 +223,17 @@ function JNIEnv:_findClass(classpath)
 
 	local classObj = self._classesLoaded[classpath]
 	if not classObj then
-		local slashClassPath = getJNISig(classpath)
+		-- NOTICE NOTICE NOTICE
+		-- using a JNI signature, i.e. "Ljava/lang/ClassName;", is the most flexible here
+		-- however Google's Android Java is dumb and can't handle that,
+		-- it only wants "java/lang/ClassName"
+		-- but this method can't handle arrays-of-classes and primitives.
+		local slashClassPath
+		if self._findClassCantHandleSignatures then
+			slashClassPath = classpath:gsub('%.', '/')
+		else
+			slashClassPath = getJNISig(classpath)
+		end
 		local envptr = self._ptr
 		local jclass = envptr[0].FindClass(envptr, slashClassPath)
 		if jclass == nil then

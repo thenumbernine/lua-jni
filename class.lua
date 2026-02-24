@@ -174,7 +174,7 @@ function JavaClass:_setupReflection()
 				sig:insert(paramClassPath)
 			end
 
-			local isVarArgs = java_lang_reflect_Method._java_lang_reflect_Method_isVarArgs(method)
+			local isVarArgs = java_lang_reflect_Constructor._java_lang_reflect_Constructor_isVarArgs(method)
 
 			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
 
