@@ -30,7 +30,9 @@ args:
 	-and-
 
 	ptr = reconstruct our JavaVM object from a JavaVM ffi cdata JNI pointer
-	jniEnv = optional, use a pre-made JNIEnv Lua object.
+	jniEnv = optional
+		either a JNIEnv Lua object to forward a pre-made JNIEnv Lua object to this JavaVM Lua object.
+		or a regular table to serve as args for constructing a new JNIEnv object.
 
 	-or- build a new one with...
 
@@ -39,6 +41,7 @@ args:
 	props = key/value of props to append -D${k}=${v}
 	libjvm = path to libjvm.so. By default it will look in $JAVA_HOME/lib/server/libjvm.so
 				... and if $JAVA_HOME is missing, its location will be inferred by "readlink -f `which java`"
+	jniEnv = optional, a regular table to serve as args for constructing a new JNIEnv object.
 --]]
 function JavaVM:init(args)
 	args = args or {}
@@ -51,7 +54,9 @@ function JavaVM:init(args)
 
 		-- In this case, for the args.ptr pathway, we wouldn't need to call GetEnv
 		-- but it seems there's no way to run JNI_CreateJavaVM without getting the initial JNIEnv
-		if args.jniEnv then
+		if args.jniEnv
+		and JNIEnv:isa(args.jniEnv)
+		then
 			self.jniEnv = args.jniEnv
 		else
 			-- assert/assume it is cdata of JavaVM*
@@ -59,10 +64,11 @@ function JavaVM:init(args)
 			assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast(void_ptr_ptr, jniEnvPtrArr), self.version))
 
 			if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
-			self.jniEnv = JNIEnv{
-				vm = self,
-				ptr = jniEnvPtrArr[0],
-			}
+
+			local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
+			jniEnvArgs.vm = self
+			jniEnvArgs.ptr = jniEnvPtrArr[0]
+			self.jniEnv = JNIEnv(jniEnvArgs)
 		end
 
 		-- if we are creating from an old pointer then we don't want __gc to cleanup so
@@ -108,7 +114,6 @@ function JavaVM:init(args)
 			or require 'java.build'.getJavaHome()..'/lib/server/libjvm.so'
 		self.jni = ffi.load(libjvmpath)
 
-		assert(not args.jniEnv)
 		local jvmPtrArr = JavaVM_ptr_1()
 		-- is there a difference between this and just calling GetEnv later?
 		local jniEnvPtrArr = JNIEnv_ptr_1()
@@ -119,10 +124,12 @@ function JavaVM:init(args)
 		self._ptr = jvmPtrArr[0]
 
 		if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
-		self.jniEnv = JNIEnv{
-			vm = self,
-			ptr = jniEnvPtrArr[0],
-		}
+
+		assert(not JNIEnv:isa(args.jniEnv))
+		local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
+		jniEnvArgs.vm = self
+		jniEnvArgs.ptr = jniEnvPtrArr[0]
+		self.jniEnv = JNIEnv(jniEnvArgs)
 
 		-- no longer need to retain for gc
 		self.options = nil

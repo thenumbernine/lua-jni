@@ -13,10 +13,8 @@ JavaObject.__name = 'JavaObject'
 --JavaObject.class exists but in Java ".class" is reserved, and I'm exposing it in my API as ":_class()"
 --JavaObject.new exists but in Java "new" is reserved, and I'm exposing it in my API as ":_new()"
 JavaObject.subclass = nil	-- make room for Java instances with fields named 'subclass'
---JavaObject.isa ... TODO this is going to hide any "isa" members in Java and get me in trouble...
--- ... but nil-ing it here breaks my class :isa() functionality and my "assert.is" functionality...
---JavaObject.isaSet ... TODO this is going to hide any "isaSet" members in Java ...
-
+--JavaObject.isa = nil -- handled in __index
+--JavaObject.isaSet = nil -- handled in __index
 
 
 function JavaObject:init(args)
@@ -176,9 +174,11 @@ end
 
 function JavaObject:__index(k)
 	-- if self[k] exists then this isn't called
-	local cl = getmetatable(self)
-	local v = cl[k]
-	if v ~= nil then return v end
+	if k ~= 'isa' and k ~= 'isaSet' then
+		local cl = getmetatable(self)
+		local v = cl[k]
+		if v ~= nil then return v end
+	end
 
 	if type(k) ~= 'string' then
 		-- TODO indexed keys for java.lang.Array's

@@ -11,8 +11,8 @@ local JavaString = class(JavaObject)
 JavaString.__name = 'JavaString'
 JavaString.__index = JavaObject.__index	-- class() will override this, so reset it
 JavaString.subclass = nil
---JavaString.isa = nil -- TODO
---JavaString.isaSet = nil -- TODO
+--JavaString.isa = nil -- handled in __index
+--JavaString.isaSet = nil -- handled in __index
 
 function JavaString:__tostring()
 	local envptr = self._env._ptr

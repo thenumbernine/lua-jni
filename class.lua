@@ -15,8 +15,8 @@ local getJNISig = require 'java.util'.getJNISig
 local JavaClass = class(JavaObject)
 JavaClass.__name = 'JavaClass'
 JavaClass.subclass = nil
---JavaClass.isa = nil -- TODO
---JavaClass.isaSet = nil -- TODO
+--JavaClass.isa = nil -- handled in __index
+--JavaClass.isaSet = nil -- handled in __index
 
 
 function JavaClass:init(args)
@@ -400,9 +400,11 @@ end
 function JavaClass:__index(k)
 
 	-- if self[k] exists then this isn't called
-	local cl = getmetatable(self)
-	local v = cl[k]
-	if v ~= nil then return v end
+	if k ~= 'isa' and k ~= 'isaSet' then
+		local cl = getmetatable(self)
+		local v = cl[k]
+		if v ~= nil then return v end
+	end
 
 	if type(k) ~= 'string' then return end
 

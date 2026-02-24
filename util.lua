@@ -1,3 +1,4 @@
+require 'java.ffi.jni'	-- primitive defs
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'

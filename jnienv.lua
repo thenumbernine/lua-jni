@@ -70,8 +70,17 @@ local bootstrapClasses = {
 local JNIEnv = class()
 JNIEnv.__name = 'JNIEnv'
 JNIEnv.subclass = nil
---JNIEnv.isa = nil -- TODO
---JNIEnv.isaSet = nil -- TODO
+--[[
+alright because
+1) I'm messing with JNIEnv's __index to do classpath lookup
+2) I'm trying to preserve the Lua-based OOP functions
+so I want to allow JNIEnv:isa() to work.
+--JNIEnv.isa = nil -- has to be here
+--JNIEnv.isaSet = nil -- " " " "
+So I'm going to leave JNIEnv.isa and JNI.isaSet.
+But I'll just dodge them in the object's __index metamethod.
+--]]
+
 
 --[[
 args:
@@ -777,14 +786,19 @@ end
 JNIEnv.__concat = string.concat
 
 
-local Name = class()
+local Name
 
 function JNIEnv:__index(k)
 	-- automatic, right?
 	--local v = rawget(self, k)
 	--if v ~= nil then return v end
-	local v = JNIEnv[k]
-	if v ~= nil then return v end
+	-- however TODO
+	-- JNIEnv still retains its .isa and .isaSet for the sake of ext.class isa inheritence test
+	-- so explicitly skip those two in JNIEnv
+	if k ~= 'isa' and k ~= 'isaSet' then
+		local v = JNIEnv[k]
+		if v ~= nil then return v end
+	end
 
 	if type(k) ~= 'string' then return end
 
@@ -828,6 +842,10 @@ assert.eq(true, self._ignoringExceptions)
 end
 
 
+Name = class()
+Name.__name = 'Name'
+Name.subclass = nil
+
 function Name:init(args)
 	rawset(self, '_env', assert.index(args, 'env'))
 	rawset(self, '_name', assert.index(args, 'name'))
@@ -847,8 +865,11 @@ end
 Name.__concat = string.concat
 
 function Name:__index(k)
-	local v = rawget(Name, k)
-	if v ~= nil then return v end
+	-- avoid the last two fields I am leaving in Name for Lua OOP
+	if k ~= 'isa' and k ~= 'isaSet' then
+		local v = rawget(Name, k)
+		if v ~= nil then return v end
+	end
 
 	-- don't build namespaces off private vars
 	-- this is really here to prevent stackoverflows during __index operations
