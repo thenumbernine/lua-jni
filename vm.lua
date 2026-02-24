@@ -27,7 +27,10 @@ JavaVM.version = ffi.C.JNI_VERSION_1_6
 args:
 	version optional, defaults to JavaVM.version which defaults to JNI_VERSION_1_6
 
+	-and-
+
 	ptr = reconstruct our JavaVM object from a JavaVM ffi cdata JNI pointer
+	jniEnv = optional, use a pre-made JNIEnv Lua object.
 
 	-or- build a new one with...
 
@@ -40,14 +43,27 @@ args:
 function JavaVM:init(args)
 	args = args or {}
 	self.version = args.version
-	local jniEnvPtrArr = JNIEnv_ptr_1()
 
 	if args.ptr then
 		-- reattach to an old JavaVM*
 		local jvmPtr = ffi.cast(JavaVM_ptr, args.ptr)
 		self._ptr = jvmPtr
-		-- assert/assume it is cdata of JavaVM*
-		assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast(void_ptr_ptr, jniEnvPtrArr), self.version))
+
+		-- In this case, for the args.ptr pathway, we wouldn't need to call GetEnv
+		-- but it seems there's no way to run JNI_CreateJavaVM without getting the initial JNIEnv
+		if args.jniEnv then
+			self.jniEnv = args.jniEnv
+		else
+			-- assert/assume it is cdata of JavaVM*
+			local jniEnvPtrArr = JNIEnv_ptr_1()
+			assert.eq(ffi.C.JNI_OK, jvmPtr[0].GetEnv(jvmPtr, ffi.cast(void_ptr_ptr, jniEnvPtrArr), self.version))
+
+			if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
+			self.jniEnv = JNIEnv{
+				vm = self,
+				ptr = jniEnvPtrArr[0],
+			}
+		end
 
 		-- if we are creating from an old pointer then we don't want __gc to cleanup so
 		function self:destroy() end
@@ -92,24 +108,27 @@ function JavaVM:init(args)
 			or require 'java.build'.getJavaHome()..'/lib/server/libjvm.so'
 		self.jni = ffi.load(libjvmpath)
 
+		assert(not args.jniEnv)
 		local jvmPtrArr = JavaVM_ptr_1()
+		-- is there a difference between this and just calling GetEnv later?
+		local jniEnvPtrArr = JNIEnv_ptr_1()
 		local result = self.jni.JNI_CreateJavaVM(jvmPtrArr, jniEnvPtrArr, jvmargs)
 		assert.eq(result, 0, 'JNI_CreateJavaVM')
 
 		if jvmPtrArr[0] == nil then error("failed to find a JavaVM*") end
 		self._ptr = jvmPtrArr[0]
+
+		if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
+		self.jniEnv = JNIEnv{
+			vm = self,
+			ptr = jniEnvPtrArr[0],
+		}
+
+		-- no longer need to retain for gc
+		self.options = nil
+		self.optionTable = nil
+		self.optionStrings = nil
 	end
-
-	if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
-	self.jniEnv = JNIEnv{
-		vm = self,
-		ptr = jniEnvPtrArr[0],
-	}
-
-	-- no longer need to retain for gc
-	self.options = nil
-	self.optionTable = nil
-	self.optionStrings = nil
 end
 
 function JavaVM:destroy()

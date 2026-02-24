@@ -92,7 +92,10 @@ function JNIEnv:init(args)
 			error("couldn't get JavaVM* back from JNIEnv*")
 		end
 		local JavaVM = require 'java.vm'
-		self._vm = JavaVM{ptr = jvmPtr}
+		self._vm = JavaVM{
+			ptr = jvmPtr,
+			jniEnv = self,	-- don't make a new JNIEnv wrapper
+		}
 	end
 
 	self._classesLoaded = {}
