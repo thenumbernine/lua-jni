@@ -1,9 +1,7 @@
 #!/usr/bin/env luajit
 local J = require 'java'
 print('J', J)
-print('J.java', J.java)
-print('J.java.lang', J.java.lang)
-print('J.java.lang.System', J.java.lang.System)
-print('J.java.lang.System.out', J.java.lang.System.out)
-local System = J.java.lang.System
+print('J.System', J.System)
+print('J.System.out', J.System.out)
+local System = J.System
 System.out:println("System.out.println works")

@@ -26,19 +26,16 @@ local thread = LiteThread{
 	print('hello from child thread Lua, arg', arg)
 
 	print('J', J)
-	print('J.java', J.java)
-	print('J.java.lang', J.java.lang)
-	print('J.java.lang.System', J.java.lang.System)
-	print('J.java.lang.System.out', J.java.lang.System.out)
+	print('J.System.out', J.System.out)
 
-	J.java.lang.System.out:println("LuaJIT -> Java -> JNI -> (new thread) -> LuaJIT -> Java -> printing here")
+	J.System.out:println("LuaJIT -> Java -> JNI -> (new thread) -> LuaJIT -> Java -> printing here")
 
 	J:_checkExceptions()
 ]=],
 }
 
 local J = jvm.jniEnv
-local th = J.java.lang.Thread:_new(J.io.github.thenumbernine.NativeRunnable:_new(thread.funcptr, J._vm._ptr))
+local th = J.Thread:_new(J.io.github.thenumbernine.NativeRunnable:_new(thread.funcptr, J._vm._ptr))
 print('thread', th)
 th:start()
 th:join()

@@ -13,18 +13,18 @@ print('float', J.float)
 print('double', J.double)
 
 
-print('java.lang.Class.forName"java.lang.Class"', J.java.lang.Class:forName'java.lang.Class')
-assert.eq(J.java.lang.Class:forName'java.lang.Class', J.java.lang.Class:forName'java.lang.Class')
-print('java.lang.Class.forName"java.lang.Void"', J.java.lang.Class:forName'java.lang.Void')
+print('java.lang.Class.forName"java.lang.Class"', J.Class:forName'java.lang.Class')
+assert.eq(J.java.lang.Class:forName'java.lang.Class', J.Class:forName'java.lang.Class')
+print('java.lang.Class.forName"java.lang.Void"', J.Class:forName'java.lang.Void')
 
-local Void = J.java.lang.Void
+local Void = J.Void
 print('Void', Void)
 print('Void._ptr', Void._ptr)
-assert.eq(J.java.lang.Void, J.java.lang.Void)
+assert.eq(J.Void, J.Void)
 
 print('Void.TYPE', Void.TYPE)
 print('Void.TYPE._ptr', Void.TYPE._ptr)
-assert.eq(J.java.lang.Void.TYPE, J.java.lang.Void.TYPE)
+assert.eq(J.Void.TYPE, J.Void.TYPE)
 
 -- Void.TYPE.getName() returns "void"
 print('Void.TYPE:getName()', Void.TYPE:getName())
@@ -43,8 +43,8 @@ print('J.void', J.void)
 -- void.class == java.lang.Void.TYPE
 
 -- so Class.forPrimitiveName'int' == Integer.TYPE ...
-local Class = J.java.lang.Class
-assert(rawequal(J.java.lang.Class, J._java_lang_Class))	-- make sure the cache works
+local Class = J.Class
+assert(rawequal(J.Class, J._java_lang_Class))	-- make sure the cache works
 
 --print(Class:forPrimitiveName'int')
 --[[ TODO this is static, why can't I see it?
@@ -91,6 +91,6 @@ print('charArr:_getClass()._members.length', charArr:_getClass()._members.length
 print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
 print('charArr:_getClass():_name()', charArr:_getClass():_name())
 print('charArr:_getClass():_super()', charArr:_getClass():_super())
---print('J.java.lang.Array', J.java.lang.Array)
+--print('J.Array', J.Array)
 
 

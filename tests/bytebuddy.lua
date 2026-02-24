@@ -18,16 +18,15 @@ local J = require 'java.vm'{
 }.jniEnv
 assert(require 'java.class':isa(J.net.bytebuddy.ByteBuddy), "I can't find the ByteBuddy jar...")
 
-local objOfClass_java_lang_Object = J.java.lang.Object:_class()
 local dynamicType = J.net.bytebuddy.ByteBuddy()
-	:subclass(objOfClass_java_lang_Object)
+	:subclass(J.Object:_class())
 	:method(J.net.bytebuddy.matcher.ElementMatchers:named'toString')
 	:intercept(J.net.bytebuddy.implementation.FixedValue:value'Hello World!')
 	:make()
-	:load(objOfClass_java_lang_Object:getClassLoader())
+	:load(J.Object:_class():getClassLoader())
 	:getLoaded()
 
--- now dynamicType is a Java object of type java.lang.Class<?>, where the ? is java.lang.Object because that's what I fed into :subclass() and :load() above
+-- now dynamicType is a Java object of type Class<?>, where the ? is Object because that's what I fed into :subclass() and :load() above
 print('dynamicType', dynamicType, dynamicType._classpath)
 local dynamicObj = dynamicType:getDeclaredConstructor():newInstance()
 print('dynamicObj', dynamicObj)

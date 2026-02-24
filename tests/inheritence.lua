@@ -27,7 +27,7 @@ print('J:_getJClassClasspath(A._ptr)', J:_getJClassClasspath(A._ptr))
 print('J:_getJClassClasspath(B._ptr)', J:_getJClassClasspath(B._ptr))
 print('J:_getJClassClasspath(C._ptr)', J:_getJClassClasspath(C._ptr))
 
-local Object = J.java.lang.Object
+local Object = J.Object
 
 print('Object', Object)
 print('A', A)

@@ -65,17 +65,17 @@ print('testObj:ol((long)1)', testObj:ol(J.long(1)))							-- correct
 
 -- overload of boxed types ... when reslver has prim or Object it will choose Object ..
 print'from boxed prims'
-print('testObj:ol(new Boolean(true))', testObj:ol(J.java.lang.Boolean:_new(true)))		-- RIGHT - Object
-print('testObj:ol(new Short(1))', testObj:ol(J.java.lang.Short:_new(1)))				-- RIGHT - Object
-print('testObj:ol(new Int(1))', testObj:ol(J.java.lang.Integer:_new(1)))				-- RIGHT - Object
-print('testObj:ol(new Float(1))', testObj:ol(J.java.lang.Float:_new(1)))				-- WRONG - float
-print('testObj:ol(new Double(1))', testObj:ol(J.java.lang.Double:_new(1)))				-- WRONG - double
-print('testObj:ol(new Long(1))', testObj:ol(J.java.lang.Long:_new(1)))					-- RIGHT - Object
+print('testObj:ol(new Boolean(true))', testObj:ol(J.Boolean:_new(true)))		-- RIGHT - Object
+print('testObj:ol(new Short(1))', testObj:ol(J.Short:_new(1)))				-- RIGHT - Object
+print('testObj:ol(new Int(1))', testObj:ol(J.Integer:_new(1)))				-- RIGHT - Object
+print('testObj:ol(new Float(1))', testObj:ol(J.Float:_new(1)))				-- WRONG - float
+print('testObj:ol(new Double(1))', testObj:ol(J.Double:_new(1)))				-- WRONG - double
+print('testObj:ol(new Long(1))', testObj:ol(J.Long:_new(1)))					-- RIGHT - Object
 
 -- overload from objects
 print'from objects'
 print('testObj:ol(String("foo"))', testObj:ol(J:_str'foo'))					-- correct
-print('testObj:ol(Object())', testObj:ol( J.java.lang.Object:_new() ))		-- correct
+print('testObj:ol(Object())', testObj:ol( J.Object:_new() ))		-- correct
 
 -- overload from arrays
 print'from arrays'
@@ -125,8 +125,8 @@ print('Test:test()', Test:test())
 
 print('Test:_super()', Test:_super())
 
-print('testObj instanceof Object', testObj:_instanceof(J.java.lang.Object))
-local testObjAsObject = testObj:_cast(J.java.lang.Object)
+print('testObj instanceof Object', testObj:_instanceof(J.Object))
+local testObjAsObject = testObj:_cast(J.Object)
 print('(Object)testObj', testObjAsObject)
 local testObjAsObjectAsTest = testObjAsObject:_cast(Test)
 print('(Test)(Object)testObj', testObjAsObjectAsTest)

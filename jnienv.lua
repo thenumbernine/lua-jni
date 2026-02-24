@@ -778,6 +778,9 @@ function JNIEnv:__index(k)
 	-- I guess that means classes only
 
 	-- ignore exceptions while we search for the class
+
+	-- first search .
+
 	self:_checkExceptions()
 assert.eq(false, self._ignoringExceptions)
 	self._ignoringExceptions = true
@@ -785,7 +788,16 @@ assert.eq(false, self._ignoringExceptions)
 assert.eq(true, self._ignoringExceptions)
 	self._ignoringExceptions = false
 	self:_exceptionClear()
+	if cl then return cl end
 
+	-- next search java.lang.*
+	self:_checkExceptions()
+assert.eq(false, self._ignoringExceptions)
+	self._ignoringExceptions = true
+	local cl = self:_findClass('java.lang.'..k)
+assert.eq(true, self._ignoringExceptions)
+	self._ignoringExceptions = false
+	self:_exceptionClear()
 	if cl then return cl end
 
 --DEBUG:print('JNIEnv __index', k)

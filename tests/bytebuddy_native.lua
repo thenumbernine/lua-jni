@@ -49,12 +49,15 @@ closureJavaMethodHandle:invokeWithArguments()
 
 -- [[ here's our ByteBuddy
 
-local classObj_java_lang_Runnable = J.java.lang.Runnable:_class()
+local Runnable_classObj = J.Runnable:_class()
 local bb = J.net.bytebuddy.ByteBuddy()
-bb = bb:subclass(classObj_java_lang_Runnable)
+bb = bb:subclass(Runnable_classObj)
 	
 bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'run')
-	--:defineMethod('run', J.java.lang.Void.TYPE, J.org.objectweb.asm.Opcodes.ACC_PUBLIC)
+
+	-- 2500 different classes to this package.  and no solid tutorial.
+
+	--:defineMethod('run', J.Void.TYPE, J.org.objectweb.asm.Opcodes.ACC_PUBLIC)
 		--J.net.bytebuddy.implementation.FixedValue:value(
 	
 	-- [[ "not a direct method handle"
@@ -66,7 +69,7 @@ bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'run')
 		J.net.bytebuddy.implementation.MethodCall:invoke(closureJavaMethodHandle)
 	)
 	--]]
-		--J.net.bytebuddy.implementation.InvokeDynamic:bootstrap(closureJavaMethodHandle, J.java.lang.Long(42))
+		--J.net.bytebuddy.implementation.InvokeDynamic:bootstrap(closureJavaMethodHandle, J.Long(42))
 		--J.net.bytebuddy.implementation.InvokeDynamic(closureJavaMethodHandle):withLongValue(J.long(42))
 			--[[
 	bb = bb:intercept(
@@ -82,22 +85,22 @@ bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'run')
 	bb = bb:intercept(
 		J.net.bytebuddy.implementation.InvokeDynamic:bootstrap(
 			J.net.bytebuddy.matcher.ElementMatchers:is(
-				classObj_java_lang_Runnable:getDeclaredMethods()[0] -- Using index might be fragile; better to use ElementMatchers.named("bootstrap") if possible in the actual API
+				Runnable_classObj:getDeclaredMethods()[0] -- Using index might be fragile; better to use ElementMatchers.named("bootstrap") if possible in the actual API
 			)
 		):withTargetMethod(
 			J.java.lang.invoke.MethodType:methodType(
-				J.java.lang.Void.TYPE -- The signature of the invokedynamic instruction
+				J.Void.TYPE -- The signature of the invokedynamic instruction
 			)
 		):withReference(
 			J.java.lang.invoke.MethodType:_class(),
-			J.java.lang.invoke.MethodType:methodType(J.java.lang.void.TYPE) -- An extra constant argument if needed, here just an example
+			J.java.lang.invoke.MethodType:methodType(J.Void.TYPE) -- An extra constant argument if needed, here just an example
 		)
 	)
 	
 			--]]
 
 bb = bb:make()
-bb = bb:load(classObj_java_lang_Runnable:getClassLoader())
+bb = bb:load(Runnable_classObj:getClassLoader())
 local dynamicType = bb:getLoaded()
 
 -- now dynamicType is a Java object of type java.lang.Class<?>, where the ? is java.lang.Object because that's what I fed into :subclass() and :load() above
