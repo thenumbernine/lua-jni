@@ -59,7 +59,10 @@ public class TestASM {
 		cw.visitEnd();
 		byte[] code = cw.toByteArray(); // Return the bytecode as a byte array
 
-/* works but does require a dynamic subclass what I need to avoid... */
+/* google ai gives this tip at the bottom of the page */
+		Class<?> helloWorldClass = java.lang.invoke.MethodHandles.lookup().defineClass(code);
+/**/
+/* works but does require a dynamic subclass what I need to avoid... * /
 		// 1. Create a loader that exposes the protected defineClass method
 		class ByteArrayClassLoader extends ClassLoader {
 			public Class<?> define(String name, byte[] b) {
