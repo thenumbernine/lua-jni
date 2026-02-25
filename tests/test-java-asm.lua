@@ -75,7 +75,7 @@ local publicLookup = MethodHandles:publicLookup()
 local helloWorldClass = publicLookup:defineHiddenClass(code, true)	-- "JVM java.lang.IllegalAccessException: java.lang.Object/publicLookup does not have full privilege access"
 --local helloWorldClass = publicLookup:defineHiddenClass(code, false)	-- "JVM java.lang.IllegalAccessException: java.lang.Object/publicLookup does not have full privilege access"
 --]]
--- [[ this works but it relies, once again, on an external class. smh i hate java.
+--[[ this works but it relies, once again, on an external class. smh i hate java.
 require 'java.build'.java{
 	src = 'TestLookupFactory.java',
 	dst = 'TestLookupFactory.class',
@@ -86,6 +86,12 @@ local helloWorldClass = lookup:defineClass(code)
 --]]
 --[[ https://stackoverflow.com/questions/31226170/load-asm-generated-class-while-runtime
 -- still needs a custom subclass to be compiled ...
+-- ex: 
+--public class RuntimeClassLoader extends ClassLoader {
+--	public Class<?> defineClass(String name, byte[] b) {
+--		return defineClass(name, b, 0, b.length);
+--	}
+--}
 print(J.Class:getClassLoader())
 print(J.Class:_class():getClassLoader())
 print(J.Class:getClass():getClassLoader())
@@ -96,8 +102,18 @@ local helloWorldClass = loader:defineClass('HelloWorld', code, 0, #code)
 print('helloWorldClass', helloWorldClass)
 os.exit()
 --]]
--- [[ some say URLClassLoader, but that requires file write?
--- https://stackoverflow.com/a/1874179/2714073
+-- [[ URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
+local path = require 'ext.path'
+
+-- TODO put this in the java lua api?
+-- either a convert-to-C function or even a get-raw-access function (that needs to be manually released...)
+local codeptr = J._ptr[0].GetByteArrayElements(J._ptr, code._ptr, nil)
+path'HelloWorld.class':write(ffi.string(codeptr, #code))
+J._ptr[0].ReleaseByteArrayElements(J._ptr, code._ptr, codeptr, 0)
+
+local urls = J:_newArray(J.java.net.URL, 1, J.java.net.URL(J:_str('file://'..path:cwd())))
+local loader = J.java.net.URLClassLoader(urls)
+local helloWorldClass = loader:loadClass'HelloWorld'
 --]]
 
 helloWorldClass

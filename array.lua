@@ -53,6 +53,10 @@ local getArrayElementsField = prims:mapi(function(name)
 	return 'Get'..name:sub(1,1):upper()..name:sub(2)..'ArrayElements', name
 end):setmetatable(nil)
 
+local releaseArrayElementsField = prims:mapi(function(name)
+	return 'Release'..name:sub(1,1):upper()..name:sub(2)..'ArrayElements', name
+end):setmetatable(nil)
+
 -- I'd override __index, but that will bring with it a world of hurt....
 function JavaArray:_get(i)
 	local env = self._env
@@ -60,13 +64,17 @@ function JavaArray:_get(i)
 	env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
+	-- TODO throw a real Java out of bounds exception
+	if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
+
 	local getArrayElements = getArrayElementsField[self._elemClassPath]
 	if getArrayElements then
+		local releaseArrayElements = releaseArrayElementsField[self._elemClassPath]
 		local arptr = env._ptr[0][getArrayElements](env._ptr, self._ptr, nil)
 		if arptr == nil then error("array index null pointer exception") end
-		-- TODO throw a real Java out of bounds exception
-		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
-		return ffi.cast(self.elemFFIType_ptr, arptr)[i]
+		local result = ffi.cast(self.elemFFIType_ptr, arptr)[i]
+		env._ptr[0][releaseArrayElements](env._ptr, self._ptr, arptr, 0)
+		return result
 	else
 		local elemClassPath = self._elemClassPath
 		return JavaObject._createObjectForClassPath{
