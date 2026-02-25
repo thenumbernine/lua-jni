@@ -59,42 +59,7 @@ public class TestASM {
 		cw.visitEnd();
 		byte[] code = cw.toByteArray(); // Return the bytecode as a byte array
 
-/* google ai gives this tip at the bottom of the page */
 		Class<?> helloWorldClass = java.lang.invoke.MethodHandles.lookup().defineClass(code);
-/**/
-/* works but does require a dynamic subclass what I need to avoid... * /
-		// 1. Create a loader that exposes the protected defineClass method
-		class ByteArrayClassLoader extends ClassLoader {
-			public Class<?> define(String name, byte[] b) {
-				return defineClass(name, b, 0, b.length);
-			}
-		}
-
-		ByteArrayClassLoader loader = new ByteArrayClassLoader();
-		
-		// 2. Use define() instead of loadClass() to register the bytes
-		Class<?> helloWorldClass = loader.define("HelloWorld", code);
-/**/
-/* doesn't work, ClassNotFound, and also is a subclass I want to avoid... 
-maybe doesn't work cuz defineClass is protected?
-can these anonymous subclasses call protected functions?
-* /
-		
-		// Custom ClassLoader to define the class from bytes
-		ClassLoader loader = new ClassLoader() {
-			public Class<?> define(String name, byte[] b) {
-				return defineClass(name, b, 0, b.length);
-			}
-		};
-
-		Class<?> helloWorldClass = loader.define("HelloWorld", code); // Use custom loader logic here
-		// (Simplified for example; in practice, use the loader's define method)
-/**/
-/* try #3 ... not gonna work * /
-		//ClassLoader loader = new ClassLoader();	// but it's abstract ... smh fucking hate java
-		ClassLoader loader = Object.class.getClassLoader();
-		Class<?> helloWorldClass = loader.defineClass("HelloWorld", code, 0, code.length);
-/**/
 
 		// Invoke the main method via reflection
 		helloWorldClass
