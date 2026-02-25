@@ -28,12 +28,16 @@ print('parent thread pthread_self', pthread.pthread_self())
 
 local J = require 'java.vm'{
 	props = {
-		['java.class.path'] = '.',
-		['java.library.path'] = '.',
+		['java.class.path'] = table.concat({
+			'.',
+			'asm-9.9.1.jar',		-- needed for ASM
+		}, ':'),
 	},
 }.jniEnv
 
-local NativeRunnable = require 'java.tests.nativerunnable'(J)
+--local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
+local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
+
 local th = J.Thread(NativeRunnable(thread.funcptr, J._vm._ptr))
 print('thread', th)
 th:start()

@@ -37,15 +37,41 @@ local thread = require 'thread.lite'{
 		local buttons = JPanel(GridBagLayout())
 
 		local JButton = J.javax.swing.JButton
+		local NativeActionListener = require 'java.tests.nativeactionlistener_asm'(J)	-- use java-ASM (still needs gcc)
+
+		local ffi = require 'ffi'
+
 		local btn1 = JButton'Btn1'
+		btn1:addActionListener(NativeActionListener(
+			ffi.cast('void *(*)(void*)', function(arg)
+				print('button1 click')
+			end), 0
+		))
 		buttons:add(btn1, gbc)
+
 		local btn2 = JButton'Btn2'
+		btn2:addActionListener(NativeActionListener(
+			ffi.cast('void *(*)(void*)', function(arg)
+					print('button2 click')
+			end), 0
+		))
 		buttons:add(btn2, gbc)
+
 		local btn3 = JButton'Btn3'
+		btn3:addActionListener(NativeActionListener(
+			ffi.cast('void *(*)(void*)', function(arg)
+				print('button3 click')
+			end), 0
+		))
 		buttons:add(btn3, gbc)
+
 		local btn4 = JButton'Btn4'
+		btn4:addActionListener(NativeActionListener(
+			ffi.cast('void *(*)(void*)', function(arg)
+				print('button4 click')
+			end), 0
+		))
 		buttons:add(btn4, gbc)
-		-- TODO btn1:addActionListener(listener) -- but then you'd have to make a subclass ...
 
 		gbc.weighty = 1
 		panel:add(buttons, gbc)
@@ -63,11 +89,15 @@ local thread = require 'thread.lite'{
 
 local J = require 'java.vm'{
 	props = {
-		['java.library.path'] = '.',	-- needed for NativeRunnable
+		['java.class.path'] = table.concat({
+			'.',
+			'asm-9.9.1.jar',		-- needed for ASM
+		}, ':'),
 	},
 }.jniEnv
 
-local NativeRunnable = require 'java.tests.nativerunnable'(J)	-- build
+--local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
+local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 
 J.javax.swing.SwingUtilities:invokeAndWait(
 	NativeRunnable(thread.funcptr, J._vm._ptr)

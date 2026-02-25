@@ -4,18 +4,19 @@ Java provides no way to handle C functions, apart from its own JNI stuff
 This means there's no way to pass in a LuaJIT->C closure callback to Java without going through JNI
 
 How would I have a Java Runnable call a LuaJIT function?
-
-Mind you this is not worrying about multithreading just yet.  Simply Runnable.
 --]]
 
 local J = require 'java.vm'{
 	props = {
-		['java.class.path'] = '.',
-		['java.library.path'] = '.',
+		['java.class.path'] = table.concat({
+			'.',
+			'asm-9.9.1.jar',		-- needed for ASM
+		}, ':'),
 	},
 }.jniEnv
 
-local NativeRunnable = require 'java.tests.nativerunnable'(J)
+--local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
+local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 
 callback = function(arg)
 	print('hello from within Lua, arg', arg)
