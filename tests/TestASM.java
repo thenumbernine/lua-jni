@@ -6,24 +6,11 @@ ByteBuddy is difficult because the docs on https://bytebuddy.net are down.
 All I find is tuts, and the methods are vague.
 Everyone says JavaASM is more difficult than ByteBuddy, 
 but I have a feeling its simpler and just more lower-level which scares most people off.
-
-welp ASM was more straightforward, 
-but it just leaves you with a byte array and says "good luck"
-and to load that? you need to make a subclass as well.
-maybe I can use ASM to make the subclass? 
-oh wait then i'd be left with another byte array.
-and no way to load it without continuing on forever.
 */
 
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.MethodVisitor;
-
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-
-//class TestASMDynamicGenerator implements Opcodes {}
 
 public class TestASM {
 	public static void main(String[] args) throws Exception {

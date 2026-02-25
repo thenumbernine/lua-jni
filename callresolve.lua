@@ -28,6 +28,7 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 
 	-- ok now ...
 	-- we gotta match up ... args with all the method option arsg
+--DEBUG:print()
 
 	local numLuaArgs = select('#', ...)
 	local bestOption
@@ -56,11 +57,13 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 --DEBUG:print('new sig:', tolua(sig))
 			end
 		else
+--DEBUG:print('#sig args:', #sig-1, 'num lua args', numLuaArgs)			
 			if #sig-1 == numLuaArgs then
 				doMatch = true
 			end
 		end
 
+--DEBUG:print('doMatch', doMatch)
 		-- sig[1] is the return type
 		-- call args #1 is the this-or-class
 		-- the rest will match up
@@ -90,6 +93,7 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 		-- but I should be scoring them by how far apart in the class tree the type coercion is
 		-- and somehow I should factor in differences of prim types
 
+--DEBUG:print('sigDist', sigDist)
 		if sigDist then
 			-- TODO calculate score based on how far away coercion is
 			-- score by difference-in-size of prim args or difference-in-class-tree of classes

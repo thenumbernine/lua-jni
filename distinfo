@@ -45,6 +45,7 @@ files = {
 	"tests/runnable_mt.lua",
 	"tests/string.lua",
 	"tests/test.lua",
+	"tests/test-java-asm.lua",
 	"util.lua",
 	"vm.lua",
 }

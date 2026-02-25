@@ -1,18 +1,12 @@
 #!/usr/bin/env luajit
 
 -- build java
-local os = require 'ext.os'
-local targets = require 'make.targets'()
 for _,fn in ipairs{'TestInheritenceA', 'TestInheritenceB', 'TestInheritenceC'} do
-	targets:add{
-		dsts = {fn..'.class'},
-		srcs = {fn..'.java'},
-		rule = function(r)
-			assert(os.exec('javac '..r.srcs[1]))
-		end,
+	require 'java.build'.java{
+		src = fn..'.java',
+		dst = fn..'.class',
 	}
 end
-targets:runAll()
 
 local J = require 'java'
 

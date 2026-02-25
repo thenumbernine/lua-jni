@@ -546,6 +546,7 @@ end
 -- used for call resolution / overload matching
 function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	local t = type(arg)
+--DEBUG:print('arg type', t)		
 
 -- hmm TODO auto-boxing auto-unboxing ...
 -- if arg is a boxed type then convert it to its prim value / as cdata (for proper type conversion)
@@ -554,21 +555,36 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	if t == 'boolean' then
 		return sig == 'boolean' or sig == 'java.lang.Boolean'
 	elseif t == 'table' then
+--DEBUG:print('arg classpath', arg._classpath)		
+		-- before testing unboxing / widening / etc, just see if it matches
+		if arg._classpath == sig then return true end
+		
 		local unboxedSig = getUnboxedPrimitiveForClasspath[sig] or sig
+--DEBUG:print('unboxedSig', unboxedSig)		
 		if isPrimitive[unboxedSig]
 		and JavaObject:isa(arg)
 		then
+--DEBUG:print('testing unboxed sig...')			
 			-- if incoming is boxed type and sig is prim then yes
 			local unboxedArgType = getUnboxedPrimitiveForClasspath[arg._classpath]
+--DEBUG:print('unboxedArgType', unboxedArgType)
 			if unboxedArgType then
 				return getPrimWidening(unboxedArgType, unboxedSig)
 			end
+			
 			return false
 		end
+		
+		-- if we're matching an object to a primitive[] ...
 		local nonarraybase = sig:match'^(.*)%['
+--DEBUG:print('nonarraybase', nonarraybase)		
 		if nonarraybase then
-			if isPrimitive[nonarraybase] then return false end
+--DEBUG:print('isPrimitive[nonarraybase]', isPrimitive[nonarraybase])
+			if isPrimitive[nonarraybase] then
+				return false 
+			end
 		end
+--DEBUG:print('(arg:_instanceof(sig))', (arg:_instanceof(sig)))
 		return (arg:_instanceof(sig))
 	elseif t == 'string' then
 		if isPrimitive[sig] then
@@ -661,8 +677,10 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 			error("can't cast boolean to "..sig)
 		end
 	elseif t == 'table' then
---print('arg is table, sig is', sig)
+--DEBUG:print('arg is table, sig is', sig)
 		if sig then
+			if arg._classpath == sig then return arg._ptr end
+
 			-- TODO who is calling this without sig anyways?
 -- ALSO TODO
 -- if a function has a signature of a prim and of Object

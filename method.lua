@@ -94,8 +94,6 @@ function JavaMethod:__call(thisOrClass, ...)
 --DEBUG:print('numJavaNonVarArgs', numJavaNonVarArgs)
 		local numLuaArgs = select('#', ...)
 --DEBUG:print('numLuaArgs ', numLuaArgs )
-		local numVarArgs = numLuaArgs - numJavaNonVarArgs
---DEBUG:print('numVarArgs ', numVarArgs )
 		local javaArgObjs = table()
 		for i=1,numJavaNonVarArgs do
 --DEBUG:print('converting lua arg', i, 'to java arg', i-1, 'sig', self._sig[i+1])
@@ -108,14 +106,17 @@ function JavaMethod:__call(thisOrClass, ...)
 		local sigLast = table.last(self._sig)
 		local sigVarArgBase = sigLast:match'^(.*)%[%]$'
 --DEBUG:print('sigVarArgBase', sigVarArgBase)
+		local numVarArgs = numLuaArgs - numJavaNonVarArgs
+--DEBUG:print('numVarArgs ', numVarArgs )
 		local javaVarArgsObj = env:_newArray(sigVarArgBase, numVarArgs)
 		for i=1,numVarArgs do
 --DEBUG:print('converting lua arg', numJavaNonVarArgs + i, 'to java vararg index', i-1)
 			javaVarArgsObj[i-1] = env:_luaToJavaArg(select(numJavaNonVarArgs + i, ...), sigVarArgBase)
 		end
 
-		javaArgObjs:insert(env:_luaToJavaArg(javaVarArgsObj, sigLast))
-
+		local jargc = numJavaNonVarArgs
+		jargc = jargc + 1
+		javaArgObjs[jargc] = env:_luaToJavaArg(javaVarArgsObj, sigLast)
 
 		-- if it's a static method then a class comes first
 		-- otherwise an object comes first
@@ -123,7 +124,7 @@ function JavaMethod:__call(thisOrClass, ...)
 			env._ptr,
 			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
 			self._ptr,
-			javaArgObjs:unpack()
+			table.unpack(javaArgObjs, 1, jargc)
 		)
 	else
 		result = env._ptr[0][callName](

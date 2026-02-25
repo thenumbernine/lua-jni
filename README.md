@@ -268,7 +268,9 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/applet.lua` shows a simple Swing application demo, though it can't do much without subclassing live or with running installed `javac`.
 
-`java/tests/ffm.lua` uses Java Foreign Function Interface, so I don't need external classes like `io.github.thenumbernine.NativeRunnable` or dependency jars like "ByteBuddy".
+`java/tests/ffm.lua` uses Java Foreign Function Interface, so I don't need external classes like `io.github.thenumbernine.NativeRunnable` or dependency jars like "ByteBuddy".  Works but sad my Android doesn't support it.
+
+`java/tests/test-java-asm.lua` uses Java-ASM to create classes at runtime to invoke LuaJIT calls, so I don't need external classes, but I'd still need external `asm.jar`...
 
 `java/tests/bytebuddy.lua` is *INCOMPLETE*, me doing the [ByteBuddy](https://bytebuddy.net/) demo to create a new class with a new `toString()` at runtime.
 
