@@ -272,6 +272,8 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/test-java-asm.lua` uses Java-ASM to create classes at runtime to invoke LuaJIT calls, so I don't need external classes (except that last hurdle of loading a class from bytecode within a JNI C app...), but I'd still need external `asm.jar`...
 
+`java/tests/runnable-asm.lua` uses Java-ASM to create a `java.lang.Runnable` subclass at runtime with native `.so` to invoke LuaJIT calls.  It requires no extra Java classes, however it still requires one extra native method compiled in C to forward back to LuaJIT callbacks.
+
 `java/tests/bytebuddy.lua` is *INCOMPLETE*, me doing the [ByteBuddy](https://bytebuddy.net/) demo to create a new class with a new `toString()` at runtime.
 
 `java/tests/bytebuddy_native.lua` is *INCOMPLETE*, me using ByteBuddy to create new Runnable implementation to do dynamic LuaJIT -> Java -> LuaJIT stuff without running `javac` or installing a Java SDK.

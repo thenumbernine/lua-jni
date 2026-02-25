@@ -25,29 +25,47 @@ local cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
 
 local newClassName = 'HelloWorld'
 local Opcodes = J.org.objectweb.asm.Opcodes
+
+--public class HelloWorld extends java.lang.Object {
 cw:visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, newClassName, nil, 'java/lang/Object', nil)
 
+--	public HelloWorld()
 local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '()V', nil, nil)
+
+--	{
 init:visitCode()
+
+--		java.lang.Object();
 init:visitVarInsn(Opcodes.ALOAD, 0)
 init:visitMethodInsn(Opcodes.INVOKESPECIAL, 'java/lang/Object', '<init>', '()V', false)
+
+--		return;
 init:visitInsn(Opcodes.RETURN)
 init:visitMaxs(0, 0)
+
+--	}
 init:visitEnd()
 
+--	public static void main(String[] args)
 local mv = cw:visitMethod(Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC, 'main', '([Ljava/lang/String;)V', nil, nil)
+
+--	{
 mv:visitCode()
 
--- System.out.println('Hello World!')
+-- 		System.out.println('Hello World!');
 mv:visitFieldInsn(Opcodes.GETSTATIC, 'java/lang/System', 'out', 'Ljava/io/PrintStream;')
 mv:visitLdcInsn('Hello World!')
 mv:visitMethodInsn(Opcodes.INVOKEVIRTUAL, 'java/io/PrintStream', 'println', '(Ljava/lang/String;)V', false)
 
+--		return;
 mv:visitInsn(Opcodes.RETURN)
 mv:visitMaxs(0, 0)
+--	}
 mv:visitEnd()
 
+--}
 cw:visitEnd()
+
 local code = cw:toByteArray()
 local helloWorldClass = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 helloWorldClass
