@@ -9,10 +9,7 @@ and until I do something like bytecode injection to build classes at runtime...
 
 --]]
 
-require 'java.tests.nativerunnable'	-- build
-
-local JVM = require 'java.vm'
-local jvm = JVM{
+local J = require 'java.vm'{
 	options = {
 		['--module-path'] = '/usr/share/openjfx/lib',
 		['--add-modules'] = 'javafx.controls,javafx.fxml',
@@ -21,13 +18,15 @@ local jvm = JVM{
 		['java.class.path'] = '.',
 		['java.library.path'] = '.',
 	}
-}
-local J = jvm.jniEnv
+}.jniEnv
+
+local NativeRunnable = require 'java.tests.nativerunnable'(J)	-- build
 
 -- TODO how to build a JavaFX app without subclassing anything ...
 -- it is possible with Swing up to the exception of making your own Runnable (hence NativeRunnable)
 -- ... probably not.
 -- you'd probably need a Application subclass , then do ...
+-- TODO try with ASM dynamically generated classes
 
 -- this will just error
 J.javafx.application.Application:launch(nil)

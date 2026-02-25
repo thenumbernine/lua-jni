@@ -1,15 +1,6 @@
 #!/usr/bin/env luajit
-require 'java.tests.nativerunnable'	-- build
 
-local JVM = require 'java.vm'
-local jvm = JVM{
-	props = {
-		['java.library.path'] = '.',	-- needed for NativeRunnable
-	}
-}
-
-local LiteThread = require 'thread.lite'
-local thread = LiteThread{
+local thread = require 'thread.lite'{
 	code = [=[
 	local J = require 'java.vm'{ptr=arg}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
@@ -70,8 +61,15 @@ local thread = LiteThread{
 ]=],
 }
 
-local J = jvm.jniEnv
+local J = require 'java.vm'{
+	props = {
+		['java.library.path'] = '.',	-- needed for NativeRunnable
+	},
+}.jniEnv
+
+local NativeRunnable = require 'java.tests.nativerunnable'(J)	-- build
+
 J.javax.swing.SwingUtilities:invokeAndWait(
-	J.io.github.thenumbernine.NativeRunnable(thread.funcptr, J._vm._ptr)
+	NativeRunnable(thread.funcptr, J._vm._ptr)
 )
 thread:showErr()

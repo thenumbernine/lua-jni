@@ -1,21 +1,8 @@
 #!/usr/bin/env luajit
 
--- build
-require 'java.tests.nativerunnable'
+-- child thread:
 
-local JVM = require 'java.vm'
-local jvm = JVM{
-	props = {
-		['java.class.path'] = '.',
-		['java.library.path'] = '.',
-	}
-}
-
-local pthread = require 'ffi.req' 'c.pthread'
-print('parent thread pthread_self', pthread.pthread_self())
-
-local LiteThread = require 'thread.lite'
-local thread = LiteThread{
+local thread = require 'thread.lite'{
 	code = [=[
 	local J = require 'java.vm'{ptr=arg}.jniEnv
 
@@ -34,8 +21,20 @@ local thread = LiteThread{
 ]=],
 }
 
-local J = jvm.jniEnv
-local th = J.Thread:_new(J.io.github.thenumbernine.NativeRunnable:_new(thread.funcptr, J._vm._ptr))
+-- parent thread:
+
+local pthread = require 'ffi.req' 'c.pthread'
+print('parent thread pthread_self', pthread.pthread_self())
+
+local J = require 'java.vm'{
+	props = {
+		['java.class.path'] = '.',
+		['java.library.path'] = '.',
+	},
+}.jniEnv
+
+local NativeRunnable = require 'java.tests.nativerunnable'(J)
+local th = J.Thread(NativeRunnable(thread.funcptr, J._vm._ptr))
 print('thread', th)
 th:start()
 th:join()

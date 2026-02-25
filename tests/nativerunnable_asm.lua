@@ -1,44 +1,28 @@
 --[[
+This is the equivalent of ./io/github/thenumbernine/NativeRunnable.java
 This at least offloads the .java->.class side of things to LuaJIT
 But it still requires a separate .so
 --]]
-local path = require 'ext.path'
-
 return function(J)
-	-- still need to build the jni side
-	require 'java.build'.C{
-		src = 'io_github_thenumbernine_NativeRunnable.c',
-		dst = 'libio_github_thenumbernine_NativeRunnable.so',
-	}
-
-	-- create the java .class to go along with it
-	local newClassName = 'io/github/thenumbernine/NativeRunnable'
+	-- how about separate the NativeCallback static native method & System.load into its own class ...
+	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
 	local cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
 
-	-- can I make this use the same namespace as my previously built .so?
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	--public class DynamicNativeRunnable extends java.lang.Object {
-	cw:visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, newClassName, nil, 'java/lang/Object', nil)
-
-	--	static
-	local clinit = cw:visitMethod(Opcodes.ACC_STATIC, '<clinit>', '()V', nil, nil)
-	--	{
-	clinit:visitCode()
-	--	push "DynamicNativeRunnable"	-- this location gives "JVM java.lang.UnsatisfiedLinkError: Expecting an absolute path of the library: ./libDynamicNativeRunnable.so"
-	--clinit:visitLdcInsn((path:cwd()/'libDynamicNativeRunnable.so').path)
-	clinit:visitLdcInsn((path:cwd()/'libio_github_thenumbernine_NativeRunnable.so').path)
-	--	call System.loadLibrary
-	clinit:visitMethodInsn(Opcodes.INVOKESTATIC, 'java/lang/System', 'load', '(Ljava/lang/String;)V', false)
-	--	return
-	clinit:visitInsn(Opcodes.RETURN)
-	--	max stacks, locals
-	clinit:visitMaxs(1, 0)
-	--	}
-	clinit:visitEnd()
+	-- can I make this use the same namespace as my previously built .so? yes.
+	--public class NativeRunnable extends java.lang.Object {
+	local newClassName = 'io/github/thenumbernine/NativeRunnable'
+	cw:visit(
+		Opcodes.V1_6,
+		Opcodes.ACC_PUBLIC,
+		newClassName,
+		nil,
+		'java/lang/Object',
+		J:_newArray(J.String, 1, J:_str'java/lang/Runnable'))
 
 	--	long funcptr;
 	cw:visitField(Opcodes.ACC_PUBLIC, 'funcptr', 'J', nil, nil)
@@ -48,7 +32,7 @@ return function(J)
 	cw:visitField(Opcodes.ACC_PUBLIC, 'arg', 'J', nil, nil)
 		:visitEnd()
 
-	--	public DynamicNativeRunnable(long funcptr, long arg)
+	--	public NativeRunnable(long funcptr, long arg)
 	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(JJ)V', nil, nil)
 	--	{
 	init:visitCode()
@@ -80,7 +64,7 @@ return function(J)
 	local run = cw:visitMethod(Opcodes.ACC_PUBLIC, 'run', '()V', nil, nil)
 	--	{
 	run:visitCode()
-	--	runNative(funcptr, arg):
+	--	NativeCallback.run(funcptr, arg):
 	--		push 'this'
 	run:visitVarInsn(Opcodes.ALOAD, 0);
 	--		replace with 'this.funcptr'
@@ -89,8 +73,8 @@ return function(J)
 	run:visitVarInsn(Opcodes.ALOAD, 0);
 	--		replace with 'this.arg'
 	run:visitFieldInsn(Opcodes.GETFIELD, newClassName, 'arg', 'J')
-	--		call 'runNative' with 2 args on the stack, returning 0 args
-	run:visitMethodInsn(Opcodes.INVOKESTATIC, newClassName, 'runNative', '(JJ)V', false)
+	--		call 'run' with 2 args on the stack, returning 0 args
+	run:visitMethodInsn(Opcodes.INVOKESTATIC, NativeCallback._classpath:gsub('%.', '/'), 'run', '(JJ)V', false)
 	--		return;
 	run:visitInsn(Opcodes.RETURN)
 	--		max stacks, locals
@@ -98,16 +82,14 @@ return function(J)
 	--	}
 	run:visitEnd()
 
-	-- public static native long runNative(long funcptr, long arg);
-	cw:visitMethod(bit.bor(Opcodes.ACC_NATIVE, Opcodes.ACC_PUBLIC, Opcodes.ACC_STATIC), 'runNative', '(JJ)V', nil, nil)
-		:visitEnd()
-
 	--}
 	cw:visitEnd()
 
 	local code = cw:toByteArray()
-	local dynamicNativeRunnableClassObj = require 'java.tests.bytecodetoclass'
+
+	-- create the java .class to go along with it
+	local classAsObj = require 'java.tests.bytecodetoclass'
 		.URIClassLoader(J, code, newClassName)
 
-	return dynamicNativeRunnableClassObj 
+	return (J:_getClassForJClass(classAsObj._ptr))
 end
