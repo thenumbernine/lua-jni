@@ -40,7 +40,7 @@ print('closureAsJavaFFMObj', closureAsJavaFFMObj)
 
 -- can't use invokeExact or you get "invokeexact cannot be invoked with reflection"
 local result = closureAsJavaFFMObj:invokeWithArguments(
-	-- J.long(42)	-- because invokeWithArguments() signature is an Object, it doesn't know to convert from a Long, so my java.method can't do auto-boxing
+	--J.long(42)	-- because invokeWithArguments() signature is an Object, it doesn't know to convert from a Long, so my java.method can't do auto-boxing
 	J.Long(42)
 )
 print('result', result)

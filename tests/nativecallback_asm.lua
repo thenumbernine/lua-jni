@@ -1,6 +1,12 @@
 --[[
 equivalent of ./io/github/thenumbernine/NativeCallback.java
 and its JNI .so
+
+TODO how about a separate class that accepts a Lua callback
+and a subclass ... Single-Abstract-Method or whatever
+and then packages the SAM args into an Object[]
+and then forwards the jobject to the NativeCallback's C arg
+and then maybe we have an extra wrapping function to the callback to translate the args from Java Object[] entries to Lua when applicable ... nil, String, prims, ...array?, etc
 --]]
 local path = require 'ext.path'
 
