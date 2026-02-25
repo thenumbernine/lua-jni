@@ -84,6 +84,21 @@ assert(require 'java.class':isa(J.TestLookupFactory))
 local lookup = J.TestLookupFactory:getFullAccess()
 local helloWorldClass = lookup:defineClass(code)
 --]]
+--[[ https://stackoverflow.com/questions/31226170/load-asm-generated-class-while-runtime
+-- still needs a custom subclass to be compiled ...
+print(J.Class:getClassLoader())
+print(J.Class:_class():getClassLoader())
+print(J.Class:getClass():getClassLoader())
+print(J.Thread:currentThread())
+local loader = J.Thread:currentThread():getContextClassLoader()
+print('loader', loader)
+local helloWorldClass = loader:defineClass('HelloWorld', code, 0, #code)
+print('helloWorldClass', helloWorldClass)
+os.exit()
+--]]
+-- [[ some say URLClassLoader, but that requires file write?
+-- https://stackoverflow.com/a/1874179/2714073
+--]]
 
 helloWorldClass
 	:getMethod('main', J.String:_class():arrayType())
