@@ -5,8 +5,9 @@ It'd be nice to have a method that worked without file-writes, without extra jav
 
 The first one does, but it also requires you be calling it from within Java, so it won't work from a JNI C app.
 --]]
+local M = {}
 
-return function(J, code, newClassName)
+--return function(J, code, newClassName)
 	--[[ Notice this fails from JNI from C, but I bet it'd work in Android Java app.
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local lookup = MethodHandles:lookup()	-- "JVM java.lang.IllegalCallerException: no caller frame"
@@ -61,17 +62,26 @@ return function(J, code, newClassName)
 	print('loader', loader)
 	return loader:defineClass(newClassName, code, 0, #code)
 	--]]
-	-- [[ URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
+	
+-- [[ URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
+-- path expects to be /-separated
+M.URIClassLoader = function(J, code, newClassName)
+assert(not newClassName:find'%.', "class should be /-separated")
 	local ffi = require 'ffi'
 	local path = require 'ext.path'
 	do	-- TODO put this in the java lua api?
 		-- either a convert-to-C function or even a get-raw-access function (that needs to be manually released...)
 		local codeptr = J._ptr[0].GetByteArrayElements(J._ptr, code._ptr, nil)
-		path(newClassName..'.class'):write(ffi.string(codeptr, #code))
+		local fp = path(newClassName..'.class')
+print('writing to', fp)
+		fp:getdir():mkdir(true)
+		assert(fp:write(ffi.string(codeptr, #code)))
 		J._ptr[0].ReleaseByteArrayElements(J._ptr, code._ptr, codeptr, 0)
 	end
 	local urls = J:_newArray(J.java.net.URL, 1, J.java.net.URL(J:_str('file://'..path:cwd())))
 	local loader = J.java.net.URLClassLoader(urls)
-	return loader:loadClass(newClassName)
-	--]]
+	return loader:loadClass((newClassName:gsub('/', '.')))
 end
+--]]
+
+return M

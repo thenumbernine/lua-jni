@@ -225,6 +225,7 @@ function JNIEnv:init(args)
 	for _,prim in ipairs(prims) do
 		self._classesLoaded[prim] = infoForPrims[prim].ctype
 	end
+	self._classesLoaded.void = ffi.typeof'void'
 end
 
 function JNIEnv:_findClass(classpath)
