@@ -3,14 +3,18 @@ java.awt.event.ActionListener implementation
 that forwards to io.github.thenumbernine.NativeRunnable
 dynamically generated using ASM 
 --]]
-local M = {}
-function M:run(J, jsuperclass)
-	if M.cache then return M.cache end
-
+return function(J, jsuperclass)
 	jsuperclass = jsuperclass or 'java/lang/Object'
 
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+
+	-- TODO name overrideable or generated based on jsuperclass
+	local newClassName = 'io/github/thenumbernine/NativeActionListener'
+
+	-- check if it's already loaded
+	local cl = J:_findClass(newClassName)
+	if cl then return cl end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
@@ -18,9 +22,7 @@ function M:run(J, jsuperclass)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	-- can I make this use the same namespace as my previously built .so? yes.
 	--public class NativeActionListener extends java.lang.Object {
-	local newClassName = 'io/github/thenumbernine/NativeActionListener'
 	cw:visit(
 		Opcodes.V1_6,
 		Opcodes.ACC_PUBLIC,
@@ -58,7 +60,7 @@ function M:run(J, jsuperclass)
 	local run = cw:visitMethod(Opcodes.ACC_PUBLIC, 'actionPerformed', '(Ljava/awt/event/ActionEvent;)V', nil, nil)
 	--	{
 	run:visitCode()
-	--	NativeCallback.run(funcptr, arg):
+	--	NativeCallback.run(funcptr, e):
 	--		push 'this'
 	run:visitVarInsn(Opcodes.ALOAD, 0);
 	--		replace with 'this.funcptr'
@@ -84,13 +86,24 @@ function M:run(J, jsuperclass)
 
 	local code = cw:toByteArray()
 
+--[[ not there?
+	local sw = J.java.io.StringWriter()
+	local pw = J.java.io.PrintWriter(sw)
+	local CheckClassAdapter = J.org.objectweb.asm.util.CheckClassAdapter
+print('CheckClassAdapter', CheckClassAdapter)	
+	local check = CheckClassAdapter(ClassWriter.COMPUTE_FRAMES)
+	check:verify(
+		J.org.objectweb.asm.ClassReader(code),
+		false,
+		pw
+	)
+	print('class verification found:')
+	print(pw)
+	print()
+--]]
+
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	M.cache = J:_getClassForJClass(classAsObj._ptr)
-	return M.cache
+	return (J:_getClassForJClass(classAsObj._ptr))
 end
-setmetatable(M, {
-	__call = M.run,
-})
-return M

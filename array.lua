@@ -36,9 +36,9 @@ function JavaArray:init(args)
 	local primInfo = infoForPrims[self._elemClassPath]
 	if primInfo then
 		-- or TODO just save this up front for primitives
-		self.elemFFIType = primInfo.ctype
-		self.elemFFIType_1 = primInfo.array1Type
-		self.elemFFIType_ptr = primInfo.ptrType
+		self._elemFFIType = primInfo.ctype
+		self._elemFFIType_1 = primInfo.array1Type
+		self._elemFFIType_ptr = primInfo.ptrType
 	end
 
 	-- do super last because it write-protects the object for java namespace lookup __newindex
@@ -75,7 +75,7 @@ function JavaArray:_get(i)
 		local releaseArrayElements = releaseArrayElementsField[self._elemClassPath]
 		local arptr = env._ptr[0][getArrayElements](env._ptr, self._ptr, nil)
 		if arptr == nil then error("array index null pointer exception") end
-		local result = ffi.cast(self.elemFFIType_ptr, arptr)[i]
+		local result = ffi.cast(self._elemFFIType_ptr, arptr)[i]
 		env._ptr[0][releaseArrayElements](env._ptr, self._ptr, arptr, 0)
 		return result
 	else
@@ -94,19 +94,19 @@ local setArrayRegionField = prims:mapi(function(name)
 	return 'Set'..name:sub(1,1):upper()..name:sub(2)..'ArrayRegion', name
 end):setmetatable(nil)
 
-
 function JavaArray:_set(i, v)
 	local env = self._env
 
 	env:_checkExceptions()
 
 	i = tonumber(i) or error("java array index expected number, found "..tostring(i))
+	if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
+
 	local setArrayRegion = setArrayRegionField[self._elemClassPath]
 	if setArrayRegion then
 --DEBUG:print(setArrayRegion, 'setting array at', i, 'to', v, self._elemClassPath)
-		if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
 		env._ptr[0][setArrayRegion](env._ptr, self._ptr, i, 1,
-			self.elemFFIType_1(v)
+			self._elemFFIType_1(v)
 		)
 	else
 		-- another one of these primitive array problems
@@ -120,6 +120,16 @@ function JavaArray:_set(i, v)
 	end
 
 	env:_checkExceptions()
+end
+
+local function unpackLocal(ar, i, n)
+	if i >= n then return end
+	return ar[i], unpackLocal(ar, i+1, n)
+end
+
+function JavaArray:_unpack()
+	local n = #ar
+	return unpackLocal(ar, 1, n)
 end
 
 function JavaArray:__index(k)

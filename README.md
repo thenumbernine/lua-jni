@@ -239,12 +239,14 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - args:
 - - `elemClassPath` = classpath of the array element, needed for subequent operations.
 
-- `ar.elemFFIType` = for primitives, LuaJIT FFI ctype of the JNI primitive type.
-- `ar.elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
-- `ar.elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
-
 - `ar[i]` aka `ar:_get(i)` = get the i'th index of the array
 - `ar[i]=v` aka `ar:_set(i, v)` = set the i'th index of the array
+
+- `x0, x1, x2, ... = ar:_unpack()` = unpacks and returns all elements of the array.
+
+- `ar._elemFFIType` = for primitives, LuaJIT FFI ctype of the JNI primitive type.
+- `ar._elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
+- `ar._elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
 
 <hr>
 

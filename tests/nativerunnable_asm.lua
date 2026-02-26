@@ -3,12 +3,16 @@ This is the equivalent of ./io/github/thenumbernine/NativeRunnable.java
 This at least offloads the .java->.class side of things to LuaJIT
 But it still requires a separate .so
 --]]
-local M = {}
-function M:run(J)
-	if M.cache then return M.cache end
-
+return function(J)
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+
+	-- can I make this use the same namespace as my previously built .so? yes.
+	local newClassName = 'io/github/thenumbernine/NativeRunnable'
+	
+	-- check if it's already loaded
+	local cl = J:_findClass(newClassName)
+	if cl then return cl end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
@@ -16,9 +20,7 @@ function M:run(J)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	-- can I make this use the same namespace as my previously built .so? yes.
 	--public class NativeRunnable extends java.lang.Object {
-	local newClassName = 'io/github/thenumbernine/NativeRunnable'
 	cw:visit(
 		Opcodes.V1_6,
 		Opcodes.ACC_PUBLIC,
@@ -117,10 +119,5 @@ function M:run(J)
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	M.cache = J:_getClassForJClass(classAsObj._ptr)
-	return M.cache
+	return (J:_getClassForJClass(classAsObj._ptr))
 end
-setmetatable(M, {
-	__call = M.run,
-})
-return M

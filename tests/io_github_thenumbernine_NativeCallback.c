@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 JNIEXPORT jobject JNICALL Java_io_github_thenumbernine_NativeCallback_run(JNIEnv * env, jclass this_, jlong jfuncptr, jobject jarg) {
+printf("native callback fptr %p arg %p\n", (void*)jfuncptr, jarg);	
 	void* vfptr = (void*)jfuncptr;
 	void* results = NULL;
 	if (!vfptr) {

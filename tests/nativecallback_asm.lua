@@ -10,15 +10,18 @@ and then maybe we have an extra wrapping function to the callback to translate t
 --]]
 local path = require 'ext.path'
 
-local M = {}
-function M:run(J)
-	if M.cache then return M.cache end
-
+return function(J)
 	-- need to build the jni .c side
 	require 'java.build'.C{
 		src = 'io_github_thenumbernine_NativeCallback.c',
 		dst = 'libio_github_thenumbernine_NativeCallback.so',
 	}
+
+	local newClassName = 'io/github/thenumbernine/NativeCallback'
+
+	-- check if it's already loaded
+	local cl = J:_findClass(newClassName)
+	if cl then return cl end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
@@ -26,7 +29,6 @@ function M:run(J)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	local newClassName = 'io/github/thenumbernine/NativeCallback'
 	cw:visit(
 		Opcodes.V1_6,
 		Opcodes.ACC_PUBLIC,
@@ -45,7 +47,7 @@ function M:run(J)
 	--	return
 	clinit:visitInsn(Opcodes.RETURN)
 	--	max stacks, locals
-	clinit:visitMaxs(1, 0)
+	clinit:visitMaxs(0, 0)
 	--	}
 	clinit:visitEnd()
 
@@ -66,10 +68,5 @@ function M:run(J)
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	M.cache = (J:_getClassForJClass(classAsObj._ptr))
-	return M.cache
+	return (J:_getClassForJClass(classAsObj._ptr))
 end
-setmetatable(M, {
-	__call = M.run,
-})
-return M
