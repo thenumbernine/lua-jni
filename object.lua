@@ -47,14 +47,12 @@ function JavaObject:init(args)
 
 				local fieldsForName = classObj._fields[k]
 				if fieldsForName then
-assert.gt(#fieldsForName, 0, k)
 					local field = fieldsForName[1]
 					return field:_set(self, v)	-- call the setter of the field
 				end
 
 				local methodsForName = classObj._methods[k]
 				if methodsForName then
-assert.gt(#methodsForName, 0, k)
 					error("can't overwrite a Java method "..k)
 				end
 				error("JavaObject.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
@@ -205,7 +203,6 @@ function JavaObject:__index(k)
 --DEBUG:print(require'ext.table'.keys(classObj._fields):sort():concat', ')
 	local fieldsForName = classObj._fields[k]
 	if fieldsForName then
-assert.gt(#fieldsForName, 0, k)
 		local field = fieldsForName[1]
 		return field:_get(self)	-- call the getter of the field
 	end
@@ -213,7 +210,6 @@ assert.gt(#fieldsForName, 0, k)
 --DEBUG:print(require'ext.table'.keys(classObj._methods):sort():concat', ')
 	local methodsForName = classObj._methods[k]
 	if methodsForName then
-assert.gt(#methodsForName, 0, k)
 --DEBUG:print('#methodsForName', k, #methodsForName)
 		local method = methodsForName[1]
 		-- now our choice of methodsForName[] will depend on the calling args...

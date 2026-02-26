@@ -435,7 +435,9 @@ function JNIEnv:_exceptionOccurred()
 --DEBUG:print(debug.traceback())
 
 	if self._dontCheckExceptions then
-		error("java exception in exception handler")
+		io.stderr:write("WARNING! java exception in exception handler\n")
+		io.stderr:write(debug.traceback(),'\n')
+		return
 	end
 	assert(not self._dontCheckExceptions)
 	self._dontCheckExceptions = true

@@ -34,11 +34,9 @@ return function(J, samClass)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	local envptrl = ffi.new('uint64_t[1]', ffi.cast('uint64_t', J._ptr))
-	local envptri = ffi.cast('uint32_t*', envptrl)
-	local envptrs = ('%08x%08x'):format(envptri[1], envptri[0])
 	local newClassName = 'io/github/thenumbernine/SAMNativeCallback_'
-		..envptrs..'_'..uniqueNameCounter
+		..bit.tohex(ffi.cast('uint64_t', J._ptr), 16)
+		..'_'..uniqueNameCounter
 --DEBUG:print('newClassName', newClassName)
 	uniqueNameCounter = uniqueNameCounter + 1
 
@@ -150,6 +148,7 @@ return function(J, samClass)
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
 	local cl = J:_getClassForJClass(classAsObj._ptr)
+	-- 'cl' is a JavaClass instance
 	cl._cb = function(self, callback)
 		assert.type(callback, 'function')
 

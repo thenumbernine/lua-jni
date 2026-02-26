@@ -7,23 +7,6 @@ so when going from javax.swing to javafx.*
 and until I do something like bytecode injection to build classes at runtime...
 ... this demo won't get finished.
 
---]]
-
-local J = require 'java.vm'{
-	options = {
-		['--module-path'] = '/usr/share/openjfx/lib',
-		['--add-modules'] = 'javafx.controls,javafx.fxml',
-	},
-	props = {
-		['java.class.path'] = table.concat({
-			'asm-9.9.1.jar',		-- needed for ASM
-			'.',
-		}, ':'),
-		--['java.library.path'] = '.',
-	}
-}.jniEnv
-
---[[
 How to build a JavaFX app without subclassing anything ...
 it is possible with Swing up to the exception of making your own Runnable (hence NativeRunnable)
 ... probably not.
@@ -38,8 +21,33 @@ Then how to get the vararg Java objects to jobjects before calling into C? (sinc
 One fix is to replace the JNI arg with a jobject that points to an Object[] that the LuaJIT side has to decode...
 Then the Java code would call io.github.thenumbernine.NativeCallback.run(long closureAddr, Object[]{args...})
 (but this but in Java-ASM calls...)
---]]
 
+--]]
+error'looks like JavaFX is in fact multithreaded so TODO make the callback run in a lite thread'
+
+
+local jvm = require 'java.vm'{
+	options = {
+		['--module-path'] = '/usr/share/openjfx/lib',
+		['--add-modules'] = 'javafx.controls,javafx.fxml',
+	},
+	props = {
+		['java.class.path'] = table.concat({
+			'asm-9.9.1.jar',		-- needed for ASM
+			'.',
+		}, ':'),
+		--['java.library.path'] = '.',
+	}
+}
+local J = jvm.jniEnv
+print('JNIEnv', J._ptr)
+	
+local pthread = require 'ffi.req' 'c.pthread'
+local parentThread = pthread.pthread_self()
+print('parent thread, pthread_self', parentThread)
+
+--print(J.javafx.application.Application._samMethod)	-- is false, so I gotta ASM it
+-- TODO make the 'MakeSAM...' work for any method passed to it ...
 local ThisApplication
 do
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
@@ -92,10 +100,21 @@ do
 	ThisApplication = J:_getClassForJClass(classObj._ptr)
 end
 
-
 local ffi = require 'ffi'
 callback = function(stage)
+	print('in stage callback')
+
+local pthread = require 'ffi.req' 'c.pthread'
+local callbackThread = pthread.pthread_self()
+print('callback thread, pthread_self', callbackThread)
+
+local envptrarr = ffi.new('JNIEnv*[1]')
+print('GetEnv', jvm._ptr[0].GetEnv(jvm._ptr, ffi.cast('void**', envptrarr), jvm.version))
+print('JNIEnv', envptrarr[0])
+print('stage', stage)
 	stage = J:_javaToLuaArg(stage, 'javafx.stage.Stage')
+print('stage', stage)
+do return end
 
 	stage:setTitle'Hello World!'
 
@@ -113,6 +132,7 @@ closure = ffi.cast('jobject (*)(jobject)', callback)
 print('closure', closure)
 local closureLong = ffi.cast('jlong', closure)
 print('closureLong', ('0x%x'):format(tonumber(closureLong)))
+print('ThisApplication._fields.funcptr', ThisApplication._fields.funcptr)
 ThisApplication.funcptr = closureLong
 print('ThisApplication.funcptr', ('0x%x'):format(tonumber(ThisApplication.funcptr)))
 -- TODO even if I write ThisApplication.funcptr here, within ThisApplication.launch it is still zero...

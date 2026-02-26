@@ -77,6 +77,33 @@ function JavaClass:init(args)
 	-- set it 'false' if the class isn't SAM
 	-- set it to the one abstract method if it is
 	self._samMethod = false
+
+	-- set our __newindex last after we're done writing to it
+	local mt = getmetatable(self)
+	setmetatable(self, table(mt, {
+		__newindex = function(self, k, v)
+			--see if we are trying to write to a Java field
+			if type(k) == 'string'
+			and not k:match'^_'
+			then
+				local fieldsForName = self._fields[k]
+				if fieldsForName then
+					local field = fieldsForName[1]
+					assert(field._isStatic, "classes can't write to member fields")
+					return field:_set(self, v)	-- call the setter of the field
+				end
+
+				local methodsForName = self._methods[k]
+				if methodsForName then
+					error("can't overwrite a Java method "..k)
+				end
+				error("JavaClass.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
+			end
+
+			-- finally do our write
+			rawset(self, k, v)
+		end,
+	}):setmetatable(nil))
 end
 
 -- call this after creating JavaClass to fill its reflection contents
@@ -527,7 +554,6 @@ function JavaClass:__index(k)
 --DEBUG:print(require'ext.table'.keys(self._fields):sort():concat', ')
 	local fieldsForName = self._fields[k]
 	if fieldsForName then
-		assert.gt(#fieldsForName, 0, k)	-- otherwise the entry shouldn't be there...
 		-- assert it is a static field?
 		local field = fieldsForName[1]
 		return field:_get(self)	-- call the getter of the field
@@ -536,7 +562,6 @@ function JavaClass:__index(k)
 --DEBUG:print(require'ext.table'.keys(self._methods):sort():concat', ')
 	local methodsForName = self._methods[k]
 	if methodsForName then
-		assert.gt(#methodsForName, 0, k)	-- otherwise the entry shouldn't be there...
 --DEBUG:print('#methodsForName', k, #methodsForName)
 		-- now our choice of methodsForName[] will depend on the calling args...
 		return JavaCallResolve{
