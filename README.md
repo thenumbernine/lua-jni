@@ -189,6 +189,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `sig` = signature string of the field.
 - - all other args forwarded to JavaField
 
+- `cl._samMethod` = this is set to a JavaMethod in the event that this class has only one single abstract method.
+
 ### JavaField
 `JavaField = require 'java.field'`
 

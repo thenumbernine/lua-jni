@@ -9,7 +9,6 @@ local prims = require 'java.util'.prims
 local infoForPrims = require 'java.util'. infoForPrims
 local getJNISig = require 'java.util'.getJNISig
 
--- some of these overlap ctypes
 local jboolean = ffi.typeof'jboolean'	-- uint8_t
 local jbyte = ffi.typeof'jbyte'			-- int8_t
 local jshort = ffi.typeof'jshort'		-- int16_t
@@ -19,38 +18,26 @@ local jlong = ffi.typeof'jlong'			-- int64_t
 local jfloat = ffi.typeof'jfloat'		-- float
 local jdouble = ffi.typeof'jdouble'		-- double
 
-local getPrimNameForCTypeName = {
-	[tostring(jboolean)] = 'boolean',
-	[tostring(jbyte)] = 'byte',
-	[tostring(jshort)] = 'short',
-	[tostring(jchar)] = 'char',
-	[tostring(jint)] = 'int',
-	[tostring(jlong)] = 'long',
-	[tostring(jfloat)] = 'float',
-	[tostring(jdouble)] = 'double',
-}
+local getPrimNameForCTypeName = table.map(
+	infoForPrims,
+	function(info)
+		return info.name, tostring(info.ctype)
+	end
+):setmetatable(nil)
 
-local getUnboxedPrimitiveForClasspath = {
-	['java.lang.Boolean'] = 'boolean',
-	['java.lang.Char'] = 'char',
-	['java.lang.Byte'] = 'byte',
-	['java.lang.Short'] = 'short',
-	['java.lang.Int'] = 'int',
-	['java.lang.Long'] = 'long',
-	['java.lang.Float'] = 'float',
-	['java.lang.Double'] = 'double',
-}
+local getUnboxedPrimitiveForClasspath = table.map(
+	infoForPrims,
+	function(info)
+		return info.name, info.boxedType
+	end
+):setmetatable(nil)
 
-local getUnboxedValueGetterMethod = {
-	['java.lang.Boolean'] = 'booleanValue',
-	['java.lang.Char'] = 'charValue',
-	['java.lang.Byte'] = 'byteValue',
-	['java.lang.Short'] = 'shortValue',
-	['java.lang.Int'] = 'intValue',
-	['java.lang.Long'] = 'longValue',
-	['java.lang.Float'] = 'floatValue',
-	['java.lang.Double'] = 'doubleValue',
-}
+local getUnboxedValueGetterMethod = table.map(
+	infoForPrims,
+	function(info)
+		return info.name..'Value', info.boxedType
+	end
+):setmetatable(nil)
 
 local isPrimitive = prims:mapi(function(name) return true, name end):setmetatable(nil)
 

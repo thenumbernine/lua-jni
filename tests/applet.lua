@@ -49,40 +49,49 @@ local thread = require 'thread.lite'{
 
 		local ffi = require 'ffi'
 
+
 		local btn1 = JButton'Btn1'
-		btn1:addActionListener(NativeActionListener(
-			ffi.cast('void *(*)(void*)', function(arg)
-				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-				print('button1 click', arg)
-			end)
-		))
+		btn1:addActionListener(
+			NativeActionListener(
+				ffi.cast('void *(*)(void*)', function(arg)
+					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+					print('button1 click', arg)
+				end)
+			)
+		)
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
-		btn2:addActionListener(NativeActionListener(
-			ffi.cast('void *(*)(void*)', function(arg)
-				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-				print('button2 click', arg)
-			end)
-		))
+		btn2:addActionListener(
+			NativeActionListener(
+				ffi.cast('void *(*)(void*)', function(arg)
+					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+					print('button2 click', arg)
+				end)
+			)
+		)
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
-		btn3:addActionListener(NativeActionListener(
-			ffi.cast('void *(*)(void*)', function(arg)
-				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-				print('button3 click', arg)
-			end)
-		))
+		btn3:addActionListener(
+			NativeActionListener(
+				ffi.cast('void *(*)(void*)', function(arg)
+					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+					print('button3 click', arg)
+				end)
+			)
+		)
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
-		btn4:addActionListener(NativeActionListener(
-			ffi.cast('void *(*)(void*)', function(arg)
-				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-				print('button4 click', arg)
-			end)
-		))
+		btn4:addActionListener(
+			NativeActionListener(
+				ffi.cast('void *(*)(void*)', function(arg)
+					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+					print('button4 click', arg)
+				end)
+			)
+		)
 		buttons:add(btn4, gbc)
 
 		gbc.weighty = 1
@@ -113,34 +122,23 @@ do	-- just to be sure, check java.awt.event.ActionListener
 	local table = require 'ext.table'
 	local ActionListener = J.java.awt.event.ActionListener
 	print('ActionListener._isInterface', ActionListener._isInterface)
-	local allMethodNames = table.keys(ActionListener._methods):sort()
-	local methodCount = 0
-	local allAbstract = true
-	for _,name in ipairs(allMethodNames) do
-		if name:sub(1,1) ~= '<' then	-- skip <init> and <clinit>
-			local options = ActionListener._methods[name]
-			print('', name)
-			for _,option in ipairs(options) do
-				if not option._isAbstract then
-					allAbstract = false
-				end
-				print('', '', require 'ext.tolua'(option._sig), option._isAbstract and 'abstract' or '')
-				methodCount = methodCount + 1
-			end
-		end
-	end
-	print('# methods', methodCount)
-	print('all abstract', allAbstract)
-	local isSAM = methodCount == 1 and allAbstract
-	print('isSAM', isSAM)
-
-	-- if it isSAM then we should be allowed to replace it with a lamdbda ...
+	print('samMethod', ActionListener._samMethod)
+	-- if it isSAM then we should be allowed to replace it with a lambda ...
 end
 
 -- load our classes in Java ASM
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 local NativeActionListener = require 'java.tests.nativeactionlistener_asm'(J)	-- use java-ASM (still needs gcc)
+
+
+-- [[ how about this:
+-- if the class is SAM,
+-- and it gets ctor'd with one arg,
+-- then auto-subclass it with io.github.thenumbernine.LookupFactory and io.github.thenumbernine.NativeCallback
+
+--]]
+
 
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))

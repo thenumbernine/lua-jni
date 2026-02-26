@@ -43,6 +43,7 @@ function JavaField:init(args)
 	self._env = assert.index(args, 'env')		-- JNIEnv
 	self._ptr = assert.index(args, 'ptr')		-- cdata
 	self._sig = assert.index(args, 'sig')		-- string
+	self._name = args.name or false				-- optional but save if provided
 
 	-- modifiers
 	self._isPublic = not not args.isPublic

@@ -38,6 +38,7 @@ function JavaMethod:init(args)
 	self._ptr = assert.index(args, 'ptr')		-- cdata
 	self._sig = args.sig or {}					-- sig desc is in require 'java.class' for now
 	self._sig[1] = self._sig[1] or 'void'
+	self._name = args.name or false				-- optional but save if provided
 
 	-- TODO I was holding this to pass to CallStatic*Method calls
 	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)

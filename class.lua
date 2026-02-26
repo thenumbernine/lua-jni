@@ -62,6 +62,11 @@ function JavaClass:init(args)
 	self._isInterface = 0 ~= bit.band(modifiers, 512)
 	self._isAbstract = 0 ~= bit.band(modifiers, 1024)
 	self._isStrict = 0 ~= bit.band(modifiers, 2048)
+
+	-- evaluate after _setupReflection
+	-- set it 'false' if the class isn't SAM
+	-- set it to the one abstract method if it is
+	self._samMethod = false
 end
 
 -- call this after creating JavaClass to fill its reflection contents
@@ -130,6 +135,7 @@ function JavaClass:_setupReflection()
 				env = env,
 				ptr = jfieldID,
 				sig = fieldClassPath,
+				name = name,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
 				isPrivate = 0 ~= bit.band(modifiers, 2),
@@ -291,6 +297,29 @@ function JavaClass:_setupReflection()
 			end
 		end
 	end
+
+
+	-- determine if this is a SAM class or not
+	-- Java says don't SAM abstract-classes.  but then there is all of Swing and JavaFX ...
+	--if self._isInterface then
+	for name,options in pairs(self._methods) do
+		for _,option in ipairs(options) do
+			-- see if the first method we find is abstract...
+			if not self._samMethod then
+				if not option._isAbstract then
+					-- it wasn't abstract, fail
+					goto detectSAMDone
+				end
+				-- write our sam method and see if there are more...
+				self._samMethod = option
+			else
+				-- there were more methods, this isn't SAM, clear it and fail
+				self._samMethod = false
+				goto detectSAMDone
+			end
+		end
+	end
+::detectSAMDone::		
 
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()

@@ -15,9 +15,21 @@ local prims = table{
 	'double',
 }
 
+local boxedTypesForPrims = {
+	boolean = 'java.lang.Boolean',
+	char = 'java.lang.Char',
+	byte = 'java.lang.Byte',
+	short = 'java.lang.Short',
+	int = 'java.lang.Int',
+	long = 'java.lang.Long',
+	float = 'java.lang.Float',
+	double = 'java.lang.Double',
+}
+
 local infoForPrims = prims:mapi(function(name)
 	local info = {}
 	info.name = name
+	info.boxedType = boxedTypesForPrims[name]
 	info.ctype = ffi.typeof('j'..name)
 	info.array1Type = ffi.typeof('$[1]', info.ctype)
 	info.ptrType = ffi.typeof('$*', info.ctype)

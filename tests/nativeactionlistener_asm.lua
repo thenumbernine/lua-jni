@@ -33,7 +33,7 @@ function M:run(J, jsuperclass)
 	cw:visitField(Opcodes.ACC_PUBLIC, 'funcptr', 'J', nil, nil)
 		:visitEnd()
 
-	--	public NativeActionListener(long funcptr, long arg)
+	--	public NativeActionListener(long funcptr)
 	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(J)V', nil, nil)
 	--	{
 	init:visitCode()
