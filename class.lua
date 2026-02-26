@@ -14,6 +14,7 @@ local getJNISig = require 'java.util'.getJNISig
 -- should JavaClass inherit from JavaObject?
 local JavaClass = class(JavaObject)
 JavaClass.__name = 'JavaClass'
+JavaClass.class = nil
 JavaClass.subclass = nil
 --JavaClass.isa = nil -- handled in __index
 --JavaClass.isaSet = nil -- handled in __index
@@ -407,6 +408,10 @@ function JavaClass:__index(k)
 	end
 
 	if type(k) ~= 'string' then return end
+
+	if k == 'class' then
+		return self:_class()
+	end
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then

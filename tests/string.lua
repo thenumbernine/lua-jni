@@ -76,7 +76,7 @@ local String2 = J._ptr[0].FindClass(J._ptr, 'java/lang/String')
 print('java.lang.String[] from JNIEnv->FindClass("java/lang/String")', String2)
 print('same?', J._ptr[0].IsSameObject(J._ptr, String1, String2))
 --]=]
-print('java.lang.String[] from String.class.arrayType()', J.String:_class():arrayType())
+print('java.lang.String[] from String.class.arrayType()', J.String.class:arrayType())
 print('java.lang.String[] from J:_findClass()', J:_findClass'java.lang.String[]')
 print('java.lang.String[] from JNIEnv->FindClass("[Ljava/lang/String;")', J._ptr[0].FindClass(J._ptr, '[Ljava/lang/String;'))
 --print('JNIEnv->FindClass("I")', J._ptr[0].FindClass(J._ptr, 'I'))

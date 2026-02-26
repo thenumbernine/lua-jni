@@ -49,7 +49,7 @@ closureJavaMethodHandle:invokeWithArguments()
 
 -- [[ here's our ByteBuddy
 
-local Runnable_classObj = J.Runnable:_class()
+local Runnable_classObj = J.Runnable.class
 local bb = J.net.bytebuddy.ByteBuddy()
 bb = bb:subclass(Runnable_classObj)
 	
@@ -75,7 +75,7 @@ bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'run')
 	bb = bb:intercept(
 		J.net.bytebuddy.implementation.InvokeDynamic:bootstrap(
 			J.java.lang.invoke.MethodHandles:constant(
-				J.java.lang.invoke.MethodHandle:_class(),
+				J.java.lang.invoke.MethodHandle.class,
 				closureJavaMethodHandle
 			)
 		)
@@ -92,7 +92,7 @@ bb = bb:method(J.net.bytebuddy.matcher.ElementMatchers:named'run')
 				J.Void.TYPE -- The signature of the invokedynamic instruction
 			)
 		):withReference(
-			J.java.lang.invoke.MethodType:_class(),
+			J.java.lang.invoke.MethodType.class,
 			J.java.lang.invoke.MethodType:methodType(J.Void.TYPE) -- An extra constant argument if needed, here just an example
 		)
 	)

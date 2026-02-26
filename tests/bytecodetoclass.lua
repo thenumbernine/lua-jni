@@ -21,14 +21,14 @@ local M = {}
 	--[[
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local publicLookup = MethodHandles:publicLookup()
-	--local lookup = publicLookup['in'](publicLookup, ClassWriter:_class())	-- upon :defineClass(), "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
-	local lookup = publicLookup['in'](publicLookup, J.Object:_class())	--  upon :defineClass(), "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
+	--local lookup = publicLookup['in'](publicLookup, ClassWriter.class)	-- upon :defineClass(), "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
+	local lookup = publicLookup['in'](publicLookup, J.Object.class)	--  upon :defineClass(), "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
 	return lookup:defineClass(code)
 	--]]
 	--[[
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local publicLookup = MethodHandles:publicLookup()
-	local lookup = MethodHandles:privateLookupIn(ClassWriter:_class(), publicLookup)	-- "JVM java.lang.IllegalAccessException: caller does not have PRIVATE and MODULE lookup mode"
+	local lookup = MethodHandles:privateLookupIn(ClassWriter.class, publicLookup)	-- "JVM java.lang.IllegalAccessException: caller does not have PRIVATE and MODULE lookup mode"
 	return lookup:defineClass(code)
 	--]]
 	--[[
@@ -55,7 +55,7 @@ local M = {}
 	--	}
 	--}
 	print(J.Class:getClassLoader())
-	print(J.Class:_class():getClassLoader())
+	print(J.Class.class:getClassLoader())
 	print(J.Class:getClass():getClassLoader())
 	print(J.Thread:currentThread())
 	local loader = J.Thread:currentThread():getContextClassLoader()

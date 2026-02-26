@@ -10,8 +10,8 @@ JavaObject.__name = 'JavaObject'
 
 -- TODO I have to break my Lua class model to make the java-interoperability layer compatible.
 --JavaObject.super exists but in Java ".super" is reserved, and I'm exposing it in my API as ":_super()"
---JavaObject.class exists but in Java ".class" is reserved, and I'm exposing it in my API as ":_class()"
 --JavaObject.new exists but in Java "new" is reserved, and I'm exposing it in my API as ":_new()"
+JavaObject.class = nil
 JavaObject.subclass = nil	-- make room for Java instances with fields named 'subclass'
 --JavaObject.isa = nil -- handled in __index
 --JavaObject.isaSet = nil -- handled in __index

@@ -9,6 +9,7 @@ local infoForPrims = require 'java.util'.infoForPrims
 local JavaArray = class(JavaObject)
 JavaArray.__name = 'JavaArray'
 JavaArray.__index = JavaObject.__index	-- class() will override this, so reset it
+JavaArray.class = nil
 JavaArray.subclass = nil
 --JavaArray.isa = nil -- TODO
 --JavaArray.isaSet = nil -- TODO
