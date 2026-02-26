@@ -4,7 +4,7 @@
 
 local thread = require 'thread.lite'{
 	code = [=[
-	local J = require 'java.vm'{ptr=arg}.jniEnv
+	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 
 	local pthread = require 'ffi.req' 'c.pthread'
 	local childThread = pthread.pthread_self()
@@ -32,13 +32,17 @@ local J = require 'java.vm'{
 			'.',
 			'asm-9.9.1.jar',		-- needed for ASM
 		}, ':'),
+		['java.library.path'] = '.',
 	},
 }.jniEnv
 
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 
-local th = J.Thread(NativeRunnable(thread.funcptr, J._vm._ptr))
+local ffi = require 'ffi'
+thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
+
+local th = J.Thread(NativeRunnable(thread.funcptr))
 print('thread', th)
 th:start()
 th:join()

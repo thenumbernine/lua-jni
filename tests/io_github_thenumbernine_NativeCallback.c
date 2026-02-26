@@ -2,15 +2,14 @@
 #include <jni.h>
 #include <stdio.h>
 
-JNIEXPORT jlong JNICALL Java_io_github_thenumbernine_NativeCallback_run(JNIEnv * env, jclass this_, jlong jfuncptr, jlong jarg) {
+JNIEXPORT jobject JNICALL Java_io_github_thenumbernine_NativeCallback_run(JNIEnv * env, jclass this_, jlong jfuncptr, jobject jarg) {
 	void* vfptr = (void*)jfuncptr;
-	void* arg = (void*)jarg;
-	jlong results = 0;
+	void* results = NULL;
 	if (!vfptr) {
 		fprintf(stderr, "!!! DANGER !!! NativeCallback called with null function pointer !!!\n");
 	} else {
 		void *(*fptr)(void*) = (void*(*)(void*))vfptr;
-		results = (jlong)fptr(arg);
+		results = fptr(jarg);
 	}
 	return results;
 }

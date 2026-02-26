@@ -32,11 +32,32 @@ function M:run(J)
 		:visitEnd()
 
 	-- long arg;
-	cw:visitField(Opcodes.ACC_PUBLIC, 'arg', 'J', nil, nil)
+	cw:visitField(Opcodes.ACC_PUBLIC, 'arg', 'Ljava/lang/Object;', nil, nil)
 		:visitEnd()
 
-	--	public NativeRunnable(long funcptr, long arg)
-	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(JJ)V', nil, nil)
+	--	public NativeRunnable(long funcptr)
+	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(J)V', nil, nil)
+	--	{
+	init:visitCode()
+	--		push 'this'
+	init:visitVarInsn(Opcodes.ALOAD, 0)
+	--		call super() aka java.lang.Object();
+	init:visitMethodInsn(Opcodes.INVOKESPECIAL, 'java/lang/Object', '<init>', '()V', false)
+	--		push 'this'
+	init:visitVarInsn(Opcodes.ALOAD, 0)
+	--		push arg #1
+	init:visitVarInsn(Opcodes.LLOAD, 1)
+	--		this.funcptr = arg #1
+	init:visitFieldInsn(Opcodes.PUTFIELD, newClassName, 'funcptr', 'J')
+	--		return;
+	init:visitInsn(Opcodes.RETURN)
+	--		max stacks, locals
+	init:visitMaxs(0, 0)
+	--	}
+	init:visitEnd()
+
+	--	public NativeRunnable(long funcptr, Object arg)
+	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(JLjava/lang/Object;)V', nil, nil)
 	--	{
 	init:visitCode()
 	--		push 'this'
@@ -52,14 +73,13 @@ function M:run(J)
 	--		push 'this'
 	init:visitVarInsn(Opcodes.ALOAD, 0)
 	--		push arg #2 (index 3)
-	init:visitVarInsn(Opcodes.LLOAD, 3)
+	init:visitVarInsn(Opcodes.ALOAD, 3)
 	--		this.funcptr = arg #2
-	init:visitFieldInsn(Opcodes.PUTFIELD, newClassName, 'arg', 'J')
+	init:visitFieldInsn(Opcodes.PUTFIELD, newClassName, 'arg', 'Ljava/lang/Object;')
 	--		return;
 	init:visitInsn(Opcodes.RETURN)
-	--		max stacks
-	-- 		# locals == 5 for 'this', arg #1 == long == 2 slots, arg #2 == long == 2 slots
-	init:visitMaxs(3, 5)
+	--		max stacks, locals
+	init:visitMaxs(0, 0)
 	--	}
 	init:visitEnd()
 
@@ -75,9 +95,13 @@ function M:run(J)
 	--		push 'this'
 	run:visitVarInsn(Opcodes.ALOAD, 0);
 	--		replace with 'this.arg'
-	run:visitFieldInsn(Opcodes.GETFIELD, newClassName, 'arg', 'J')
+	run:visitFieldInsn(Opcodes.GETFIELD, newClassName, 'arg', 'Ljava/lang/Object;')
 	--		call 'run' with 2 args on the stack, returning 0 args
-	run:visitMethodInsn(Opcodes.INVOKESTATIC, NativeCallback._classpath:gsub('%.', '/'), 'run', '(JJ)V', false)
+	run:visitMethodInsn(
+		Opcodes.INVOKESTATIC,
+		NativeCallback._classpath:gsub('%.', '/'),
+		'run', '(JLjava/lang/Object;)Ljava/lang/Object;',
+		false)
 	--		return;
 	run:visitInsn(Opcodes.RETURN)
 	--		max stacks, locals

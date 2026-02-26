@@ -2,7 +2,7 @@
 
 local thread = require 'thread.lite'{
 	code = [=[
-	local J = require 'java.vm'{ptr=arg}.jniEnv
+	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
 	-- init the cache from the already-generated classes
@@ -52,32 +52,36 @@ local thread = require 'thread.lite'{
 		local btn1 = JButton'Btn1'
 		btn1:addActionListener(NativeActionListener(
 			ffi.cast('void *(*)(void*)', function(arg)
-				print('button1 click')
-			end), 0
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button1 click', arg)
+			end)
 		))
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
 		btn2:addActionListener(NativeActionListener(
 			ffi.cast('void *(*)(void*)', function(arg)
-					print('button2 click')
-			end), 0
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button2 click', arg)
+			end)
 		))
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
 		btn3:addActionListener(NativeActionListener(
 			ffi.cast('void *(*)(void*)', function(arg)
-				print('button3 click')
-			end), 0
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button3 click', arg)
+			end)
 		))
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
 		btn4:addActionListener(NativeActionListener(
 			ffi.cast('void *(*)(void*)', function(arg)
-				print('button4 click')
-			end), 0
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button4 click', arg)
+			end)
 		))
 		buttons:add(btn4, gbc)
 
@@ -101,6 +105,7 @@ local J = require 'java.vm'{
 			'.',
 			'asm-9.9.1.jar',		-- needed for ASM
 		}, ':'),
+		['java.library.path'] = '.',
 	},
 }.jniEnv
 
@@ -108,7 +113,10 @@ local J = require 'java.vm'{
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 local NativeActionListener = require 'java.tests.nativeactionlistener_asm'(J)	-- use java-ASM (still needs gcc)
 
+local ffi = require 'ffi'
+thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
+
 J.javax.swing.SwingUtilities:invokeAndWait(
-	NativeRunnable(thread.funcptr, J._vm._ptr)
+	NativeRunnable(thread.funcptr)
 )
 thread:showErr()

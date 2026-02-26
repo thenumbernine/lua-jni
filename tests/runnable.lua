@@ -12,15 +12,20 @@ local J = require 'java.vm'{
 			'.',
 			'asm-9.9.1.jar',		-- needed for ASM
 		}, ':'),
+		['java.library.path'] = '.',
 	},
 }.jniEnv
 
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 
+local ffi = require 'ffi'
 callback = function(arg)
+	arg = J:_javaToLuaArg(arg, 'java.lang.Long')
 	print('hello from within Lua, arg', arg)
 end
-local ffi = require 'ffi'
 closure = ffi.cast('void *(*)(void*)', callback)
-NativeRunnable(closure, 123456789):run()
+NativeRunnable(
+	closure,
+	J.Long:valueOf(123456789)
+):run()

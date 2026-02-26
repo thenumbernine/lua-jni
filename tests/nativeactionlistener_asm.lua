@@ -33,12 +33,8 @@ function M:run(J, jsuperclass)
 	cw:visitField(Opcodes.ACC_PUBLIC, 'funcptr', 'J', nil, nil)
 		:visitEnd()
 
-	-- long arg;
-	cw:visitField(Opcodes.ACC_PUBLIC, 'arg', 'J', nil, nil)
-		:visitEnd()
-
 	--	public NativeActionListener(long funcptr, long arg)
-	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(JJ)V', nil, nil)
+	local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '(J)V', nil, nil)
 	--	{
 	init:visitCode()
 	--		push 'this'
@@ -51,17 +47,10 @@ function M:run(J, jsuperclass)
 	init:visitVarInsn(Opcodes.LLOAD, 1)
 	--		this.funcptr = arg #1
 	init:visitFieldInsn(Opcodes.PUTFIELD, newClassName, 'funcptr', 'J')
-	--		push 'this'
-	init:visitVarInsn(Opcodes.ALOAD, 0)
-	--		push arg #2 (index 3)
-	init:visitVarInsn(Opcodes.LLOAD, 3)
-	--		this.funcptr = arg #2
-	init:visitFieldInsn(Opcodes.PUTFIELD, newClassName, 'arg', 'J')
 	--		return;
 	init:visitInsn(Opcodes.RETURN)
-	--		max stacks
-	-- 		# locals == 5 for 'this', arg #1 == long == 2 slots, arg #2 == long == 2 slots
-	init:visitMaxs(3, 5)
+	--		max stacks, locals
+	init:visitMaxs(0, 0)
 	--	}
 	init:visitEnd()
 
@@ -74,12 +63,15 @@ function M:run(J, jsuperclass)
 	run:visitVarInsn(Opcodes.ALOAD, 0);
 	--		replace with 'this.funcptr'
 	run:visitFieldInsn(Opcodes.GETFIELD, newClassName, 'funcptr', 'J')
-	--		push 'this'
-	run:visitVarInsn(Opcodes.ALOAD, 0);
-	--		replace with 'this.arg'
-	run:visitFieldInsn(Opcodes.GETFIELD, newClassName, 'arg', 'J')
-	--		call 'run' with 2 args on the stack, returning 0 args
-	run:visitMethodInsn(Opcodes.INVOKESTATIC, NativeCallback._classpath:gsub('%.', '/'), 'run', '(JJ)V', false)
+	--		push 'e'
+	run:visitVarInsn(Opcodes.ALOAD, 1);
+	--		call 'run'
+	run:visitMethodInsn(
+		Opcodes.INVOKESTATIC,
+		NativeCallback._classpath:gsub('%.', '/'),
+		'run',
+		'(JLjava/lang/Object;)Ljava/lang/Object;',
+		false)
 	--		return;
 	run:visitInsn(Opcodes.RETURN)
 	--		max stacks, locals

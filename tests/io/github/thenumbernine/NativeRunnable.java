@@ -1,11 +1,14 @@
 package io.github.thenumbernine;
 
 public class NativeRunnable implements java.lang.Runnable {
-	// YES THE FIELDS ARE PUBLIC
-	// GET OVER YOURSELF JAVA
-	public long funcptr, arg;	//bitness of the systems ... is there 128-bit addressing anywhere?
+	public long funcptr;	//bitness of the systems ... is there 128-bit addressing anywhere?
+	public Object arg;
+	
+	public NativeRunnable(long funcptr) {
+		this.funcptr = funcptr;
+	}
 
-	public NativeRunnable(long funcptr, long arg) {
+	public NativeRunnable(long funcptr, Object arg) {
 		this.funcptr = funcptr;
 		this.arg = arg;
 	}

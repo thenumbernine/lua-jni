@@ -50,8 +50,13 @@ function M:run(J)
 	clinit:visitEnd()
 
 	-- public static native long run(long funcptr, long arg);
-	cw:visitMethod(bit.bor(Opcodes.ACC_NATIVE, Opcodes.ACC_PUBLIC, Opcodes.ACC_STATIC), 'run', '(JJ)V', nil, nil)
-		:visitEnd()
+	cw:visitMethod(
+		bit.bor(Opcodes.ACC_NATIVE, Opcodes.ACC_PUBLIC, Opcodes.ACC_STATIC),
+		'run',
+		'(JLjava/lang/Object;)Ljava/lang/Object;',
+		nil,
+		nil
+	):visitEnd()
 
 	--}
 	cw:visitEnd()

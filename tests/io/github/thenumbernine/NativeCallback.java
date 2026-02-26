@@ -8,5 +8,5 @@ public class NativeCallback {
 	// this is a wrapper for what should be an underlying pthread-style callback,
 	// i.e. void*(*)(void*)
 	// i.e. void *callback(void*) {}
-	public static native long run(long funcptr, long arg);
+	public static native Object run(long funcptr, Object arg);
 }
