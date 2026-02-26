@@ -108,10 +108,6 @@ function JNIEnv:init(args)
 	self._ignoringExceptions = true
 
 
-	-- TODO just use JNI calls for the "boostrap"/reflection class-construction
-	-- then no need to check bootstrapClasses later.
-	self._java_lang_Class_jclass = self._ptr[0].FindClass(self._ptr, 'java/lang/Class')
-
 	-- save these up front
 	-- must match bootstrapClasses for the subsequent class cache build to not cause a stack overflow
 	-- TODO better would be to just not make/use the cache until after building these classes and methods

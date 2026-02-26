@@ -46,15 +46,19 @@ function JavaClass:init(args)
 	-- TODO should the caller do this? like is done with reflection ... hmm
 	-- caller is just JNIEnv:_findClass
 	local envptr = self._env._ptr
+	-- hmm, if I store java/lang/Class instead of retrieve it here every time then I get segafults
+	-- why?  I even went out of my way to start NewGlobalRef'ing all my java classes & objects ....
+	-- (fun fact, never NewGlobalRef'ing them never once caused a segfault, and now that I assumed it was I implemented it and the segfault turned out to be something else)
 	local modifiersMethodID = envptr[0].GetMethodID(
 		envptr,
-		self._env._java_lang_Class_jclass,
+		envptr[0].FindClass(envptr, 'java/lang/Class'),
 		'getModifiers',
 		'()I')
 	local modifiers = envptr[0].CallIntMethod(
 		envptr,
 		self._ptr,
 		modifiersMethodID)
+
 --DEBUG:print('class', self._classpath, 'modifiers', modifiers)
 	self._isPublic = 0 ~= bit.band(modifiers, 1)
 	self._isPrivate = 0 ~= bit.band(modifiers, 2)
