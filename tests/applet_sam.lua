@@ -5,8 +5,8 @@ local thread = require 'thread.lite'{
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
-	-- weird now that I am retrieving these via JNIEnv, now treating the callback arg as a jobject is segfaulting
-	local NativeActionListener = require 'java.tests.nativeactionlistener_asm'(J)	-- use java-ASM (still needs gcc)
+	local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
+	local NativeActionListener = MakeSAMNativeCallback(J, J.java.awt.event.ActionListener)
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -42,56 +42,39 @@ local thread = require 'thread.lite'{
 		local JButton = J.javax.swing.JButton
 
 		local ffi = require 'ffi'
-print('jvmPtr', ffi.cast('void*', jvmPtr))
-print('NativeActionListener', NativeActionListener._ptr)
 
 		local btn1 = JButton'Btn1'
-print('btn1', btn1._ptr)
-		local func = function(arg)
-			--arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-			print('button1 click', arg)
-		end
-print('func', func)		
-		local closure = ffi.cast('void *(*)(void*)', func)
-print('closure1', ffi.cast('void*', closure))
-		local listener = NativeActionListener(closure)
-print('listener', listener._ptr)
-		btn1:addActionListener(listener)
+		btn1:addActionListener(NativeActionListener(
+			function(...)
+				print('button1 click', ...)
+			end
+		))
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
-		btn2:addActionListener(
-			NativeActionListener(
-				ffi.cast('void *(*)(void*)', function(arg)
-					--arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-					arg = J:_javaToLuaArg(arg, 'java.lang.Object')
-					print('button2 click', arg)
-				end)
-			)
-		)
+		btn2:addActionListener(NativeActionListener(
+			function(...)
+				print('button2 click', ...)
+			end
+		))
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
-		btn3:addActionListener(
-			NativeActionListener(
-				ffi.cast('void *(*)(void*)', function(arg)
-					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-					print('button3 click', arg)
-				end)
-			)
-		)
+		btn3:addActionListener(NativeActionListener(
+			function(...)
+				print('button3 click', ...)
+			end
+		))
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
-		btn4:addActionListener(
-			NativeActionListener(
-				ffi.cast('void *(*)(void*)', function(arg)
-					arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
-					print('button4 click', arg)
-				end)
-			)
-		)
+		btn4:addActionListener(NativeActionListener(
+			function(...)
+				print('button4 click', ...)
+			end
+		))
 		buttons:add(btn4, gbc)
+
 
 		gbc.weighty = 1
 		panel:add(buttons, gbc)
@@ -117,19 +100,14 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
--- load our classes in Java ASM
---local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
---local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
--- [[
-local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
-local NativeRunnable = MakeSAMNativeCallback(J, J.Runnable)
---]]
 
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
+
+local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
+local NativeRunnable = MakeSAMNativeCallback(J, J.Runnable)
 
 J.javax.swing.SwingUtilities:invokeAndWait(
 	NativeRunnable(thread.funcptr)
 )
 thread:showErr()
-

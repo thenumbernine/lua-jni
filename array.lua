@@ -128,8 +128,8 @@ local function unpackLocal(ar, i, n)
 end
 
 function JavaArray:_unpack()
-	local n = #ar
-	return unpackLocal(ar, 1, n)
+	local n = #self
+	return unpackLocal(self, 0, n)
 end
 
 function JavaArray:__index(k)

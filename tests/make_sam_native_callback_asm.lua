@@ -6,6 +6,7 @@ and redirects the contents of the SAM function to io.github.thenumbernine.Native
 --]]
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
+local table = require 'ext.table'
 local JavaClass = require 'java.class'
 local getJNISig = require 'java.util'.getJNISig
 local infoForPrims = require 'java.util'.infoForPrims
@@ -17,7 +18,7 @@ return function(J, samClass)
 	local samMethod = samClass._samMethod
 	local samClassSlashSep = samClass._classpath:gsub('%.', '/')
 
-	local parentClassSlashSep = samClass._isInterface 
+	local parentClassSlashSep = samClass._isInterface
 		and 'java/lang/Object'
 		or samClassSlashSep
 
@@ -33,7 +34,12 @@ return function(J, samClass)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
-	local newClassName = 'io/github/thenumbernine/SAMNativeCallback_'..uniqueNameCounter
+	local envptrl = ffi.new('uint64_t[1]', ffi.cast('uint64_t', J._ptr))
+	local envptri = ffi.cast('uint32_t*', envptrl)
+	local envptrs = ('%08x%08x'):format(envptri[1], envptri[0])
+	local newClassName = 'io/github/thenumbernine/SAMNativeCallback_'
+		..envptrs..'_'..uniqueNameCounter
+--DEBUG:print('newClassName', newClassName)
 	uniqueNameCounter = uniqueNameCounter + 1
 
 	--public class ${newClassName} extends java.lang.Object {
@@ -83,15 +89,16 @@ return function(J, samClass)
 		mv:visitIntInsn(Opcodes.BIPUSH, sigNumArgs)
 		mv:visitTypeInsn(Opcodes.ANEWARRAY, 'java/lang/Object')
 
-		local localVarIndex = 0
+		local localVarIndex = 1
 		for i=0,sigNumArgs-1 do
 			mv:visitInsn(Opcodes.DUP)
 			mv:visitIntInsn(Opcodes.BIPUSH, i)
 
-			local argOpcode = Opcodes.ILOAD	-- TODO determine arg opcode somehow
-			mv:visitVarInsn(argOpcode, localVarIndex)
 			local argSig = samMethod._sig[i+2]
 			local primInfo = infoForPrims[argSig]
+
+			local argOpcode = primInfo and Opcodes.ILOAD or Opcodes.ALOAD
+			mv:visitVarInsn(argOpcode, localVarIndex)
 			if primInfo then
 				local boxedTypeSlashSep = primInfo.boxedType:gsub('%.', '/')
 				mv:visitMethodInsn(
@@ -124,7 +131,14 @@ return function(J, samClass)
 		-- TODO TODO return any result
 
 	mv:visitInsn(Opcodes.RETURN)
-	mv:visitMaxs(0, 0)
+	mv:visitMaxs(
+		10,	-- max stack
+		1 + (table.sub(samMethod._sig, 2):mapi(function(sigi)
+			-- max locals ... wait, locals include args right?
+			-- so any sig that is double or long needs 2, otherwise 1?
+			return (sigi == 'long' or sigi == 'double') and 2 or 1
+		end):sum() or 0)
+	)
 	mv:visitEnd()
 
 	--}
@@ -136,7 +150,7 @@ return function(J, samClass)
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
 	local cl = J:_getClassForJClass(classAsObj._ptr)
-	rawset(cl, '_cb', function(self, callback)
+	cl._cb = function(self, callback)
 		assert.type(callback, 'function')
 
 		-- arg = nil or a jobject to Object[]
@@ -148,7 +162,7 @@ return function(J, samClass)
 				return callback()
 			end
 		end
-		
+
 		local closure = ffi.cast('void *(*)(void*)', unpackCallback)
 		local obj = self:_new(
 			ffi.cast('jlong', closure)
@@ -171,7 +185,19 @@ return function(J, samClass)
 		end
 
 		return obj
-	end)
+	end
+
+	-- override ctor to accept function
+	-- TODO put this in JavaClass:_new, but that will make everything dependent on ASM...
+	local oldnew = cl._new	-- should be JavaClass._new
+	cl._new = function(self, ...)
+		local arg = ...
+		if type(arg) == 'function' then
+			return self:_cb(arg)
+		else
+			return oldnew(self, ...)
+		end
+	end
 
 	return cl
 end
