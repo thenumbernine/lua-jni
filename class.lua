@@ -29,7 +29,9 @@ function JavaClass:init(args)
 	-- locking namespace for java name resolve,
 	-- so define all to-be-used variables here,
 	-- even as 'false' for the if-exists tests to fail:
-	self._members = false
+	self._fields = false
+	self._methods = false
+	self._ctors = false
 
 	-- TODO save ctors, methods, and fields separately?
 	-- then no need to class-detect upon __index...
@@ -76,8 +78,12 @@ function JavaClass:_setupReflection()
 	env._ignoringExceptions = true
 
 --DEBUG:print('calling setupReflect on', self._classpath)
-	if self._members then return end	-- or should I warn?
-	self._members = {}	-- self._members[fieldname][fieldIndex] = JavaObject of field or member
+	assert.eq(false, self._fields, "_setupReflection expected _fields to be false")
+	assert.eq(false, self._methods, "_setupReflection expected _methods to be false")
+	assert.eq(false, self._ctors, "_setupReflection expected _ctors to be false")
+	self._fields = {}		-- self._fields[fieldname][index] = JavaField
+	self._methods = {}		-- self._methods[fieldname][index] = JavaMethod
+	self._ctors = table()	-- self._ctors[index] = JavaMethod
 
 	local java_lang_Class = env._java_lang_Class
 	local java_lang_reflect_Field = env._java_lang_reflect_Field
@@ -139,8 +145,8 @@ function JavaClass:_setupReflection()
 				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
-			self._members[name] = self._members[name] or table()
-			self._members[name]:insert(fieldObj)
+			self._fields[name] = self._fields[name] or table()
+			self._fields[name]:insert(fieldObj)
 --DEBUG:print('field['..i..'] = '..name, fieldClassPath)
 		end
 	end
@@ -201,8 +207,8 @@ function JavaClass:_setupReflection()
 				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
-			self._members[name] = self._members[name] or table()
-			self._members[name]:insert(methodObj)
+			self._methods[name] = self._methods[name] or table()
+			self._methods[name]:insert(methodObj)
 --DEBUG:print('method['..i..'] = '..name, tolua(sig))
 		end
 	end
@@ -211,9 +217,7 @@ function JavaClass:_setupReflection()
 	if self._javaObjConstructors == false then
 		io.stderr:write(' !!! DANGER !!! failed to get constructors from class '..self._classpath..'\n')
 	else
-		local name = '<init>'	-- all constructors have the same name
-		self._members[name] = self._members[name] or table()	-- honestly there shouldn't be one here ... unless a constructor got listed as a method, and that would be atypical
-		local ctors = self._members[name]
+		local ctorname = '<init>'	-- all constructors have the same name
 		local foundDefaultCtor
 		for i=0,#self._javaObjConstructors-1 do
 			local method = self._javaObjConstructors[i]
@@ -233,14 +237,11 @@ function JavaClass:_setupReflection()
 			local isVarArgs = java_lang_reflect_Constructor._java_lang_reflect_Constructor_isVarArgs(method)
 
 			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
-
---print('modifiers', modifiers)
-			-- NOTICE, ctors do NOT have 'isStatic' flag,
-			-- even though  they are supposed to be called with the jclass as the argument (since the object does not yet exist)
+--DEBUG:print('modifiers', modifiers)
 
 			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
-
 --DEBUG:print('jmethodID', jmethodID)
+
 			assert(jmethodID ~= nil, "couldn't get jmethodID from reflect constructor")
 
 			if #sig == 1 and sig[1] == 'void' then
@@ -250,7 +251,7 @@ function JavaClass:_setupReflection()
 			local methodObj = JavaMethod{
 				env = env,
 				ptr = jmethodID,
-				name = name,
+				name = ctorname,
 				sig = sig,
 				isVarArgs = isVarArgs,
 				-- or just pass the modifiers?
@@ -268,7 +269,7 @@ function JavaClass:_setupReflection()
 				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
-			ctors:insert(methodObj)
+			self._ctors:insert(methodObj)
 --DEBUG:print('constructor['..i..'] = '..tolua(sig))
 		end
 
@@ -279,14 +280,14 @@ function JavaClass:_setupReflection()
 --DEBUG:print('getting default ctor of class', self._classpath)
 			-- sometimes the default isn't there, like in java.lang.Class ...
 			local defaultCtorMethod = self:_method{
-				name = name,
+				name = ctorname,
 				sig = {},
 			}
 
 			-- can this ever not exist?
 			-- maybe by protecting it or something?
 			if defaultCtorMethod then
-				ctors:insert(defaultCtorMethod)
+				self._ctors:insert(defaultCtorMethod)
 			end
 		end
 	end
@@ -399,7 +400,7 @@ function JavaClass:_field(args)
 end
 
 function JavaClass:_new(...)
-	local ctors = self._members['<init>']
+	local ctors = self._ctors
 	if not ctors or #ctors == 0 then
 		error("can't new, no constructors present for "..self._classpath)
 	else
@@ -491,29 +492,26 @@ function JavaClass:__index(k)
 
 	-- now check fields/methods
 --DEBUG:print('here', self._classpath)
---DEBUG:print(require'ext.table'.keys(self._members):sort():concat', ')
-	local membersForName = self._members[k]
-	if membersForName then
-		assert.gt(#membersForName, 0, k)	-- otherwise the entry shouldn't be there...
---DEBUG:print('#membersForName', k, #membersForName)
-		-- how to resolve
-		-- now if its a field vs a method ...
-		local member = membersForName[1]
-		local JavaField = require 'java.field'
-		local JavaMethod = require 'java.method'
-		if JavaField:isa(member) then
-			-- assert it is a static member?
-			return member:_get(self)	-- call the getter of the field
-		elseif JavaMethod:isa(member) then
-			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve{
-				name = k,
-				caller = self,
-				options = membersForName,
-			}
-		else
-			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
-		end
+--DEBUG:print(require'ext.table'.keys(self._fields):sort():concat', ')
+	local fieldsForName = self._fields[k]
+	if fieldsForName then
+		assert.gt(#fieldsForName, 0, k)	-- otherwise the entry shouldn't be there...
+		-- assert it is a static field?
+		local field = fieldsForName[1]
+		return field:_get(self)	-- call the getter of the field
+	end
+
+--DEBUG:print(require'ext.table'.keys(self._methods):sort():concat', ')
+	local methodsForName = self._methods[k]
+	if methodsForName then
+		assert.gt(#methodsForName, 0, k)	-- otherwise the entry shouldn't be there...
+--DEBUG:print('#methodsForName', k, #methodsForName)
+		-- now our choice of methodsForName[] will depend on the calling args...
+		return JavaCallResolve{
+			name = k,
+			caller = self,
+			options = methodsForName,
+		}
 	end
 end
 

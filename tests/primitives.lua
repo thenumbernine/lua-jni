@@ -46,18 +46,6 @@ print('J.void', J.void)
 local Class = J.Class
 assert(rawequal(J.Class, J._java_lang_Class))	-- make sure the cache works
 
---print(Class:forPrimitiveName'int')
---[[ TODO this is static, why can't I see it?
-print('Class:')
-for _,name in ipairs(table.keys(Class._members):sort()) do
-	local membersForName = Class._members[name]
-	print('', name, #membersForName)
-end
--- ahhhaa
--- because it's a Java v22 method
--- and I'm using Java v21
---]]
-
 
 -- array tests
 
@@ -87,7 +75,8 @@ print('charArr[1]', charArr[1])
 
 print('#charArr', #charArr)
 print('charArr.length', charArr.length)
-print('charArr:_getClass()._members.length', charArr:_getClass()._members.length)
+print('charArr:_getClass()._fields.length', charArr:_getClass()._fields.length)
+print('charArr:_getClass()._methods.length', charArr:_getClass()._methods.length)
 print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
 print('charArr:_getClass():_name()', charArr:_getClass():_name())
 print('charArr:_getClass():_super()', charArr:_getClass():_super())

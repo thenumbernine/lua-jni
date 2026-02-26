@@ -18,12 +18,22 @@ assert.eq(String, String2)
 
 print('String:_isAssignableFrom(String)', String:_isAssignableFrom(String))
 
---[[ show all contents
+-- [[ show all contents
 print'String:'
-for _,name in ipairs(table.keys(String._members):sort()) do
-	local membersForName = String._members[name]
-	print('', name, #membersForName)
-	for _,option in ipairs(membersForName) do
+for _,name in ipairs(table.keys(String._fields):sort()) do
+	local fieldsForName = String._fields[name]
+	print('', name, #fieldsForName)
+	for _,option in ipairs(fieldsForName) do
+		print('','',option)
+	end
+end
+for _,option in ipairs(String._ctors) do
+	print('','',option)
+end
+for _,name in ipairs(table.keys(String._methods):sort()) do
+	local methodsForName = String._methods[name]
+	print('', name, #methodsForName)
+	for _,option in ipairs(methodsForName) do
 		print('','',option)
 	end
 end
@@ -44,8 +54,8 @@ print('s.join',  s.join)
 print('#s', #s)
 print('s.length', s.length)	-- turns out string.length is syntactic sugar for string.length()
 print('s:length()', s:length())
-print('#s:_getClass()._members.length', #s:_getClass()._members.length)
-print('s:_getClass()._members.length[1]._sig', tolua(s:_getClass()._members.length[1]._sig))
+print('#s:_getClass()._methods.length', #s:_getClass()._methods.length)
+print('s:_getClass()._methods.length[1]._sig', tolua(s:_getClass()._methods.length[1]._sig))
 
 
 -- can I make an array of Strings?

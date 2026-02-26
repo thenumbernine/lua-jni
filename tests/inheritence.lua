@@ -98,8 +98,8 @@ print(c:_getClass())
 print('want true:', c:_getClass() == TestInheritenceC)
 
 print('a:toString()', a:toString())
-print('b:toString()', b:toString())	-- "char" has no member named _members
-print('c:toString()', c:toString())	-- "unsigned short" has no member named _members
+print('b:toString()', b:toString())
+print('c:toString()', c:toString())
 
 print('a', a)
 print('b', b)	-- error

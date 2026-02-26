@@ -39,19 +39,18 @@ function JavaObject:init(args)
 			and not k:match'^_'
 			then
 				local classObj = self:_getClass()
-				local membersForName = classObj._members[k]
-				if membersForName then
-assert.gt(#membersForName, 0, k)
-					local member = membersForName[1]
-					local JavaField = require 'java.field'
-					local JavaMethod = require 'java.method'
-					if JavaField:isa(member) then
-						return member:_set(self, v)	-- call the getter of the field
-					elseif JavaMethod:isa(member) then
-						error("can't overwrite a Java method "..k)
-					else
-						error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
-					end
+				
+				local fieldsForName = classObj._fields[k]
+				if fieldsForName then
+assert.gt(#fieldsForName, 0, k)
+					local field = fieldsForName[1]
+					return field:_set(self, v)	-- call the setter of the field
+				end
+
+				local methodsForName = classObj._methods[k]
+				if methodsForName then
+assert.gt(#methodsForName, 0, k)
+					error("can't overwrite a Java method "..k)
 				end
 				error("JavaObject.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
 			end
@@ -198,28 +197,26 @@ function JavaObject:__index(k)
 	-- now check fields/methods
 	local classObj = self:_getClass()
 --DEBUG:print('here', classObj._classpath)
---DEBUG:print(require'ext.table'.keys(classObj._members):sort():concat', ')
-	local membersForName = classObj._members[k]
-	if membersForName then
-assert.gt(#membersForName, 0, k)
---DEBUG:print('#membersForName', k, #membersForName)
-		-- how to resolve
-		-- now if its a field vs a method ...
-		local member = membersForName[1]
-		local JavaField = require 'java.field'
-		local JavaMethod = require 'java.method'
-		if JavaField:isa(member) then
-			return member:_get(self)	-- call the getter of the field
-		elseif JavaMethod:isa(member) then
-			-- now our choice of membersForName[] will depend on the calling args...
-			return JavaCallResolve{
-				name = k,
-				caller = self,
-				options = membersForName,
-			}
-		else
-			error("got a member for field "..k.." with unknown type "..tostring(getmetatable(member).__name))
-		end
+--DEBUG:print(require'ext.table'.keys(classObj._fields):sort():concat', ')
+	local fieldsForName = classObj._fields[k]
+	if fieldsForName then
+assert.gt(#fieldsForName, 0, k)
+		local field = fieldsForName[1]
+		return field:_get(self)	-- call the getter of the field
+	end
+
+--DEBUG:print(require'ext.table'.keys(classObj._methods):sort():concat', ')
+	local methodsForName = classObj._methods[k]
+	if methodsForName then
+assert.gt(#methodsForName, 0, k)
+--DEBUG:print('#methodsForName', k, #methodsForName)
+		local method = methodsForName[1]
+		-- now our choice of methodsForName[] will depend on the calling args...
+		return JavaCallResolve{
+			name = k,
+			caller = self,
+			options = methodsForName,
+		}
 	end
 end
 
@@ -256,17 +253,19 @@ function JavaObject:__len()
 		-- String is final, so it's ok
 		return envptr[0].GetStringLength(envptr, self._ptr)
 	else
-		-- TODO member vs method detect
 		local classObj = self:_getClass()
-		local length = classObj._members.length
-		if not length then return 0 end
-		if JavaField:isa(length[1]) then
-			return self.length
-		elseif JavaMethod:isa(length[1]) then
-			return self:length()
-		else
-			error'???'
+		
+		local lengthField = classObj._fields.length
+		if lengthField then
+			return lengthField:_get(self)
 		end
+
+		local lengthMethod = classObj._methods.length
+		if lengthMethod then
+			return self:length()	-- JavaCallResolve
+		end
+		
+		return 0
 	end
 end
 

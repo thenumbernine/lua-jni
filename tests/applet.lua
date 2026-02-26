@@ -113,12 +113,12 @@ do	-- just to be sure, check java.awt.event.ActionListener
 	local table = require 'ext.table'
 	local ActionListener = J.java.awt.event.ActionListener
 	print('ActionListener._isInterface', ActionListener._isInterface)
-	local allMemberNames = table.keys(ActionListener._members):sort()
+	local allMethodNames = table.keys(ActionListener._methods):sort()
 	local methodCount = 0
 	local allAbstract = true
-	for _,name in ipairs(allMemberNames) do
+	for _,name in ipairs(allMethodNames) do
 		if name:sub(1,1) ~= '<' then	-- skip <init> and <clinit>
-			local options = ActionListener._members[name]
+			local options = ActionListener._methods[name]
 			print('', name)
 			for _,option in ipairs(options) do
 				if not option._isAbstract then
