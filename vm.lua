@@ -149,8 +149,15 @@ function JavaVM:destroy()
 	end
 end
 
+-- I can't think of any way to cleanly shutdown across threads and multiple Lua states ...
 function JavaVM:__gc()
+	local ptr = self._ptr
+--DEBUG:print('JavaVM shutdown', ptr, ptr[0])
 	self:destroy()
+	if ptr then
+		ptr[0] = nil
+	end
+	self._ptr = nil
 end
 
 return JavaVM

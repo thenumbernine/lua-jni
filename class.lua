@@ -22,8 +22,14 @@ JavaClass.subclass = nil
 
 
 function JavaClass:init(args)
-	self._env = assert.index(args, 'env')
-	self._ptr = assert.index(args, 'ptr')
+	-- matches JavaObject, its superclass, but here I'm not calling JavaObject:init...
+	local env = assert.index(args, 'env')
+	self._env = env
+	local envptr = env._ptr
+
+	local ptr = assert.index(args, 'ptr')
+	self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
+
 	self._classpath = assert.index(args, 'classpath')
 
 	-- locking namespace for java name resolve,
@@ -319,7 +325,7 @@ function JavaClass:_setupReflection()
 			end
 		end
 	end
-::detectSAMDone::		
+::detectSAMDone::
 
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()

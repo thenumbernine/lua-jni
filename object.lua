@@ -1,3 +1,4 @@
+require 'ext.gc'
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
@@ -18,8 +19,12 @@ JavaObject.subclass = nil	-- make room for Java instances with fields named 'sub
 
 
 function JavaObject:init(args)
-	self._env = assert.index(args, 'env')
-	self._ptr = assert.index(args, 'ptr')
+	local env = assert.index(args, 'env')
+	self._env = env
+	local envptr = env._ptr
+
+	local ptr = assert.index(args, 'ptr')
+	self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
 
 	-- TODO detect if not provided?
 	self._classpath = assert.index(args, 'classpath')
@@ -39,7 +44,7 @@ function JavaObject:init(args)
 			and not k:match'^_'
 			then
 				local classObj = self:_getClass()
-				
+
 				local fieldsForName = classObj._fields[k]
 				if fieldsForName then
 assert.gt(#fieldsForName, 0, k)
@@ -254,7 +259,7 @@ function JavaObject:__len()
 		return envptr[0].GetStringLength(envptr, self._ptr)
 	else
 		local classObj = self:_getClass()
-		
+
 		local lengthField = classObj._fields.length
 		if lengthField then
 			return lengthField:_get(self)
@@ -264,8 +269,26 @@ function JavaObject:__len()
 		if lengthMethod then
 			return self:length()	-- JavaCallResolve
 		end
-		
+
 		return 0
+	end
+end
+
+function JavaObject:__gc()
+	local ptr = rawget(self, '_ptr')
+	if ptr then
+		local env = self._env
+		if env then
+			local vmptr = env._vm._ptr
+			if vmptr
+			and vmptr[0] ~= nil
+			then
+				local envptr = env._ptr
+--DEBUG:print('obj shutting down with vm ptr', vmptr, vmptr[0])
+				envptr[0].DeleteGlobalRef(envptr, ptr)
+				rawset(self, '_ptr', false)
+			end
+		end
 	end
 end
 
