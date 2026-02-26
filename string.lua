@@ -10,6 +10,7 @@ local JavaObject = require 'java.object'
 local JavaString = class(JavaObject)
 JavaString.__name = 'JavaString'
 JavaString.__index = JavaObject.__index	-- class() will override this, so reset it
+JavaString.super = nil
 JavaString.class = nil
 JavaString.subclass = nil
 --JavaString.isa = nil -- handled in __index

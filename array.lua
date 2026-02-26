@@ -6,9 +6,11 @@ local prims = require 'java.util'.prims
 local infoForPrims = require 'java.util'.infoForPrims
 
 
-local JavaArray = class(JavaObject)
+local super = JavaObject
+local JavaArray = class(super)
 JavaArray.__name = 'JavaArray'
 JavaArray.__index = JavaObject.__index	-- class() will override this, so reset it
+JavaArray.super = nil
 JavaArray.class = nil
 JavaArray.subclass = nil
 --JavaArray.isa = nil -- TODO
@@ -40,7 +42,7 @@ function JavaArray:init(args)
 	end
 
 	-- do super last because it write-protects the object for java namespace lookup __newindex
-	JavaArray.super.init(self, args)
+	super.init(self, args)
 	local JavaObject__newindex = getmetatable(self).__newindex
 	getmetatable(self).__newindex = function(self, k, v)
 		if type(k) == 'number' then
@@ -129,7 +131,7 @@ function JavaArray:__index(k)
 	end
 
 	-- fallthrough to array fields in JavaObject's __index
-	return JavaArray.super.__index(self, k)
+	return super.__index(self, k)
 end
 
 return JavaArray

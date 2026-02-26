@@ -14,6 +14,7 @@ local getJNISig = require 'java.util'.getJNISig
 -- should JavaClass inherit from JavaObject?
 local JavaClass = class(JavaObject)
 JavaClass.__name = 'JavaClass'
+JavaClass.super = nil
 JavaClass.class = nil
 JavaClass.subclass = nil
 --JavaClass.isa = nil -- handled in __index

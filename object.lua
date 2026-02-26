@@ -9,8 +9,8 @@ local JavaObject = class()
 JavaObject.__name = 'JavaObject'
 
 -- TODO I have to break my Lua class model to make the java-interoperability layer compatible.
---JavaObject.super exists but in Java ".super" is reserved, and I'm exposing it in my API as ":_super()"
 --JavaObject.new exists but in Java "new" is reserved, and I'm exposing it in my API as ":_new()"
+JavaObject.super = nil
 JavaObject.class = nil
 JavaObject.subclass = nil	-- make room for Java instances with fields named 'subclass'
 --JavaObject.isa = nil -- handled in __index
@@ -184,6 +184,9 @@ function JavaObject:__index(k)
 		-- TODO indexed keys for java.lang.Array's
 		return
 	end
+
+	-- TODO nonvirtual namespaces references,
+	--  handle "this" and "super"
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
