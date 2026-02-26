@@ -93,8 +93,7 @@ function M:run(J, jsuperclass)
 	local code = cw:toByteArray()
 
 	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'
-		.URIClassLoader(J, code, newClassName)
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
 	M.cache = (J:_getClassForJClass(classAsObj._ptr))
 	return M.cache
