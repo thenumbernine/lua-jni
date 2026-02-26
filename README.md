@@ -180,19 +180,14 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
 - args:
 - - `name` = the method name
-- - `sig` = the method signature, a table of classpaths/primitives, the first is the return type.  An empty table defaults to a `void` return type.
 - - `nonvirtual` = forwards to `JavaMethod`
-- - `isVarArgs` = forwards to `JavaMethod`
-- - `isStatic` = set to `true` to retrieve a static method.
+- - all other args forwarded to JavaMethod
 
 - `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
 - args:
-- - `env` = `JNIEnv` object.
-- - `ptr` = `jfieldID`.
 - - `name` = field name.
 - - `sig` = signature string of the field.
-- - `isStatic` = true for static fields.
-
+- - all other args forwarded to JavaField
 
 ### JavaField
 `JavaField = require 'java.field'`

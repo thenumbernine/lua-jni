@@ -319,63 +319,59 @@ end
 args:
 	name
 	sig
-		= table of args as slash-separated classpaths,
+		= table of args as dot-separated classpaths or primitive names,
 		first arg is return type
 	isStatic = boolean
-	nonvirtual = boolean
-	isVarArgs
+	... the rest are forwarded to JavaMethod
 --]]
 function JavaClass:_method(args)
-	local env = self._env
+	assert.type(args, 'table')
 
+	local env = self._env
 	env:_checkExceptions()
 
-	assert.type(args, 'table')
 	local funcname = assert.type(assert.index(args, 'name'), 'string')
 	local isStatic = args.isStatic
-	local nonvirtual = args.nonvirtual
-	local isVarArgs = args.isVarArgs
 	local sig = assert.type(assert.index(args, 'sig'), 'table')
 	local sigstr = getJNISig(sig)
 --DEBUG:print('sigstr', sigstr)
 
-	local method
+	local jmethodID
 	if isStatic then
-		method = env._ptr[0].GetStaticMethodID(env._ptr, self._ptr, funcname, sigstr)
+		jmethodID = env._ptr[0].GetStaticMethodID(env._ptr, self._ptr, funcname, sigstr)
 	else
-		method = env._ptr[0].GetMethodID(env._ptr, self._ptr, funcname, sigstr)
+		jmethodID = env._ptr[0].GetMethodID(env._ptr, self._ptr, funcname, sigstr)
 	end
 	-- will this throw an exception? probably.
-	if method == nil then
+	if jmethodID == nil then
 		local ex = env:_exceptionOccurred()
 		return
 			nil,
 			"failed to find method "..tostring(funcname)
 				..(isStatic and ' static' or '')
-				..(nonvirtual and ' nonvirtual' or '')
-				..(isVarArgs and ' isVarArgs' or '')
 				..' '..tolua(sigstr),
 			ex
 	end
-	return JavaMethod{
-		env = env,
-		class = self,
-		ptr = method,
-		name = funcname,
-		sig = sig,
-		nonvirtual = nonvirtual,
-		isVarArgs = isVarArgs,
-		-- TODO all modifiers
-		isStatic = isStatic,
-	}
+
+	args.env = env
+	args.class = self
+	args.ptr = jmethodID
+	return JavaMethod(args)
 end
 
+--[[
+args:
+	name
+	sig = table of args as dot-separated classpaths or primitive names,
+	isStatic = boolean
+	... the rest are forwarded to JavaField
+--]]
 function JavaClass:_field(args)
-	local env = self._env
+	assert.type(args, 'table')
 
+	local env = self._env
 	env:_checkExceptions()
 
-	assert.type(args, 'table')
 	local fieldname = assert.type(assert.index(args, 'name'), 'string')
 	local sig = assert.type(assert.index(args, 'sig'), 'string')
 	local sigstr = getJNISig(sig)
@@ -390,13 +386,10 @@ function JavaClass:_field(args)
 		local ex = env:_exceptionOccurred()
 		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(isStatic and ' static' or ''), ex
 	end
-	return JavaField{
-		env = env,
-		ptr = jfieldID,
-		sig = sig,
-		-- TODO all modifiers
-		isStatic = isStatic,
-	}
+
+	args.env = env
+	args.ptr = jfieldID
+	return JavaField(args)
 end
 
 function JavaClass:_new(...)
