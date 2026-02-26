@@ -167,7 +167,9 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_throwNew()` = throw a new instance of this class.
 
-- `cl:_class()` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
+- `cl.class` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
+
+- `cl:_class()` = the method underlying `cl.class`.
 
 - `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
 

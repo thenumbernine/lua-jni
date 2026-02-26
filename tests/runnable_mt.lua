@@ -39,6 +39,10 @@ local J = require 'java.vm'{
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 
+-- before I was passing J._vm._ptr as the arg
+-- now I can't because JNI expects it to be jobject and will poke inside the memory
+-- I could wrap it in a Long, but then I'd need the VM to decode it,
+-- so why not just write the VM pointer this way.
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
