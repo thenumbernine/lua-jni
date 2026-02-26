@@ -8,11 +8,20 @@ The first one does, but it also requires you be calling it from within Java, so 
 local M = {}
 
 --return function(J, code, newClassName)
-	--[[ Notice this fails from JNI from C, but I bet it'd work in Android Java app.
+
+M.JNIDefineClass = function(J, code, newClassName)
+	local codeptr = code:_map()
+	local jclass = J._ptr[0].DefineClass(J._ptr, newClassName, nil, codeptr, #code)
+	code:_unmap(codeptr)
+	return J:_getClassForJClass(jclass)
+end
+
+M.MethodHandlesLookup = function(J, code)	-- Notice this fails from JNI from C, but I bet it'd work in Android Java app.
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local lookup = MethodHandles:lookup()	-- "JVM java.lang.IllegalCallerException: no caller frame"
 	return lookup:defineClass(code)
-	--]]
+end
+
 	--[[ upon "defineClass", throws "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local lookup = MethodHandles:publicLookup()
@@ -78,7 +87,7 @@ assert(not newClassName:find'%.', "class should be /-separated")
 		-- either a convert-to-C function or even a get-raw-access function (that needs to be manually released...)
 		local codeptr = J._ptr[0].GetByteArrayElements(J._ptr, code._ptr, nil)
 		local fp = path(newClassName..'.class')
-print('writing to', fp)
+--DEBUG:print('writing to', fp)
 		fp:getdir():mkdir(true)
 		assert(fp:write(ffi.string(codeptr, #code)))
 		J._ptr[0].ReleaseByteArrayElements(J._ptr, code._ptr, codeptr, 0)
@@ -91,6 +100,13 @@ end
 -- pick a default
 setmetatable(M, {
 	__call = function(self, ...)
+		--[[ maybe this is the JNI preferred way?
+		-- but when you use nil for classloader, seems it cannot find classes inside jars ... hmm
+		return self.JNIDefineClass(...)
+		--]]
+		-- [[ doesn't work with CLI... maybe it will with Android?
+		return self.MethodHandlesLookup(...)
+		--]]
 		-- [[ works for runnable.lua and runnable_mt.lua
 		-- but fails on the applet test
 		-- because lua isn't sharing its cached java class between thread lua states

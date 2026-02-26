@@ -94,8 +94,8 @@ local thread = require 'thread.lite'{
 local J = require 'java.vm'{
 	props = {
 		['java.class.path'] = table.concat({
-			'.',
 			'asm-9.9.1.jar',		-- needed for ASM
+			'.',
 		}, ':'),
 		['java.library.path'] = '.',
 	},

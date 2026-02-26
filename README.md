@@ -242,6 +242,9 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `ar[i]` aka `ar:_get(i)` = get the i'th index of the array
 - `ar[i]=v` aka `ar:_set(i, v)` = set the i'th index of the array
 
+- `data = ar:_map()` = get a pointer to the raw Java data.  Only works for primitives.
+- `ar:_unmap(data)` = release a pointer got from `ar:_map()`.
+
 - `x0, x1, x2, ... = ar:_unpack()` = unpacks and returns all elements of the array.
 
 - `ar._elemFFIType` = for primitives, LuaJIT FFI ctype of the JNI primitive type.

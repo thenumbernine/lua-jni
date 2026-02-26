@@ -122,6 +122,30 @@ function JavaArray:_set(i, v)
 	env:_checkExceptions()
 end
 
+function JavaArray:_map()
+	local getArrayElements = getArrayElementsField[self._elemClassPath]
+	if not getArrayElements then
+		error("JavaArray:_map() only works for primitives, found "..tostring(self._elemClassPath))
+	end
+
+	local envptr = self._env._ptr
+	local arptr = envptr[0][getArrayElements](envptr, self._ptr, nil)
+	if arptr == nil then error("array null pointer exception") end
+
+	return ffi.cast(self._elemFFIType_ptr, arptr)
+end
+
+function JavaArray:_unmap(arptr)
+	assert.type(arptr, 'cdata', "_unmap expected pointer")
+	local releaseArrayElements = releaseArrayElementsField[self._elemClassPath]
+	if not releaseArrayElements then
+		error("JavaArray:_unmap() only works for primitives, found "..tostring(self._elemClassPath))
+	end
+
+	local envptr = self._env._ptr
+	envptr[0][releaseArrayElements](envptr, self._ptr, arptr, 0)
+end
+
 local function unpackLocal(ar, i, n)
 	if i >= n then return end
 	return ar[i], unpackLocal(ar, i+1, n)
