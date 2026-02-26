@@ -90,7 +90,12 @@ return function(J, samClass)
 		local localVarIndex = 1
 		for i=0,sigNumArgs-1 do
 			mv:visitInsn(Opcodes.DUP)
-			mv:visitIntInsn(Opcodes.BIPUSH, i)
+
+			if i <= 5 then
+				mv:visitInsn(Opcodes.ICONST_0+i)
+			else
+				mv:visitIntInsn(Opcodes.BIPUSH, i)
+			end
 
 			local argSig = samMethod._sig[i+2]
 			local primInfo = infoForPrims[argSig]
