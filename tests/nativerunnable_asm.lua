@@ -3,7 +3,10 @@ This is the equivalent of ./io/github/thenumbernine/NativeRunnable.java
 This at least offloads the .java->.class side of things to LuaJIT
 But it still requires a separate .so
 --]]
-return function(J)
+local M = {}
+function M:run(J)
+	if M.cache then return M.cache end
+
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
 
@@ -88,8 +91,12 @@ return function(J)
 	local code = cw:toByteArray()
 
 	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'
-		.URIClassLoader(J, code, newClassName)
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	return (J:_getClassForJClass(classAsObj._ptr))
+	M.cache = J:_getClassForJClass(classAsObj._ptr)
+	return M.cache
 end
+setmetatable(M, {
+	__call = M.run,
+})
+return M

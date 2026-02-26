@@ -37,15 +37,20 @@ local M = {}
 	return publicLookup:defineHiddenClass(code, true)	-- "JVM java.lang.IllegalAccessException: java.lang.Object/publicLookup does not have full privilege access"
 	--return publicLookup:defineHiddenClass(code, false)	-- "JVM java.lang.IllegalAccessException: java.lang.Object/publicLookup does not have full privilege access"
 	--]]
-	--[[ this works but it relies, once again, on an external class. smh i hate java.
+	
+-- this works but it relies, once again, on an external class.
+-- but unlike the URIClassLoader, this is just one written class, not many.
+M.LookupFactory = function(J, code)
 	require 'java.build'.java{
-		src = 'TestLookupFactory.java',
-		dst = 'TestLookupFactory.class',
+		src = 'io/github/thenumbernine/LookupFactory.java',
+		dst = 'io/github/thenumbernine/LookupFactory.class',
 	}
-	assert(require 'java.class':isa(J.TestLookupFactory))
-	local lookup = J.TestLookupFactory:getFullAccess()
+	local LookupFactory = J.io.github.thenumbernine.LookupFactory
+	assert(require 'java.class':isa(LookupFactory))
+	local lookup = LookupFactory:getFullAccess()
 	return lookup:defineClass(code)
-	--]]
+end
+	
 	--[[ https://stackoverflow.com/questions/31226170/load-asm-generated-class-while-runtime
 	-- still needs a custom subclass to be compiled ...
 	-- ex: 
@@ -63,7 +68,7 @@ local M = {}
 	return loader:defineClass(newClassName, code, 0, #code)
 	--]]
 	
--- [[ URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
+-- URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
 -- path expects to be /-separated
 M.URIClassLoader = function(J, code, newClassName)
 assert(not newClassName:find'%.', "class should be /-separated")
@@ -82,6 +87,19 @@ print('writing to', fp)
 	local loader = J.java.net.URLClassLoader(urls)
 	return loader:loadClass((newClassName:gsub('/', '.')))
 end
---]]
+
+-- pick a default
+setmetatable(M, {
+	__call = function(self, ...)
+		-- [[ works for runnable.lua and runnable_mt.lua
+		-- but fails on the applet test
+		-- because lua isn't sharing its cached java class between thread lua states
+		return self.LookupFactory(...)
+		--]]
+		--[[ works on applet
+		return self.URIClassLoader(...)
+		--]]
+	end,
+})
 
 return M

@@ -3,7 +3,10 @@ java.awt.event.ActionListener implementation
 that forwards to io.github.thenumbernine.NativeRunnable
 dynamically generated using ASM 
 --]]
-return function(J, jsuperclass)
+local M = {}
+function M:run(J, jsuperclass)
+	if M.cache then return M.cache end
+
 	jsuperclass = jsuperclass or 'java/lang/Object'
 
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
@@ -93,6 +96,10 @@ return function(J, jsuperclass)
 	local classAsObj = require 'java.tests.bytecodetoclass'
 		.URIClassLoader(J, code, newClassName)
 
-	return (J:_getClassForJClass(classAsObj._ptr))
-
+	M.cache = (J:_getClassForJClass(classAsObj._ptr))
+	return M.cache
 end
+setmetatable(M, {
+	__call = M.run,
+})
+return M

@@ -5,6 +5,13 @@ local thread = require 'thread.lite'{
 	local J = require 'java.vm'{ptr=arg}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
+	-- now that we've built the JavaVM in the new thread,
+	--  we can build the new JavaClass objects
+	require 'java.tests.nativerunnable_asm'.cache = 
+		J:_getClassForJClass(NativeRunnable_ptr)
+	require 'java.tests.nativecallback_asm'.cache =
+		J:_getClassForJClass(NativeCallback_ptr)
+
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
 	frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
@@ -98,6 +105,19 @@ local J = require 'java.vm'{
 
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
+
+-- when using JavaASM to biuld classes dynamically,
+-- we can't build the same dynamic class twice in the same JVM,
+--  so forward them to the thread sub-lua
+-- but we shouldn't build them in the sub-lua yet until we get our VM until we get our new env until the new thread 
+-- OR I could just re-grab them by classname in the new thread ...
+thread.lua([[
+NativeRunnable_ptr = assert(...)
+]], require 'java.tests.nativerunnable_asm'.cache._ptr)
+
+thread.lua([[
+NativeCallback_ptr = assert(...)
+]], require 'java.tests.nativecallback_asm'.cache._ptr)
 
 J.javax.swing.SwingUtilities:invokeAndWait(
 	NativeRunnable(thread.funcptr, J._vm._ptr)

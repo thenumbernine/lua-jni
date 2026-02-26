@@ -10,7 +10,10 @@ and then maybe we have an extra wrapping function to the callback to translate t
 --]]
 local path = require 'ext.path'
 
-return function(J)
+local M = {}
+function M:run(J)
+	if M.cache then return M.cache end
+
 	-- need to build the jni .c side
 	require 'java.build'.C{
 		src = 'io_github_thenumbernine_NativeCallback.c',
@@ -56,8 +59,12 @@ return function(J)
 	local code = cw:toByteArray()
 
 	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'
-		.URIClassLoader(J, code, newClassName)
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	return (J:_getClassForJClass(classAsObj._ptr))
+	M.cache = (J:_getClassForJClass(classAsObj._ptr))
+	return M.cache
 end
+setmetatable(M, {
+	__call = M.run,
+})
+return M
