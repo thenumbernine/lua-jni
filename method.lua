@@ -46,15 +46,24 @@ function JavaMethod:init(args)
 	-- so maybe I don't want .class to be saved.
 	--self._class = assert.index(args, 'class')	-- JavaClass where the method came from ...
 
-	-- you need to know if its static to load the method
-	-- and you need to know if its static to call the method
-	-- ... seems that is something that shoudlve been saved with the  method itself ...
-	self._static = not not args.static
-
 	-- this is used in java wrt super.call ... is that the only time?
 	self._nonvirtual = not not args.nonvirtual
 
 	self._isVarArgs = not not args.isVarArgs
+
+	-- modifiers
+	self._isPublic = not not args.isPublic
+	self._isPrivate = not not args.isPrivate
+	self._isProtected = not not args.isProtected
+	self._isStatic = not not args.isStatic
+	self._isFinal = not not args.isFinal
+	self._isSynchronized = not not args.isSynchronized
+	self._isVolatile = not not args.isVolatile
+	self._isTransient = not not args.isTransient
+	self._isNative = not not args.isNative
+	self._isInterface = not not args.isInterface
+	self._isAbstract = not not args.isAbstract
+	self._isStrict = not not args.isStrict
 end
 
 function JavaMethod:__call(thisOrClass, ...)
@@ -68,7 +77,7 @@ function JavaMethod:__call(thisOrClass, ...)
 
 	local returnType = self._sig[1]
 	local callName
-	if self._static then
+	if self._isStatic then
 		callName = callStaticNameForReturnType[returnType]
 			or callStaticNameForReturnType.object
 	elseif self._nonvirtual then
@@ -166,7 +175,7 @@ end
 function JavaMethod:__tostring()
 	return self.__name..'('
 		..tostring(self._ptr)
-		..(self._static and ' static' or '')
+		..(self._isStatic and ' static' or '')
 		..(self._nonvirtual and ' nonvirtual' or '')
 		..(self._isVarArgs and ' isVarArgs' or '')
 		..' '..tolua(self._sig)

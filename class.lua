@@ -30,6 +30,36 @@ function JavaClass:init(args)
 	-- so define all to-be-used variables here,
 	-- even as 'false' for the if-exists tests to fail:
 	self._members = false
+
+	-- TODO save ctors, methods, and fields separately?
+	-- then no need to class-detect upon __index...
+
+	-- modifiers
+	-- TODO should the caller do this? like is done with reflection ... hmm
+	-- caller is just JNIEnv:_findClass
+	local envptr = self._env._ptr
+	local modifiersMethodID = envptr[0].GetMethodID(
+		envptr,
+		self._env._java_lang_Class_jclass,
+		'getModifiers',
+		'()I')
+	local modifiers = envptr[0].CallIntMethod(
+		envptr,
+		self._ptr,
+		modifiersMethodID)
+--DEBUG:print('class', self._classpath, 'modifiers', modifiers)
+	self._isPublic = 0 ~= bit.band(modifiers, 1)
+	self._isPrivate = 0 ~= bit.band(modifiers, 2)
+	self._isProtected = 0 ~= bit.band(modifiers, 4)
+	self._isStatic = 0 ~= bit.band(modifiers, 8)
+	self._isFinal = 0 ~= bit.band(modifiers, 16)
+	self._isSynchronized = 0 ~= bit.band(modifiers, 32)
+	self._isVolatile = 0 ~= bit.band(modifiers, 64)
+	self._isTransient = 0 ~= bit.band(modifiers, 128)
+	self._isNative = 0 ~= bit.band(modifiers, 256)
+	self._isInterface = 0 ~= bit.band(modifiers, 512)
+	self._isAbstract = 0 ~= bit.band(modifiers, 1024)
+	self._isStrict = 0 ~= bit.band(modifiers, 2048)
 end
 
 -- call this after creating JavaClass to fill its reflection contents
@@ -81,8 +111,8 @@ function JavaClass:_setupReflection()
 			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(fieldType))
 --DEBUG:print('fieldType', fieldType, fieldClassPath)
 
-			local fieldModifiers = java_lang_reflect_Field._java_lang_reflect_Field_getModifiers(field)
---DEBUG:print('fieldModifiers', fieldModifiers)
+			local modifiers = java_lang_reflect_Field._java_lang_reflect_Field_getModifiers(field)
+--DEBUG:print('modifiers', modifiers)
 
 			-- ok now switch this reflect field obj to a jni jfieldID
 			local jfieldID = env._ptr[0].FromReflectedField(env._ptr, field._ptr)
@@ -94,7 +124,19 @@ function JavaClass:_setupReflection()
 				env = env,
 				ptr = jfieldID,
 				sig = fieldClassPath,
-				static = 0 ~= bit.band(fieldModifiers, 8),	-- java.lang.reflect.Modifier.STATIC
+				-- or just pass the modifiers?
+				isPublic = 0 ~= bit.band(modifiers, 1),
+				isPrivate = 0 ~= bit.band(modifiers, 2),
+				isProtected = 0 ~= bit.band(modifiers, 4),
+				isStatic = 0 ~= bit.band(modifiers, 8),
+				isFinal = 0 ~= bit.band(modifiers, 16),
+				isSynchronized = 0 ~= bit.band(modifiers, 32),
+				isVolatile = 0 ~= bit.band(modifiers, 64),
+				isTransient = 0 ~= bit.band(modifiers, 128),
+				isNative = 0 ~= bit.band(modifiers, 256),
+				isInterface = 0 ~= bit.band(modifiers, 512),
+				isAbstract = 0 ~= bit.band(modifiers, 1024),
+				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
 			self._members[name] = self._members[name] or table()
@@ -143,8 +185,20 @@ function JavaClass:_setupReflection()
 				ptr = jmethodID,
 				name = name,
 				sig = sig,
-				static = 0 ~= bit.band(modifiers, 8),
 				isVarArgs = isVarArgs,
+				-- or just pass the modifiers?
+				isPublic = 0 ~= bit.band(modifiers, 1),
+				isPrivate = 0 ~= bit.band(modifiers, 2),
+				isProtected = 0 ~= bit.band(modifiers, 4),
+				isStatic = 0 ~= bit.band(modifiers, 8),
+				isFinal = 0 ~= bit.band(modifiers, 16),
+				isSynchronized = 0 ~= bit.band(modifiers, 32),
+				isVolatile = 0 ~= bit.band(modifiers, 64),
+				isTransient = 0 ~= bit.band(modifiers, 128),
+				isNative = 0 ~= bit.band(modifiers, 256),
+				isInterface = 0 ~= bit.band(modifiers, 512),
+				isAbstract = 0 ~= bit.band(modifiers, 1024),
+				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
 			self._members[name] = self._members[name] or table()
@@ -181,7 +235,7 @@ function JavaClass:_setupReflection()
 			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
 
 --print('modifiers', modifiers)
-			-- NOTICE, ctors do NOT have 'static' flag,
+			-- NOTICE, ctors do NOT have 'isStatic' flag,
 			-- even though  they are supposed to be called with the jclass as the argument (since the object does not yet exist)
 
 			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
@@ -198,8 +252,20 @@ function JavaClass:_setupReflection()
 				ptr = jmethodID,
 				name = name,
 				sig = sig,
-				static = 0 ~= bit.band(modifiers, 8),
 				isVarArgs = isVarArgs,
+				-- or just pass the modifiers?
+				isPublic = 0 ~= bit.band(modifiers, 1),
+				isPrivate = 0 ~= bit.band(modifiers, 2),
+				isProtected = 0 ~= bit.band(modifiers, 4),
+				isStatic = 0 ~= bit.band(modifiers, 8),
+				isFinal = 0 ~= bit.band(modifiers, 16),
+				isSynchronized = 0 ~= bit.band(modifiers, 32),
+				isVolatile = 0 ~= bit.band(modifiers, 64),
+				isTransient = 0 ~= bit.band(modifiers, 128),
+				isNative = 0 ~= bit.band(modifiers, 256),
+				isInterface = 0 ~= bit.band(modifiers, 512),
+				isAbstract = 0 ~= bit.band(modifiers, 1024),
+				isStrict = 0 ~= bit.band(modifiers, 2048),
 			}
 
 			ctors:insert(methodObj)
@@ -254,7 +320,7 @@ args:
 	sig
 		= table of args as slash-separated classpaths,
 		first arg is return type
-	static = boolean
+	isStatic = boolean
 	nonvirtual = boolean
 	isVarArgs
 --]]
@@ -265,7 +331,7 @@ function JavaClass:_method(args)
 
 	assert.type(args, 'table')
 	local funcname = assert.type(assert.index(args, 'name'), 'string')
-	local static = args.static
+	local isStatic = args.isStatic
 	local nonvirtual = args.nonvirtual
 	local isVarArgs = args.isVarArgs
 	local sig = assert.type(assert.index(args, 'sig'), 'table')
@@ -273,7 +339,7 @@ function JavaClass:_method(args)
 --DEBUG:print('sigstr', sigstr)
 
 	local method
-	if static then
+	if isStatic then
 		method = env._ptr[0].GetStaticMethodID(env._ptr, self._ptr, funcname, sigstr)
 	else
 		method = env._ptr[0].GetMethodID(env._ptr, self._ptr, funcname, sigstr)
@@ -284,7 +350,7 @@ function JavaClass:_method(args)
 		return
 			nil,
 			"failed to find method "..tostring(funcname)
-				..(static and ' static' or '')
+				..(isStatic and ' static' or '')
 				..(nonvirtual and ' nonvirtual' or '')
 				..(isVarArgs and ' isVarArgs' or '')
 				..' '..tolua(sigstr),
@@ -296,9 +362,10 @@ function JavaClass:_method(args)
 		ptr = method,
 		name = funcname,
 		sig = sig,
-		static = static,
 		nonvirtual = nonvirtual,
 		isVarArgs = isVarArgs,
+		-- TODO all modifiers
+		isStatic = isStatic,
 	}
 end
 
@@ -311,22 +378,23 @@ function JavaClass:_field(args)
 	local fieldname = assert.type(assert.index(args, 'name'), 'string')
 	local sig = assert.type(assert.index(args, 'sig'), 'string')
 	local sigstr = getJNISig(sig)
-	local static = args.static
+	local isStatic = args.isStatic
 	local jfieldID
-	if static then
+	if isStatic then
 		jfieldID = env._ptr[0].GetStaticFieldID(env._ptr, self._ptr, fieldname, sigstr)
 	else
 		jfieldID = env._ptr[0].GetFieldID(env._ptr, self._ptr, fieldname, sigstr)
 	end
 	if jfieldID == nil then
 		local ex = env:_exceptionOccurred()
-		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(static and ' static' or ''), ex
+		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(isStatic and ' static' or ''), ex
 	end
 	return JavaField{
 		env = env,
 		ptr = jfieldID,
 		sig = sig,
-		static = static,
+		-- TODO all modifiers
+		isStatic = isStatic,
 	}
 end
 

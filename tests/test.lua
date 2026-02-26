@@ -35,7 +35,7 @@ print('Test:_name()', Test:_name())
 
 --public static String test() { return "Testing"; }
 -- TODO is there a way to get a method signature?
-local Test_test = assert(Test:_method{name='test', sig={'java.lang.String'}, static=true})
+local Test_test = assert(Test:_method{name='test', sig={'java.lang.String'}, isStatic=true})
 print('Test.test', Test_test)
 print('Test.test()', Test_test(Test))
 

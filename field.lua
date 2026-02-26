@@ -43,7 +43,20 @@ function JavaField:init(args)
 	self._env = assert.index(args, 'env')		-- JNIEnv
 	self._ptr = assert.index(args, 'ptr')		-- cdata
 	self._sig = assert.index(args, 'sig')		-- string
-	self._static = not not args.static
+
+	-- modifiers
+	self._isPublic = not not args.isPublic
+	self._isPrivate = not not args.isPrivate
+	self._isProtected = not not args.isProtected
+	self._isStatic = not not args.isStatic
+	self._isFinal = not not args.isFinal
+	self._isSynchronized = not not args.isSynchronized
+	self._isVolatile = not not args.isVolatile
+	self._isTransient = not not args.isTransient
+	self._isNative = not not args.isNative
+	self._isInterface = not not args.isInterface
+	self._isAbstract = not not args.isAbstract
+	self._isStrict = not not args.isStrict
 end
 
 -- there is a case for maintaining these pointers ...
@@ -64,7 +77,7 @@ function JavaField:_get(thisOrClass)
 	env:_checkExceptions()
 
 	local getName, returnObject
-	if self._static then
+	if self._isStatic then
 		returnObject = getStaticNameForType.object
 		getName = getStaticNameForType[self._sig] or returnObject
 	else
@@ -95,7 +108,7 @@ function JavaField:_set(thisOrClass, value)
 	env:_checkExceptions()
 
 	local setName, returnObject
-	if self._static then
+	if self._isStatic then
 		returnObject = setStaticNameForType.object
 		setName = setStaticNameForType[self._sig] or returnObject
 	else

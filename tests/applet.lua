@@ -109,6 +109,35 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
+do	-- just to be sure, check java.awt.event.ActionListener
+	local table = require 'ext.table'
+	local ActionListener = J.java.awt.event.ActionListener
+	print('ActionListener._isInterface', ActionListener._isInterface)
+	local allMemberNames = table.keys(ActionListener._members):sort()
+	local methodCount = 0
+	local allAbstract = true
+	for _,name in ipairs(allMemberNames) do
+		if name:sub(1,1) ~= '<' then	-- skip <init> and <clinit>
+			local options = ActionListener._members[name]
+			print('', name)
+			for _,option in ipairs(options) do
+				if not option._isAbstract then
+					allAbstract = false
+				end
+				print('', '', require 'ext.tolua'(option._sig), option._isAbstract and 'abstract' or '')
+				methodCount = methodCount + 1
+			end
+		end
+	end
+	print('# methods', methodCount)
+	print('all abstract', allAbstract)
+	local isSAM = methodCount == 1 and allAbstract
+	print('isSAM', isSAM)
+
+	-- if it isSAM then we should be allowed to replace it with a lamdbda ...
+end
+
+-- load our classes in Java ASM
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
 local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
 local NativeActionListener = require 'java.tests.nativeactionlistener_asm'(J)	-- use java-ASM (still needs gcc)

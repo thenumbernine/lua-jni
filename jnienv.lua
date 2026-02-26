@@ -120,6 +120,11 @@ function JNIEnv:init(args)
 	-- don't JavaObject-wrap excpetions during startup
 	self._ignoringExceptions = true
 
+
+	-- TODO just use JNI calls for the "boostrap"/reflection class-construction
+	-- then no need to check bootstrapClasses later.
+	self._java_lang_Class_jclass = self._ptr[0].FindClass(self._ptr, 'java/lang/Class')
+
 	-- save these up front
 	-- must match bootstrapClasses for the subsequent class cache build to not cause a stack overflow
 	-- TODO better would be to just not make/use the cache until after building these classes and methods
@@ -129,6 +134,11 @@ function JNIEnv:init(args)
 	self._java_lang_Class._java_lang_Class_getTypeName = assert(self._java_lang_Class:_method{
 		name = 'getTypeName',
 		sig = {'java.lang.String'},
+	})
+	-- or not since I need this in JavaClass's ctor, and chicken and egg...
+	self._java_lang_Class._java_lang_Class_getModifiers = assert(self._java_lang_Class:_method{
+		name = 'getModifiers',
+		sig = {'int'},
 	})
 	self._java_lang_Class._java_lang_Class_getFields = assert(self._java_lang_Class:_method{
 		name = 'getFields',
@@ -289,6 +299,7 @@ end
 function JNIEnv:_saveJClassForClassPath(args)
 	local classpath = args.classpath
 	args.env = self
+
 	local classObj = JavaClass(args)
 
 	-- maybe do this in the ctor
@@ -547,7 +558,7 @@ end
 -- used for call resolution / overload matching
 function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	local t = type(arg)
---DEBUG:print('arg type', t)		
+--DEBUG:print('arg type', t)
 
 -- hmm TODO auto-boxing auto-unboxing ...
 -- if arg is a boxed type then convert it to its prim value / as cdata (for proper type conversion)
@@ -556,33 +567,33 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	if t == 'boolean' then
 		return sig == 'boolean' or sig == 'java.lang.Boolean'
 	elseif t == 'table' then
---DEBUG:print('arg classpath', arg._classpath)		
+--DEBUG:print('arg classpath', arg._classpath)
 		-- before testing unboxing / widening / etc, just see if it matches
 		if arg._classpath == sig then return true end
-		
+
 		local unboxedSig = getUnboxedPrimitiveForClasspath[sig] or sig
---DEBUG:print('unboxedSig', unboxedSig)		
+--DEBUG:print('unboxedSig', unboxedSig)
 		if isPrimitive[unboxedSig]
 		and JavaObject:isa(arg)
 		then
---DEBUG:print('testing unboxed sig...')			
+--DEBUG:print('testing unboxed sig...')
 			-- if incoming is boxed type and sig is prim then yes
 			local unboxedArgType = getUnboxedPrimitiveForClasspath[arg._classpath]
 --DEBUG:print('unboxedArgType', unboxedArgType)
 			if unboxedArgType then
 				return getPrimWidening(unboxedArgType, unboxedSig)
 			end
-			
+
 			return false
 		end
-		
+
 		-- if we're matching an object to a primitive[] ...
 		local nonarraybase = sig:match'^(.*)%['
---DEBUG:print('nonarraybase', nonarraybase)		
+--DEBUG:print('nonarraybase', nonarraybase)
 		if nonarraybase then
 --DEBUG:print('isPrimitive[nonarraybase]', isPrimitive[nonarraybase])
 			if isPrimitive[nonarraybase] then
-				return false 
+				return false
 			end
 		end
 --DEBUG:print('(arg:_instanceof(sig))', (arg:_instanceof(sig)))
