@@ -36,7 +36,8 @@ local TestClass = LuaJavaClass{
 				--return J.Double(3.14)
 			end,
 			sig = {
-				'double',--'java.lang.Double',
+				'double',
+				--'java.lang.Double',
 				'java.lang.Object',
 			},
 		},

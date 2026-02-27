@@ -198,12 +198,11 @@ function M:run(args)
 			else
 				-- return a boxed type
 				local primInfo = infoForPrims[returnType]
-				local boxedType = primInfo and primInfo.boxedType or returnType
---DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedType)
-				result = J:_luaToJavaArg(result, boxedType)
+				local boxedSig = primInfo and primInfo.boxedType or returnType
+--DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedSig)
 				-- will be a java.lang.Object here no matter what
 				-- so the jobject(jobject) funcptr sig can handle it
-				return result._ptr
+				return J:_luaToJavaArg(result, boxedSig)
 			end
 		end
 		local closure = ffi.cast('void*(*)(void*)', wrapper)

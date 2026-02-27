@@ -767,7 +767,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 --DEBUG:print('got class', toClassObj._classpath)
 			local obj = toClassObj(arg)
 --DEBUG:print('_luaToJavaArg result', obj._ptr, obj._classpath, 'for', sig)
-			return obj
+			return obj._ptr
 		end
 		error("can't convert number to "..sig)
 	elseif t == 'nil' then
