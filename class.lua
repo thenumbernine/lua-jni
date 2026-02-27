@@ -1,3 +1,6 @@
+--[[
+This is a wrapper for a class / type in Java, i.e. a jclass in JNI
+--]]
 local assert = require 'ext.assert'
 local class = require 'ext.class'
 local string = require 'ext.string'

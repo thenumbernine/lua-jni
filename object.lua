@@ -1,3 +1,6 @@
+--[[
+This is a wrapper for an object in Java, i.e. a jobject in JNI
+--]]
 require 'ext.gc'
 local class = require 'ext.class'
 local assert = require 'ext.assert'

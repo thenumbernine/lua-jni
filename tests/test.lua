@@ -2,14 +2,11 @@
 -- just run a bunch of stuff and see if anything crashes
 local assert = require 'ext.assert'
 
-require 'make.targets'():add{	-- make sure it's built
-	dsts = {'Test.class'},
-	srcs = {'Test.java'},
-	rule = function(r)
-		assert.eq(r.srcs[1]:gsub('%.java$', '%.class'), r.dsts[1])	-- or else find where it will go ...
-		assert(require 'ext.os'.exec('javac "'..r.srcs[1]..'"'))
-	end,
-}:runAll()
+-- make sure it's built
+require 'java.build'.java{
+	dst = 'Test.class',
+	src = 'Test.java',
+}
 
 local ffi = require 'ffi'
 local J = require 'java'
