@@ -13,7 +13,6 @@ local NativeRunnable = LuaJavaClassFromSAM{
 	env = J,
 	class = J.Runnable,
 	func = function(...)
-		-- arg is the arguments of the SAM that are captured in an Object[]
 		print('hello from within Lua!', ...)
 	end,
 }

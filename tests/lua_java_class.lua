@@ -118,7 +118,10 @@ function M:run(args)
 		local n = #srcInterfaces
 		interfaces = J:_newArray(J.String, n)
 		for i=0,n-1 do
-			interfaces[i] = srcInterfaces[i+1]:gsub('%.', '/')
+			local interface = srcInterfaces[i+1]:gsub('%.', '/')
+--DEBUG:print('interface', interface)
+			--interfaces[i] = interface
+			interfaces:_set(i, interface)
 		end
 	end
 
@@ -181,38 +184,49 @@ function M:run(args)
 			)
 		end
 
-		local func = assert.index(method, 'func')	-- should I assert it is a function? does LuaJIT function closure casting handle __call of objects automatically?
-		local wrapper = function(args)
+
+		local func = assert.index(method, 'func')
+		-- if it's cdata then use it as-is
+		local funcptr
+		if type(func) == 'cdata' then
+		-- if it's a function then wrap it in a conversion layer
+			funcptr = func
+		elseif type(func) == 'function' then
+			local wrapper = function(args)
 --DEBUG:print('wrapper args', args)
-			local result
+				local result
 --DEBUG:print('wrapper calling sig', require 'ext.tolua'(sig))
-			if args ~= nil then
-				-- args should be Object[] always, and for members it will have args[0]==this
-				args = J:_javaToLuaArg(args, 'java.lang.Object[]')
-				result = func(args:_unpack())
-			else
-				result = func()
-			end
-			if returnType == 'void' then
-				return nil
-			else
-				-- return a boxed type
-				local primInfo = infoForPrims[returnType]
-				local boxedSig = primInfo and primInfo.boxedType or returnType
+				if args ~= nil then
+					-- args should be Object[] always, and for members it will have args[0]==this
+					args = J:_javaToLuaArg(args, 'java.lang.Object[]')
+					result = func(args:_unpack())
+				else
+					result = func()
+				end
+				if returnType == 'void' then
+					return nil
+				else
+					-- return a boxed type
+					local primInfo = infoForPrims[returnType]
+					local boxedSig = primInfo and primInfo.boxedType or returnType
 --DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedSig)
-				-- will be a java.lang.Object here no matter what
-				-- so the jobject(jobject) funcptr sig can handle it
-				return J:_luaToJavaArg(result, boxedSig)
+					-- will be a java.lang.Object here no matter what
+					-- so the jobject(jobject) funcptr sig can handle it
+					return J:_luaToJavaArg(result, boxedSig)
+				end
 			end
+			local closure = ffi.cast('void*(*)(void*)', wrapper)
+			closures:insert(closure)
+			funcptr = closure
+		else
+			error("idk how to handle func of type "..type(func))
 		end
-		local closure = ffi.cast('void*(*)(void*)', wrapper)
-		closures:insert(closure)
 
 		-- now native callback will get ...
 		-- 1) a funcptr from a closure
 		mv:visitLdcInsn(
 			J.Long(
-				ffi.cast('jlong', closure)
+				ffi.cast('jlong', funcptr)
 			)
 		)
 

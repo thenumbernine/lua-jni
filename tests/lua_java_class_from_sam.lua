@@ -17,6 +17,7 @@ return function(args)
 	local env = assert.index(args, 'env')
 	local samClass = assert.index(args, 'class')
 
+--DEBUG:print('samClass', samClass)
 	assert(JavaClass:isa(samClass), "expected samClass to be a JavaClass")
 	local samMethod = samClass._samMethod
 
@@ -31,11 +32,12 @@ return function(args)
 	local cl = LuaJavaClass{
 		env = env,
 		extends = parentClass,
+		interfaces = interfaces,
 		methods = {
 			{
 				name = samMethod._name,
 				sig = samMethod._sig,
-				func = assert.index(args, 'func'),
+				func = args.func,
 			},
 		},
 	}

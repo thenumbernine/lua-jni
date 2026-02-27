@@ -2,6 +2,7 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local class = require 'ext.class'
 local JavaObject = require 'java.object'
+local JavaClass = require 'java.class'
 local prims = require 'java.util'.prims
 local infoForPrims = require 'java.util'.infoForPrims
 
@@ -32,6 +33,10 @@ function JavaArray:init(args)
 	self._elemClassPath = args.elemClassPath
 		or _classpath:match'^(.*)%[%]$'
 		or error("didn't provide JavaArray .elemClassPath, and .classpath "..tostring(_classpath).." did not end in []")
+	if JavaClass:isa(self._elemClassPath) then
+		self._elemClassPath = self._elemClassPath._classpath
+	end
+	assert.type(self._elemClassPath, 'string')
 
 	local primInfo = infoForPrims[self._elemClassPath]
 	if primInfo then
@@ -111,6 +116,9 @@ function JavaArray:_set(i, v)
 	else
 		-- another one of these primitive array problems
 		-- the setter will depend on what the underlying primitive type is.
+--DEBUG:print('type(v)', type(v))
+--DEBUG:print('self._elemClassPath', self._elemClassPath)
+--DEBUG:assert.type(self._elemClassPath, 'string')
 		env._ptr[0].SetObjectArrayElement(
 			env._ptr,
 			self._ptr,

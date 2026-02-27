@@ -587,6 +587,9 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 		if isPrimitive[sig] then
 			return false
 		end
+		if sig == 'java.lang.String' then
+			return true
+		end
 		local nonarraybase = sig:match'^(.*)%['
 		if nonarraybase then
 			if isPrimitive[nonarraybase] then return false end
@@ -712,6 +715,9 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	elseif t == 'string' then
 		if isPrimitive[sig] then
 			error("can't cast string to primitive")
+		end
+		if sig == 'java.lang.String' then
+			return self:_str(arg)._ptr
 		end
 		local nonarraybase = sig:match'^(.*)%['
 		if nonarraybase then
