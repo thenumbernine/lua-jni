@@ -182,14 +182,14 @@ function M:run(args)
 		end
 
 		local func = assert.index(method, 'func')	-- should I assert it is a function? does LuaJIT function closure casting handle __call of objects automatically?
-		local wrapper = function(this, arg)
-			this = J:_javaToLuaArg(this, classname)
-			arg = J:_javaToLuaArg(arg, 'java.lang.Object[]')
+		local wrapper = function(args)
+--DEBUG:print('wrapper args', args)
 			local result
 --DEBUG:print('wrapper calling sig', require 'ext.tolua'(sig))
-			if arg ~= nil then
-				arg = J:_javaToLuaArg(arg, 'java.lang.Object[]')
-				result = func(arg:_unpack())
+			if args ~= nil then
+				-- args should be Object[] always, and for members it will have args[0]==this
+				args = J:_javaToLuaArg(args, 'java.lang.Object[]')
+				result = func(args:_unpack())
 			else
 				result = func()
 			end
@@ -218,18 +218,17 @@ function M:run(args)
 
 		-- 2) an Object[] of {this, ... rest of args of the method}
 		local sigNumArgs = #sig-1
-		if sigNumArgs == 0 then
-			mv:visitInsn(Opcodes.ACONST_NULL)
-		else
-			mv:visitIntInsn(Opcodes.BIPUSH, sigNumArgs+1)		-- +1 for 'this' (TODO static)
-			mv:visitTypeInsn(Opcodes.ANEWARRAY, 'java/lang/Object')
+print('sigNumArgs', sigNumArgs)
+		mv:visitIntInsn(Opcodes.BIPUSH, sigNumArgs+1)		-- +1 for 'this' (TODO static)
+		mv:visitTypeInsn(Opcodes.ANEWARRAY, 'java/lang/Object')
 
-			-- set args[0] = this
-			mv:visitInsn(Opcodes.DUP)
-			mv:visitInsn(Opcodes.ICONST_0)
-			mv:visitVarInsn(Opcodes.ALOAD, 0)
-			mv:visitInsn(Opcodes.AASTORE)
+		-- set args[0] = this
+		mv:visitInsn(Opcodes.DUP)
+		mv:visitInsn(Opcodes.ICONST_0)
+		mv:visitVarInsn(Opcodes.ALOAD, 0)
+		mv:visitInsn(Opcodes.AASTORE)
 
+		if sigNumArgs > 0 then
 			local localVarIndex = 1
 			for i=0,sigNumArgs-1 do		-- 0-based argument index
 				mv:visitInsn(Opcodes.DUP)

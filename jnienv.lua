@@ -665,6 +665,9 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 	return false
 end
 
+--[[
+converts from a Lua or Lua-wrapping-Java object to something that the JNI API can accept as an argument
+--]]
 function JNIEnv:_luaToJavaArg(arg, sig)
 	local t = type(arg)
 --DEBUG:print('JNIEnv:_luaToJavaArg', t, 'convert to', sig)

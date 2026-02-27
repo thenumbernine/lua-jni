@@ -29,8 +29,9 @@ local TestClass = LuaJavaClass{
 		{
 			name = 'bar',
 			func = function(...)
-				print("Foo says hello!")
-				print('args', ...)
+				print("LuaJavaClass TestClass bar() says hello!")
+				print('lua got #args', select('#', ...))
+				print('lua got args', ...)
 
 				return 3.14
 				--return J.Double(3.14)
