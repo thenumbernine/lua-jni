@@ -48,6 +48,7 @@ end
 -- So I'll put them here with key = classname
 local M = {}
 M.savedClosures = {}
+M.classnameBase = 'io.github.thenumbernine.LuaJavaClass_'
 
 --[[
 args:
@@ -102,7 +103,7 @@ function M:run(args)
 
 	local classname = args.name
 	if not classname then
-		classname = 'io.github.thenumbernine.LuaJavaClass_'
+		classname = M.classnameBase
 			..bit.tohex(ffi.cast('uint64_t', J._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
 			..'_'..uniqueNameCounter
 		uniqueNameCounter = uniqueNameCounter + 1

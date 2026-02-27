@@ -12,6 +12,7 @@ local M = {}
 M.JNIDefineClass = function(J, code, newClassName)
 	local loader = J.Thread:currentThread():getContextClassLoader()
 	local codeptr = code:_map()
+	J:_checkExceptions()
 	local jclass = J._ptr[0].DefineClass(
 		J._ptr,
 		newClassName,
@@ -19,6 +20,11 @@ M.JNIDefineClass = function(J, code, newClassName)
 		codeptr,
 		#code
 	)
+	J:_checkExceptions()	-- is DefineClass supposed to throw an exception on failure?
+	-- cuz on Android it's not...
+	if jclass == nil then
+		error("JNI DefineClass failed to load "..tostring(newClassName))
+	end
 	code:_unmap(codeptr)
 	return J:_getClassForJClass(jclass)
 end
@@ -26,7 +32,7 @@ end
 M.MethodHandlesLookup = function(J, code)	-- Notice this fails from JNI from C, but I bet it'd work in Android Java app.
 	local MethodHandles = J.java.lang.invoke.MethodHandles
 	local lookup = MethodHandles:lookup()	-- "JVM java.lang.IllegalCallerException: no caller frame"
-	return lookup:defineClass(code)
+	return lookup:defineClass(code)		-- in Android this gives "attempt to call method 'defineClass' (a nil value)"
 end
 
 	--[[ upon "defineClass", throws "JVM java.lang.IllegalAccessException: Lookup does not have PACKAGE access"
