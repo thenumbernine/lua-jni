@@ -1,5 +1,15 @@
 --[[
 This will represent a .class blob of data, to be used with classloaders
+
+Right now I am lazily exploding everything.
+
+But I'm tempted to make all lua class fields into pointers into the data blob,
+and give them ffi ctype metatables for reading and writing values.
+and then leave the bytecode as-is...
+
+Then again, Java-ASM ClassWriter isn't exactly writing bytes as it goes.
+A lot has to be stored and compressed upon conversion to byte array.
+I might as well keep it exploded.
 --]]
 local ffi = require 'ffi'
 local table = require 'ext.table'
