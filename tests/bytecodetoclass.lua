@@ -101,10 +101,10 @@ end
 setmetatable(M, {
 	__call = function(self, ...)
 		--[[ maybe this is the JNI preferred way?
-		-- but when you use nil for classloader, seems it cannot find classes inside jars ... hmm
+		-- but when you use nil for classloader, then in new threads, it seems it cannot find classes inside jars ... hmm
 		return self.JNIDefineClass(...)
 		--]]
-		-- [[ doesn't work with CLI... maybe it will with Android?
+		--[[ doesn't work with CLI... maybe it will with Android?
 		return self.MethodHandlesLookup(...)
 		--]]
 		-- [[ works for runnable.lua and runnable_mt.lua
