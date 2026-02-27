@@ -69,5 +69,10 @@ return function(J)
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
 
-	return (J:_getClassForJClass(classAsObj._ptr))
+	local cl = J:_getClassForJClass(classAsObj._ptr)
+
+	-- save for later:
+	rawset(cl, '_runMethodName', 'run')
+
+	return cl
 end

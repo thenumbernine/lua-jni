@@ -128,7 +128,7 @@ return function(J, samClass)
 	mv:visitMethodInsn(
 		Opcodes.INVOKESTATIC,
 		NativeCallback._classpath:gsub('%.', '/'),
-		'run',
+		assert(NativeCallback._runMethodName),
 		'(JLjava/lang/Object;)Ljava/lang/Object;',
 		false
 	)

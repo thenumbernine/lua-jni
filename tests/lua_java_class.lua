@@ -285,7 +285,7 @@ function M:run(args)
 		mv:visitMethodInsn(
 			Opcodes.INVOKESTATIC,
 			NativeCallbackSlashSep,
-			'run',
+			assert(NativeCallback._runMethodName),
 			'(JLjava/lang/Object;)Ljava/lang/Object;',
 			false
 		)
