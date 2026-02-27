@@ -7,17 +7,20 @@ local tolua = require 'ext.tolua'
 local J = require 'java.vm'{
 	props = {
 		['java.class.path'] = table.concat({
-			'.',
-			'asm-9.9.1.jar',		-- needed for ASM
+			'asm-9.9.1.jar',				-- needed to find Java ASM: asm-9.9.1.jar
+			--'.',							-- only needed for external .class's?
 		}, ':'),
-		['java.library.path'] = '.',
+		---['java.library.path'] = '.',		-- only needed for external ... which? .so's?
 	},
 }.jniEnv
 
 local LuaJavaClass = require 'java.tests.lua_java_class'
 local TestClass = LuaJavaClass{
 	env = J,
-	--name = 'TestClass',	-- JVM java.lang.IllegalArgumentException: TestClass not in same package as lookup class
+	-- when using io.github.thenumbernine.LookupFactory to loading, this gives:
+	-- 	JVM java.lang.IllegalArgumentException: TestClass not in same package as lookup class
+	-- but when using JNIEnv.DefineClass, it works
+	--name = 'TestClass',
 	name = 'io.github.thenumbernine.TestClass',	-- works
 	fields = {
 		{

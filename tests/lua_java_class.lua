@@ -52,10 +52,10 @@ M.savedClosures = {}
 --[[
 args:
 	env = JavaEnv
-	name = dot-separated class name
-	parent = parent-class, or java.lang.Object by default
-	interfaces = list-of-interfaces to use
-	fields = {
+	name = (optional) dot-separated class name
+	extends = (optional) parent-class, or java.lang.Object by default
+	interfaces = (optional) list-of-interfaces to use
+	fields = (optional) {
 		{
 			name =
 			sig = string of dot-separated java type (primitive, class, array, etc)
@@ -66,7 +66,7 @@ args:
 		},
 		...
 	}
-	ctors = {
+	ctors = (optional) {
 		{
 			func = Lua callback function
 			sig =
@@ -75,7 +75,7 @@ args:
 		},
 		...
 	}
-	methods = {
+	methods = (optional) {
 		{
 			func = Lua callback function
 			name =
@@ -100,7 +100,7 @@ function M:run(args)
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
 	local NativeCallbackSlashSep = NativeCallback._classpath:gsub('%.', '/')
 
-	local classname = assert.type(assert.index(args, 'name'), 'string')
+	local classname = args.name
 	if not classname then
 		classname = 'io.github.thenumbernine.LuaJavaClass_'
 			..bit.tohex(ffi.cast('uint64_t', J._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
@@ -109,7 +109,7 @@ function M:run(args)
 	end
 	local classnameSlashSep = classname:gsub('%.', '/')
 
-	local parentClass = args.parentClass or 'java.lang.Object'
+	local parentClass = args.extends or 'java.lang.Object'
 	local parentClassSlashSep = parentClass:gsub('%.', '/')
 
 	local interfaces
@@ -118,7 +118,7 @@ function M:run(args)
 		local n = #srcInterfaces
 		interfaces = J:_newArray(J.String, n)
 		for i=0,n-1 do
-			interfaces[i] = srcInterfaces[i+1]
+			interfaces[i] = srcInterfaces[i+1]:gsub('%.', '/')
 		end
 	end
 
@@ -218,11 +218,12 @@ function M:run(args)
 
 		-- 2) an Object[] of {this, ... rest of args of the method}
 		local sigNumArgs = #sig-1
-print('sigNumArgs', sigNumArgs)
+--DEBUG:print('sigNumArgs', sigNumArgs)
 		mv:visitIntInsn(Opcodes.BIPUSH, sigNumArgs+1)		-- +1 for 'this' (TODO static)
 		mv:visitTypeInsn(Opcodes.ANEWARRAY, 'java/lang/Object')
 
 		-- set args[0] = this
+		-- TODO if it's static, what to do?  pass nothing?  pass the JavaObject of the java.lang.Class?
 		mv:visitInsn(Opcodes.DUP)
 		mv:visitInsn(Opcodes.ICONST_0)
 		mv:visitVarInsn(Opcodes.ALOAD, 0)

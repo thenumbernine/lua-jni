@@ -14,5 +14,5 @@ local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
 local NativeRunnable = MakeSAMNativeCallback(J, J.Runnable)
 NativeRunnable(function(...)
 	-- arg is the arguments of the SAM that are captured in an Object[]
-	print('hello from within Lua!', ...) 
+	print('hello from within Lua!', ...)
 end):run()

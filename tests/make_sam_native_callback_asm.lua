@@ -4,14 +4,16 @@ this makes a subclass of a SAM interface (or abstract class)
 using Java-ASM
 and redirects the contents of the SAM function to io.github.thenumbernine.NativeCallback
 --]]
+local JavaClass = require 'java.class'
+
+local uniqueNameCounter = 1
+
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
-local JavaClass = require 'java.class'
 local getJNISig = require 'java.util'.getJNISig
 local infoForPrims = require 'java.util'.infoForPrims
 
-local uniqueNameCounter = 1
 return function(J, samClass)
 	assert(JavaClass:isa(samClass), "expected samClass to be a JavaClass")
 
@@ -202,6 +204,5 @@ return function(J, samClass)
 			return oldnew(self, ...)
 		end
 	end
-
 	return cl
 end
