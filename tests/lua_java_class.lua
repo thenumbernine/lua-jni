@@ -284,15 +284,17 @@ function M:run(args)
 		if returnType == 'void' then
 			mv:visitInsn(Opcodes.RETURN)
 		elseif primInfo then
-			-- TODO cast and determine if it is a BoxedType
-			-- if it's not then return 0
+			-- cast to BoxedType
 			local boxedTypeSlashName = primInfo.boxedType:gsub('%.', '/')
-			mv:visitTypeInsn(Opcodes.CHECKCAST, boxedTypeSlashName)
+			mv:visitTypeInsn(
+				Opcodes.CHECKCAST,
+				boxedTypeSlashName
+			)
 			mv:visitMethodInsn(
 				Opcodes.INVOKEVIRTUAL,
 				boxedTypeSlashName,
 				primInfo.name..'Value',
-				getJNISig{primInfo.name, primInfo.boxedType},
+				getJNISig{primInfo.name},
 				false)
 			mv:visitInsn(primInfo.returnOp)
 		else

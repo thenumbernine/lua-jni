@@ -32,11 +32,11 @@ local TestClass = LuaJavaClass{
 				print("Foo says hello!")
 				print('args', ...)
 
-				return 3.14 
+				return 3.14
 				--return J.Double(3.14)
 			end,
 			sig = {
-				'java.lang.Double',
+				'double',--'java.lang.Double',
 				'java.lang.Object',
 			},
 		},
