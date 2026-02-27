@@ -35,14 +35,14 @@ return function(J, samClass)
 	local Opcodes = J.org.objectweb.asm.Opcodes
 
 	local newClassName = 'io/github/thenumbernine/SAMNativeCallback_'
-		..bit.tohex(ffi.cast('uint64_t', J._ptr), 16)
+		..bit.tohex(ffi.cast('uint64_t', J._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
 		..'_'..uniqueNameCounter
 --DEBUG:print('newClassName', newClassName)
 	uniqueNameCounter = uniqueNameCounter + 1
 
 	--public class ${newClassName} extends java.lang.Object {
 	cw:visit(
-		Opcodes.V1_6,
+		Opcodes.V1_6,	-- TODO match with J._vm.version
 		Opcodes.ACC_PUBLIC,
 		newClassName,
 		nil,
@@ -108,7 +108,7 @@ return function(J, samClass)
 					Opcodes.INVOKESTATIC,
 					boxedTypeSlashSep,
 					'valueOf',
-					getJNISig{info.boxedType, info.name},
+					getJNISig{primInfo.boxedType, primInfo.name},
 					false
 				)
 			end
