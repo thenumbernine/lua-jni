@@ -362,6 +362,32 @@ function M:run(args)
 	local cl = J:_getClassForJClass(classAsObj._ptr)
 	return cl
 end
+
+-- [[
+-- TODO while we're here, make this default behavior
+-- change JavaClass ctor to accept functions, auto-subclass, and return their instances
+function JavaClass:_cb(func)
+	local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
+	local newsubclass = LuaJavaClassFromSAM{
+		env = self._env,
+		class = self,
+		func = func,
+	}
+	return newsubclass()
+end
+
+local oldJavaClassNew = JavaClass._new
+function JavaClass:_new(...)
+	-- if it's a function then subclass JavaClass and return an instance of the subclass
+	local arg = ...
+	if type(arg) == 'function' then
+		return self:_cb(...)
+	else
+		return oldJavaClassNew(self, ...)
+	end
+end
+--]]
+
 return setmetatable(M, {
 	__call = M.run,
 })

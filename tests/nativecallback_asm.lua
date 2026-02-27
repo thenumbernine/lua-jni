@@ -24,7 +24,8 @@ return function(J)
 	if cl then return cl end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
-	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
+	local JavaClass = require 'java.class'
+	assert(JavaClass:isa(ClassWriter), "JRE isn't finding ASM")
 	local cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
 
 	local Opcodes = J.org.objectweb.asm.Opcodes

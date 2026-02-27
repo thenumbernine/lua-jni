@@ -5,7 +5,7 @@ local thread = require 'thread.lite'{
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
-	local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
+	local LuaJavaClass = require 'java.tests.lua_java_class'	-- include to modify JavaClass (until I implement it in java/class.lua ...)
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -44,43 +44,35 @@ local thread = require 'thread.lite'{
 		local ActionListener = J.java.awt.event.ActionListener
 
 		local btn1 = JButton'Btn1'
-		btn1:addActionListener(LuaJavaClassFromSAM{
-			env = J,
-			class = ActionListener,
-			func = function(...)
+		btn1:addActionListener(ActionListener(
+			function(...)
 				print('button1 click', ...)
-			end,
-		}())
+			end
+		))
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
-		btn2:addActionListener(LuaJavaClassFromSAM{
-			env = J,
-			class = ActionListener,
-			func = function(...)
+		btn2:addActionListener(ActionListener(
+			function(...)
 				print('button2 click', ...)
-			end,
-		}())
+			end
+		))
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
-		btn3:addActionListener(LuaJavaClassFromSAM{
-			env = J,
-			class = ActionListener,
-			func = function(...)
+		btn3:addActionListener(ActionListener(
+			function(...)
 				print('button3 click', ...)
-			end,
-		}())
+			end
+		))
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
-		btn4:addActionListener(LuaJavaClassFromSAM{
-			env = J,
-			class = ActionListener,
-			func = function(...)
+		btn4:addActionListener(ActionListener(
+			function(...)
 				print('button4 click', ...)
-			end,
-		}())
+			end
+		))
 		buttons:add(btn4, gbc)
 
 
@@ -101,10 +93,10 @@ local thread = require 'thread.lite'{
 local J = require 'java.vm'{
 	props = {
 		['java.class.path'] = table.concat({
-			'.',
+			--'.',
 			'asm-9.9.1.jar',		-- needed for ASM
 		}, ':'),
-		['java.library.path'] = '.',
+		--['java.library.path'] = '.',
 	},
 }.jniEnv
 
@@ -112,12 +104,11 @@ local J = require 'java.vm'{
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
-local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
-local NativeRunnable = LuaJavaClassFromSAM{
-	env = J,
-	class = J.Runnable,
-	func = thread.funcptr,
-}
+-- include to modify JavaClass (until I implement it in java/class.lua ...)
+local LuaJavaClass = require 'java.tests.lua_java_class'
+J.javax.swing.SwingUtilities:invokeAndWait(
+	-- must manually call _cb because funcptr isn't 'function' so _new can't determine
+	J.Runnable:_cb(thread.funcptr)
+)
 
-J.javax.swing.SwingUtilities:invokeAndWait(NativeRunnable())
 thread:showErr()
