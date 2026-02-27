@@ -30,12 +30,13 @@ local TestClass = LuaJavaClass{
 			name = 'bar',
 			func = function(...)
 				print("Foo says hello!")
-				print(...)
-				return J.Double(3.14)
+				print('args', ...)
+
+				return 3.14 
+				--return J.Double(3.14)
 			end,
 			sig = {
-				--'java.lang.Object',	-- works as return type
-				'java.lang.Double',	-- fails as return type.
+				'java.lang.Double',
 				'java.lang.Object',
 			},
 		},
@@ -56,4 +57,4 @@ local testObj = TestClass()
 print('testObj', testObj)
 
 local obj = testObj:bar( J:_str("testing") )
-print('foo returns', obj) 
+print('foo returns', obj)

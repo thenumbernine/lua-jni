@@ -667,6 +667,7 @@ end
 
 function JNIEnv:_luaToJavaArg(arg, sig)
 	local t = type(arg)
+--DEBUG:print('JNIEnv:_luaToJavaArg', t, 'convert to', sig)
 	if t == 'boolean'  then
 		if sig == 'boolean' then
 			return jboolean(arg)
@@ -751,13 +752,24 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		-- cross our fingers, what's one more segfault?
 		return arg
 	elseif t == 'number' then
+--DEBUG:print('got number', arg)
+--DEBUG:print('want', sig)
 		local primInfo = infoForPrims[sig]
-		if not primInfo then
-			error("can't convert number to "..sig)
+		if primInfo then
+--DEBUG:print('is prim, returning', primInfo.ctype)
+			return ffi.new(primInfo.ctype, arg)
 		end
-		-- TODO will vararg know how to convert things?
-		-- TODO assert sig is a primitive
-		return ffi.new(primInfo.ctype, arg)
+		-- if it's a boxed type then return it
+		local unboxedSig = getUnboxedPrimitiveForClasspath[sig]
+		if unboxedSig then
+--DEBUG:print('is boxed, returning', sig)
+			local toClassObj = self:_findClass(sig)
+--DEBUG:print('got class', toClassObj._classpath)
+			local obj = toClassObj(arg)
+--DEBUG:print('_luaToJavaArg result', obj._ptr, obj._classpath, 'for', sig)
+			return obj
+		end
+		error("can't convert number to "..sig)
 	elseif t == 'nil' then
 		local primInfo = infoForPrims[sig]
 		-- objects can be nil

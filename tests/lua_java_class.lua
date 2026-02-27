@@ -12,10 +12,42 @@ local infoForPrims = require 'java.util'.infoForPrims
 
 local uniqueNameCounter = 1
 
+local alreadyInitd
+local function initInfoForPrims(Opcodes)
+	if alreadyInitd then return end
+	alreadyInitd = true
+	table.union(infoForPrims.boolean, {
+		returnOp = Opcodes.IRETURN,
+	})
+	table.union(infoForPrims.char, {
+		returnOp = Opcodes.IRETURN,
+	})
+	table.union(infoForPrims.byte, {
+		returnOp = Opcodes.IRETURN,
+	})
+	table.union(infoForPrims.short, {
+		returnOp = Opcodes.IRETURN,
+	})
+	table.union(infoForPrims.int, {
+		returnOp = Opcodes.IRETURN,
+	})
+	table.union(infoForPrims.long, {
+		returnOp = Opcodes.LRETURN,
+	})
+	table.union(infoForPrims.float, {
+		returnOp = Opcodes.FRETURN,
+	})
+	table.union(infoForPrims.double, {
+		returnOp = Opcodes.DRETURN,
+	})
+end
+
+
 -- Where to put the saved closures?
 -- I'd put them in the JavaClass object but I'm sure it would go out of scope too quickly
 -- So I'll put them here with key = classname
-local savedClosures = {}
+local M = {}
+M.savedClosures = {}
 
 --[[
 args:
@@ -25,7 +57,7 @@ args:
 	interfaces = list-of-interfaces to use
 	fields = {
 		{
-			name = 
+			name =
 			sig = string of dot-separated java type (primitive, class, array, etc)
 			isStatic =
 			isPublic =
@@ -37,7 +69,7 @@ args:
 	ctors = {
 		{
 			func = Lua callback function
-			sig = 
+			sig =
 			isPrivate =
 			isPublic =
 		},
@@ -62,7 +94,7 @@ args:
 	isAbstract
 	isInterface		<- btw what is an interface class's parent class?
 --]]
-return function(args)
+function M:run(args)
 	local J = assert.index(args, 'env')
 
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
@@ -78,7 +110,7 @@ return function(args)
 	local classnameSlashSep = classname:gsub('%.', '/')
 
 	local parentClass = args.parentClass or 'java.lang.Object'
-	local parentClassSlashSep = parentClass:gsub('%.', '/') 
+	local parentClassSlashSep = parentClass:gsub('%.', '/')
 
 	local interfaces
 	local srcInterfaces = args.interfaces
@@ -92,9 +124,12 @@ return function(args)
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(JavaClass:isa(ClassWriter), "JRE isn't finding ASM")
-	local cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
-	
 	local Opcodes = J.org.objectweb.asm.Opcodes
+
+	-- do this once but only after finding ASM
+	initInfoForPrims(Opcodes)
+
+	local cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
 
 	cw:visit(
 		Opcodes.V1_6,		-- TODO match with J._vm.version
@@ -119,7 +154,7 @@ return function(args)
 	end
 
 	local closures = table()	-- to-free
-	savedClosures[classname] =  closures
+	M.savedClosures[classname] =  closures
 
 	local function buildLuaWrapperMethod(method)
 		local sig = method.sig or {}
@@ -133,7 +168,7 @@ return function(args)
 			nil
 		)
 		mv:visitCode()
-	
+
 		-- special for ctors, call parent
 		if method.name == '<init>' then
 			mv:visitVarInsn(Opcodes.ALOAD, 0)
@@ -151,14 +186,24 @@ return function(args)
 			this = J:_javaToLuaArg(this, classname)
 			arg = J:_javaToLuaArg(arg, 'java.lang.Object[]')
 			local result
+--DEBUG:print('wrapper calling sig', require 'ext.tolua'(sig))
 			if arg ~= nil then
 				arg = J:_javaToLuaArg(arg, 'java.lang.Object[]')
 				result = func(arg:_unpack())
 			else
 				result = func()
 			end
-			if returnType ~= 'void' then
-				return J:_luaToJavaArg(result, returnType)
+			if returnType == 'void' then
+				return nil
+			else
+				-- return a boxed type
+				local primInfo = infoForPrims[returnType]
+				local boxedType = primInfo and primInfo.boxedType or returnType
+--DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedType)
+				result = J:_luaToJavaArg(result, boxedType)
+				-- will be a java.lang.Object here no matter what
+				-- so the jobject(jobject) funcptr sig can handle it
+				return result._ptr
 			end
 		end
 		local closure = ffi.cast('void*(*)(void*)', wrapper)
@@ -179,7 +224,7 @@ return function(args)
 		else
 			mv:visitIntInsn(Opcodes.BIPUSH, sigNumArgs+1)		-- +1 for 'this' (TODO static)
 			mv:visitTypeInsn(Opcodes.ANEWARRAY, 'java/lang/Object')
-			
+
 			-- set args[0] = this
 			mv:visitInsn(Opcodes.DUP)
 			mv:visitInsn(Opcodes.ICONST_0)
@@ -232,16 +277,29 @@ return function(args)
 			false
 		)
 
-		-- return any result
+		-- now on the stack is a java.lang.Object from NativeCallback.run()
+		-- next, convert it depending on this function's return type
+--DEBUG:print('returnType', returnType)
+		local primInfo = infoForPrims[returnType]
 		if returnType == 'void' then
 			mv:visitInsn(Opcodes.RETURN)
-		elseif returnType == 'long' then
-			mv:visitInsn(Opcodes.LRETURN)
-		elseif returnType == 'float' then
-			mv:visitInsn(Opcodes.FRETURN)
-		elseif returnType == 'double' then
-			mv:visitInsn(Opcodes.DRETURN)
-		elseif not infoForPrims[returnType] then
+		elseif primInfo then
+			-- TODO cast and determine if it is a BoxedType
+			-- if it's not then return 0
+			local boxedTypeSlashName = primInfo.boxedType:gsub('%.', '/')
+			mv:visitTypeInsn(Opcodes.CHECKCAST, boxedTypeSlashName)
+			mv:visitMethodInsn(
+				Opcodes.INVOKEVIRTUAL,
+				boxedTypeSlashName,
+				primInfo.name..'Value',
+				getJNISig{primInfo.name, primInfo.boxedType},
+				false)
+			mv:visitInsn(primInfo.returnOp)
+		else
+			mv:visitTypeInsn(
+				Opcodes.CHECKCAST,
+				(returnType:gsub('%.', '/'))
+			)
 			mv:visitInsn(Opcodes.ARETURN)
 		end
 
@@ -258,7 +316,7 @@ return function(args)
 
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
-		-- provide a default ctor
+		-- provide a default ctor, no need for closure or callback
 		local init = cw:visitMethod(Opcodes.ACC_PUBLIC, '<init>', '()V', nil, nil)
 		init:visitCode()
 		init:visitVarInsn(Opcodes.ALOAD, 0)
@@ -289,3 +347,6 @@ return function(args)
 	local cl = J:_getClassForJClass(classAsObj._ptr)
 	return cl
 end
+return setmetatable(M, {
+	__call = M.run,
+})

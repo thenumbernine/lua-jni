@@ -12,5 +12,6 @@ JNIEXPORT jobject JNICALL Java_io_github_thenumbernine_NativeCallback_run(JNIEnv
 		void *(*fptr)(void*) = (void*(*)(void*))vfptr;
 		results = fptr(jarg);
 	}
+//printf("native callback result %p\n", results);
 	return results;
 }
