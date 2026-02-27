@@ -6,7 +6,6 @@ local thread = require 'thread.lite'{
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
 	local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
-	local NativeActionListener = LuaJavaClassFromSAM(J, J.java.awt.event.ActionListener)
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -42,37 +41,46 @@ local thread = require 'thread.lite'{
 		local JButton = J.javax.swing.JButton
 
 		local ffi = require 'ffi'
+		local ActionListener = J.java.awt.event.ActionListener
 
 		local btn1 = JButton'Btn1'
-		btn1:addActionListener(NativeActionListener(
-			function(...)
+		btn1:addActionListener(LuaJavaClassFromSAM{
+			env = J,
+			class = ActionListener,
+			func = function(...)
 				print('button1 click', ...)
-			end
-		))
+			end,
+		}())
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
-		btn2:addActionListener(NativeActionListener(
-			function(...)
+		btn2:addActionListener(LuaJavaClassFromSAM{
+			env = J,
+			class = ActionListener,
+			func = function(...)
 				print('button2 click', ...)
-			end
-		))
+			end,
+		}())
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
-		btn3:addActionListener(NativeActionListener(
-			function(...)
+		btn3:addActionListener(LuaJavaClassFromSAM{
+			env = J,
+			class = ActionListener,
+			func = function(...)
 				print('button3 click', ...)
-			end
-		))
+			end,
+		}())
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
-		btn4:addActionListener(NativeActionListener(
-			function(...)
+		btn4:addActionListener(LuaJavaClassFromSAM{
+			env = J,
+			class = ActionListener,
+			func = function(...)
 				print('button4 click', ...)
-			end
-		))
+			end,
+		}())
 		buttons:add(btn4, gbc)
 
 

@@ -10,8 +10,15 @@ local M = {}
 --return function(J, code, newClassName)
 
 M.JNIDefineClass = function(J, code, newClassName)
+	local loader = J.Thread:currentThread():getContextClassLoader()
 	local codeptr = code:_map()
-	local jclass = J._ptr[0].DefineClass(J._ptr, newClassName, nil, codeptr, #code)
+	local jclass = J._ptr[0].DefineClass(
+		J._ptr,
+		newClassName,
+		loader._ptr,
+		codeptr,
+		#code
+	)
 	code:_unmap(codeptr)
 	return J:_getClassForJClass(jclass)
 end
@@ -60,7 +67,8 @@ M.LookupFactory = function(J, code)
 	return lookup:defineClass(code)
 end
 	
-	--[[ https://stackoverflow.com/questions/31226170/load-asm-generated-class-while-runtime
+-- https://stackoverflow.com/questions/31226170/load-asm-generated-class-while-runtime
+M.ClassLoader = function(J, code)
 	-- still needs a custom subclass to be compiled ...
 	-- ex: 
 	--public class RuntimeClassLoader extends ClassLoader {
@@ -75,7 +83,7 @@ end
 	local loader = J.Thread:currentThread():getContextClassLoader()
 	print('loader', loader)
 	return loader:defineClass(newClassName, code, 0, #code)
-	--]]
+end
 	
 -- URLClassLoader, but that requires file write.  https://stackoverflow.com/a/1874179/2714073
 -- path expects to be /-separated
@@ -101,7 +109,6 @@ end
 setmetatable(M, {
 	__call = function(self, ...)
 		-- [[ maybe this is the JNI preferred way?
-		-- but when you use nil for classloader, then in new threads, it seems it cannot find classes inside jars ... hmm
 		return self.JNIDefineClass(...)
 		--]]
 		--[[ doesn't work with CLI... maybe it will with Android?
@@ -111,6 +118,9 @@ setmetatable(M, {
 		-- but fails on the applet test
 		-- because lua isn't sharing its cached java class between thread lua states
 		return self.LookupFactory(...)
+		--]]
+		--[[ classloader?
+		return self.ClassLoader(...)
 		--]]
 		--[[ works on applet
 		return self.URIClassLoader(...)
