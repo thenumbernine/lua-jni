@@ -4,6 +4,8 @@ How to load a class from bytecode?
 It'd be nice to have a method that worked without file-writes, without extra javac's
 
 The first one does, but it also requires you be calling it from within Java, so it won't work from a JNI C app.
+
+TODO should this accept slash-sep or dot-sep classes?
 --]]
 local M = {}
 

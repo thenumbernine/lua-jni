@@ -10,6 +10,10 @@ and then leave the bytecode as-is...
 Then again, Java-ASM ClassWriter isn't exactly writing bytes as it goes.
 A lot has to be stored and compressed upon conversion to byte array.
 I might as well keep it exploded.
+
+...
+Every classname is slash-separated and every signature will be the JNI style.
+If I translated them then I'd have to translate to and from the compiled bytecode, which is too much.
 --]]
 local ffi = require 'ffi'
 local table = require 'ext.table'
@@ -17,7 +21,97 @@ local assert = require 'ext.assert'
 local path = require 'ext.path'
 local class = require 'ext.class'
 
-					
+
+local function deepCopy(t)
+	if type(t) ~= 'table' then return t end
+	local t2 = table(t)
+	for k,v in pairs(t) do
+		t2[k] = deepCopy(v)
+	end
+	return t2
+end
+
+local function readClassName(cldata, index)
+	local const = cldata.constants[index]
+	assert.eq(const.tag, 'class')
+	return assert.type(const.name, 'string')
+end
+
+local function instInsertClass(inst, insBlob, cldata)
+	inst:insert((readClassName(cldata, insBlob:readu2())))
+end
+
+local function instInsertMethod(inst, insBlob, cldata)
+	local methodIndex = insBlob:readu2()
+	local method = assert.index(cldata.constants, methodIndex)
+	assert.eq(method.tag, 'methodRef')
+	inst:insert(method.class.name)
+	inst:insert(method.nameAndType.name)
+	inst:insert(method.nameAndType.sig)
+end
+
+local function instInsertField(inst, insBlob, cldata)
+	local fieldIndex = insBlob:readu2()
+	local field = assert.index(cldata.constants, fieldIndex)
+	assert.eq(field.tag, 'fieldRef')
+	inst:insert(field.class.name)
+	inst:insert(field.nameAndType.name)
+	inst:insert(field.nameAndType.sig)
+end
+
+
+local function instInsertConst(inst, insBlob, cldata, constIndex)
+	local const = cldata.constants[constIndex]
+	if not const then
+		-- how do we notice 'dynamic index' ?
+		inst:insert(constIndex)
+	else
+		-- value type ...
+		if const.tag == 'class' then
+			inst:insert(const.tag)
+			inst:insert(const.name)
+		elseif const.tag == 'methodHandle' then
+			inst:insert(const.tag)
+			inst:insert(const.refKind)
+			inst:insert(const.reference)
+		elseif const.tag == 'methodType' then
+			inst:insert(const.tag)
+			inst:insert(const.sig)
+		elseif const.tag == 'int'
+		or const.tag == 'float'
+		then
+			-- if it's a number then leave a hint at what kind of number
+			-- or how about for floats, use a dot ...
+			inst:insert(const.tag)
+			inst:insert(const.value)
+		elseif const.tag == 'string' then
+			inst:insert(const.tag)
+			inst:insert(const.value)
+		else
+			error'here'
+		end
+	end
+end
+
+local function instInsertConst2(inst, insBlob, cldata, constIndex)
+	local const = cldata.constants[constIndex]
+	if not const then
+		-- how do we notice 'dynamic index' ?
+		inst:insert(constIndex)
+	else
+		if const.tag == 'long' then
+			inst:insert(const.tag)
+			inst:insert(const.value)
+			--inst:insert(ffi.cast('int64_t', const.value))	-- forc LL suffix
+		elseif const.tag == 'double' then
+			inst:insert(const.tag)
+			inst:insert(const.value)	-- forcing serialization to use a dot would be nice ...
+		else
+			error'here'
+		end
+	end
+end
+
 -- https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 local instDescForOp = {
 	[0x00] = {name='nop'},	-- [No change]	perform no operation
@@ -38,9 +132,34 @@ local instDescForOp = {
 	[0x0f] = {name='dconst_1'},	-- → 1.0	push the constant 1.0 (a double) onto the stack
 	[0x10] = {name='bipush', args={'uint8_t'}},	-- 1: byte	→ value	push a byte onto the stack as an integer value
 	[0x11] = {name='sipush', args={'uint16_t'}},	-- 2: byte1, byte2	→ value	push a short onto the stack as an integer value
-	[0x12] = {name='ldc', args={'uint8_t'}},	-- 1: index	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack
-	[0x13] = {name='ldc_w', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
-	[0x14] = {name='ldc2_w', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (double, long, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
+
+	-- 1: index	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack
+	[0x12] = {
+		name='ldc',
+		--args={'uint8_t'},	-- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
+		args = function(inst, insBlob, cldata)
+			instInsertConst(inst, insBlob, cldata, insBlob:readu1())
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
+	[0x13] = {
+		name='ldc_w',
+		args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertConst(inst, insBlob, cldata, insBlob:readu2())
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (double, long, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
+	[0x14] = {
+		name='ldc2_w',
+		--args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertConst2(inst, insBlob, cldata, insBlob:readu2())
+		end,
+	},
+
 	[0x15] = {name='iload', args={'uint8_t'}},	-- 1: index	→ value	load an int value from a local variable #index
 	[0x16] = {name='lload', args={'uint8_t'}},	-- 1: index	→ value	load a long value from a local variable #index
 	[0x17] = {name='fload', args={'uint8_t'}},	-- 1: index	→ value	load a float value from a local variable #index
@@ -152,7 +271,7 @@ local instDescForOp = {
 	[0x81] = {name='lor'},	-- value1, value2 → result	bitwise OR of two longs
 	[0x82] = {name='ixor'},	-- value1, value2 → result	int xor
 	[0x83] = {name='lxor'},	-- value1, value2 → result	bitwise XOR of two longs
-	[0x84] = {name='iinc', args={'uint8_t', 'uint8_t'}},	-- 2: index, const	[No change]	increment local variable #index by signed byte const
+	[0x84] = {name='iinc', args={'uint8_t', 'int8_t'}},	-- 2: index, const	[No change]	increment local variable #index by signed byte const
 	[0x85] = {name='i2l'},	-- value → result	convert an int into a long
 	[0x86] = {name='i2f'},	-- value → result	convert an int into a float
 	[0x87] = {name='i2d'},	-- value → result	convert an int into a double
@@ -173,25 +292,25 @@ local instDescForOp = {
 	[0x96] = {name='fcmpg'},	-- value1, value2 → result	compare two floats, 1 on NaN
 	[0x97] = {name='dcmpl'},	-- value1, value2 → result	compare two doubles, -1 on NaN
 	[0x98] = {name='dcmpg'},	-- value1, value2 → result	compare two doubles, 1 on NaN
-	[0x99] = {name='ifeq', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9a] = {name='ifne', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9b] = {name='iflt', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9c] = {name='ifge', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9d] = {name='ifgt', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9e] = {name='ifle', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9f] = {name='if_icmpeq', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa0] = {name='if_icmpne', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa1] = {name='if_icmplt', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa2] = {name='if_icmpge', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa3] = {name='if_icmpgt', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa4] = {name='if_icmple', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa5] = {name='if_acmpeq', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa6] = {name='if_acmpne', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa7] = {name='goto', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	[no change]	goes to another instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa8] = {name='jsr', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	→ address	jump to subroutine at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2) and place the return address on the stack
-	[0xa9] = {name='ret', args={'uint8_t'}},	-- 1: index	[No change]	continue execution from address taken from a local variable #index (the asymmetry with jsr is intentional)
+	[0x99] = {name='ifeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9a] = {name='ifne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9b] = {name='iflt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9c] = {name='ifge', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9d] = {name='ifgt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9e] = {name='ifle', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9f] = {name='if_icmpeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa0] = {name='if_icmpne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa1] = {name='if_icmplt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa2] = {name='if_icmpge', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa3] = {name='if_icmpgt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa4] = {name='if_icmple', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa5] = {name='if_acmpeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa6] = {name='if_acmpne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa7] = {name='goto', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	[no change]	goes to another instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa8] = {name='jsr', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	→ address	jump to subroutine at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2) and place the return address on the stack
+	[0xa9] = {name='ret', args={'int8_t'}},	-- 1: index	[No change]	continue execution from address taken from a local variable #index (the asymmetry with jsr is intentional)
 	[0xaa] = {name='tableswitch',
-		args = function() error'TODO' end,	--... 
+		args = function() error'TODO' end,	--...
 	},	-- 16+: [0–3 bytes padding], defaultbyte1, defaultbyte2, defaultbyte3, defaultbyte4, lowbyte1, lowbyte2, lowbyte3, lowbyte4, highbyte1, highbyte2, highbyte3, highbyte4, jump offsets...	index →	continue execution from an address in the table at offset index
 	[0xab] = {name='lookupswitch',
 		args = function() error'TODO' end,
@@ -202,30 +321,151 @@ local instDescForOp = {
 	[0xaf] = {name='dreturn'},	-- value → [empty]	return a double from a method
 	[0xb0] = {name='areturn'},	-- objectref → [empty]	return a reference from a method
 	[0xb1] = {name='return'},	-- → [empty]	return from a void method
-	[0xb2] = {name='getstatic', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	→ value	get a static field value of a class, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
-	[0xb3] = {name='putstatic', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	value →	set static field to value in a class, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xb4] = {name='getfield', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref → value	get a field value of an object objectref, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
-	[0xb5] = {name='putfield', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref, value →	set field to value in an object objectref, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xb6] = {name='invokevirtual', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xb7] = {name='invokespecial', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xb8] = {name='invokestatic', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	[arg1, arg2, ...] → result	invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xb9] = {name='invokeinterface', args={'uint16_t', 'uint8_t', 'uint8_t'}},	-- 4: indexbyte1, indexbyte2, count, 0	objectref, [arg1, arg2, ...] → result	invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xba] = {name='invokedynamic', args={'uint16_t', 'uint8_t', 'uint8_t'}},	-- 4: indexbyte1, indexbyte2, 0, 0	[arg1, arg2, ...] → result	invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
-	[0xbb] = {name='new', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	→ objectref	create new object of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2)
-	[0xbc] = {name='newarray', args={'uint8_t'}},	-- 1: atype	count → arrayref	create new array with count elements of primitive type identified by atype
-	[0xbd] = {name='anewarray', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	count → arrayref	create a new array of references of length count and component type identified by the class reference index (indexbyte1 << 8 | indexbyte2) in the constant pool
+
+	-- 2: indexbyte1, indexbyte2	→ value	get a static field value of a class, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
+	[0xb2] = {
+		name='getstatic',
+		--args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertField(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	value →	set static field to value in a class, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb3] = {
+		name='putstatic',
+		--args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertField(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	objectref → value	get a field value of an object objectref, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
+	[0xb4] = {
+		name='getfield',
+		--args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertField(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	objectref, value →	set field to value in an object objectref, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb5] = {
+		name='putfield',
+		--args={'uint16_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertField(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb6] = {
+		name='invokevirtual',
+		args = function(inst, insBlob, cldata)
+			instInsertMethod(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb7] = {
+		name='invokespecial',
+		args = function(inst, insBlob, cldata)
+			instInsertMethod(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	[arg1, arg2, ...] → result	invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb8] = {
+		name='invokestatic',
+		args = function(inst, insBlob, cldata)
+			instInsertMethod(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 4: indexbyte1, indexbyte2, count, 0	objectref, [arg1, arg2, ...] → result	invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xb9] = {
+		name='invokeinterface',
+		args = function(inst, insBlob, cldata)
+			instInsertMethod(inst, insBlob, cldata)
+			inst:insert(insBlob:readu1())	-- count ... what's count for?
+			assert.eq(insBlob:readu1(), 0)	-- 0
+		end,
+	},
+
+	-- 4: indexbyte1, indexbyte2, 0, 0	[arg1, arg2, ...] → result	invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xba] = {
+		name='invokedynamic',
+		args={'uint16_t', 'uint8_t', 'uint8_t'},
+		args = function(inst, insBlob, cldata)
+			instInsertMethod(inst, insBlob, cldata)
+			assert.eq(insBlob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	→ objectref	create new object of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2)
+	[0xbb] = {
+		name='new',
+		--args={'uint16_t'},
+		args = function(inst, isnBlob, cldata)
+			instInsertClass(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 1: atype	count → arrayref	create new array with count elements of primitive type identified by atype
+	[0xbc] = {
+		name='newarray',
+		args={'uint8_t'},
+		-- TODO args is atype is a primitive type
+	},
+
+	-- 2: indexbyte1, indexbyte2	count → arrayref	create a new array of references of length count and component type identified by the class reference index (indexbyte1 << 8 | indexbyte2) in the constant pool
+	[0xbd] = {
+		name='anewarray',
+		--args={'uint16_t'},
+		args = function(inst, isnBlob, cldata)
+			instInsertClass(inst, insBlob, cldata)
+		end,
+	},
+
 	[0xbe] = {name='arraylength'},	-- arrayref → length	get the length of an array
 	[0xbf] = {name='athrow'},	-- objectref → [empty], objectref	throws an error or exception (notice that the rest of the stack is cleared, leaving only a reference to the Throwable)
-	[0xc0] = {name='checkcast', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref → objectref	checks whether an objectref is of a certain type, the class reference of which is in the constant pool at index (indexbyte1 << 8 | indexbyte2)
-	[0xc1] = {name='instanceof', args={'uint16_t'}},	-- 2: indexbyte1, indexbyte2	objectref → result	determines if an object objectref is of a given type, identified by class reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+
+	-- 2: indexbyte1, indexbyte2	objectref → objectref	checks whether an objectref is of a certain type, the class reference of which is in the constant pool at index (indexbyte1 << 8 | indexbyte2)
+	[0xc0] = {
+		name='checkcast',
+		--args={'uint16_t'},
+		args = function(inst, isnBlob, cldata)
+			instInsertClass(inst, insBlob, cldata)
+		end,
+	},
+
+	-- 2: indexbyte1, indexbyte2	objectref → result	determines if an object objectref is of a given type, identified by class reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	[0xc1] = {
+		name='instanceof',
+		--args={'uint16_t'},
+		args = function(inst, isnBlob, cldata)
+			instInsertClass(inst, insBlob, cldata)
+		end,
+	},
+
 	[0xc2] = {name='monitorenter'},	-- objectref →	enter monitor for object ("grab the lock" – start of synchronized() section)
 	[0xc3] = {name='monitorexit'},	-- objectref →	exit monitor for object ("release the lock" – end of synchronized() section)
 	[0xc4] = {name='wide', args=function() error'TODO' end},	-- 3/5: opcode, indexbyte1, indexbyte2 or iinc, indexbyte1, indexbyte2, countbyte1, countbyte2	[same as for corresponding instructions]	execute opcode, where opcode is either iload, fload, aload, lload, dload, istore, fstore, astore, lstore, dstore, or ret, but assume the index is 16 bit; or execute iinc, where the index is 16 bits and the constant to increment by is a signed 16 bit short
-	[0xc5] = {name='multianewarray', args={'uint16_t', 'uint8_t'}},	-- 3: indexbyte1, indexbyte2, dimensions	count1, [count2,...] → arrayref	create a new array of dimensions dimensions of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2); the sizes of each dimension is identified by count1, [count2, etc.]
-	[0xc6] = {name='ifnull', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xc7] = {name='ifnonnull', args={'uint16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xc8] = {name='goto_w', args={'uint32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	[no change]	goes to another instruction at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4)
-	[0xc9] = {name='jsr_w', args={'uint32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	→ address	jump to subroutine at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4) and place the return address on the stack
+
+	-- 3: indexbyte1, indexbyte2, dimensions	count1, [count2,...] → arrayref	create a new array of dimensions dimensions of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2); the sizes of each dimension is identified by count1, [count2, etc.]
+	[0xc5] = {
+		name='multianewarray',
+		--args={'uint16_t', 'uint8_t'}
+		args = function(inst, isnBlob, cldata)
+			instInsertClass(inst, insBlob, cldata)
+			inst:insert(insBlob:readu8())
+		end,
+	},
+
+	[0xc6] = {name='ifnull', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xc7] = {name='ifnonnull', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xc8] = {name='goto_w', args={'int32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	[no change]	goes to another instruction at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4)
+	[0xc9] = {name='jsr_w', args={'int32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	→ address	jump to subroutine at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4) and place the return address on the stack
 	[0xca] = {name='breakpoint'},	-- reserved for breakpoints in Java debuggers; should not appear in any class file
 	[0xfe] = {name='impdep1'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
 	[0xff] = {name='impdep2'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
@@ -234,13 +474,24 @@ local instDescForOp = {
 
 
 local JavaClassData = class()
-JavaClassData.__name = 'JavaClassData' 
+JavaClassData.__name = 'JavaClassData'
 
-function JavaClassData:init(data)
+function JavaClassData:init(args)
 	if type(args) == 'string' then
-		self:readData(args)	-- assume its raw data 
+		self:readData(args)	-- assume its raw data
+	elseif type(args) == 'nil' then
+	elseif type(args) == 'table' then
+		for k,v in pairs(args) do
+			self[k] = v
+		end
+	else
+		error("idk how to init this")
 	end
 end
+
+
+-------------------------------- READING --------------------------------
+
 
 -- static ctor
 function JavaClassData:fromFile(filename)
@@ -298,15 +549,6 @@ function Blob:assertDone()
 end
 
 function JavaClassData:readData(data)
-	local function deepCopy(t)
-		if type(t) ~= 'table' then return t end
-		local t2 = table(t)
-		for k,v in pairs(t) do
-			t2[k] = deepCopy(v)
-		end
-		return t2
-	end
-
 	local function deepCopyIndex(index)
 		return deepCopy(assert.index(self.constants, index))
 	end
@@ -331,6 +573,7 @@ function JavaClassData:readData(data)
 	assert.eq(magic, 0xcafebabe)
 	local minorVersion = blob:readu2()
 	local majorVersion = blob:readu2()
+--print(majorVersion..'.'..minorVersion)
 	-- store version info or nah?
 	local constantCount = blob:readu2()
 	self.constants = table()
@@ -338,7 +581,7 @@ function JavaClassData:readData(data)
 		local skipnext
 		for i=1,constantCount-1 do
 			if not skipnext then
-				local tag = blob:read'uint8_t'
+				local tag = blob:readu1()
 				local constant = {index=i, tag=tag}
 				if tag == 7 then		-- class
 					constant.tag = 'class'
@@ -355,9 +598,10 @@ function JavaClassData:readData(data)
 					constant.tag = 'interfaceMethodRef'
 					constant.classIndex = blob:readu2()
 					constant.nameAndTypeIndex = blob:readu2()
+
 				elseif tag == 8 then	-- string ... string literal
 					constant.tag = 'string'
-					constant.stringIndex = blob:readu2()
+					constant.valueIndex = blob:readu2()
 				elseif tag == 3 then	-- integer
 					constant.tag = 'int'
 					constant.value = blob:read'int32_t'
@@ -373,10 +617,11 @@ function JavaClassData:readData(data)
 					constant.tag = 'double'
 					constant.value = blob:read'double'
 					skipnext = true
+
 				elseif tag == 12 then	-- nameAndType
 					constant.tag = 'nameAndType'
 					constant.nameIndex = blob:readu2()
-					constant.descriptorIndex = blob:readu2()
+					constant.sigIndex = blob:readu2()
 				elseif tag == 1 then 	-- utf8string ... the string data
 					local length = blob:readu2()
 					--[[ keep a table?
@@ -388,11 +633,22 @@ function JavaClassData:readData(data)
 					--]]
 				elseif tag == 15 then	-- methodHandle
 					constant.tag = 'methodHandle'
-					constant.referenceKind = blob:readu2()
+					local refKind = blob:readu2()
+					constant.refKind = assert.index({
+						'getField',
+						'getStatic',
+						'putField',
+						'putStatic',
+						'invokeVirtual',
+						'invokeStatic',
+						'invokeSpecial',
+						'newInvokeSpecial',
+						'invokeInterface',
+					}, refKind)
 					constant.referenceIndex = blob:readu2()
 				elseif tag == 16 then	-- methodType
 					constant.tag = 'methodType'
-					constant.descriptorIndex = blob:readu2()
+					constant.sigIndex = blob:readu2()
 				elseif tag == 18 then	-- invokeDynamic
 					constant.tag = 'invokeDynamic'
 					constant.boostrapMethodAttrIndex = blob:readu2()
@@ -436,13 +692,13 @@ function JavaClassData:readData(data)
 				constant.nameAndType = assert.index(self.constants, constant.nameAndTypeIndex)
 				constant.nameAndTypeIndex = nil
 			end
-			if constant.stringIndex then
-				constant.string = assert.index(self.constants, constant.stringIndex)
-				constant.stringIndex = nil
+			if constant.valueIndex then
+				constant.value = assert.index(self.constants, constant.valueIndex)
+				constant.valueIndex = nil
 			end
-			if constant.descriptorIndex then
-				constant.descriptor = assert.index(self.constants, constant.descriptorIndex)
-				constant.descriptorIndex = nil
+			if constant.sigIndex then
+				constant.sig = assert.index(self.constants, constant.sigIndex)
+				constant.sigIndex = nil
 			end
 			if constant.referenceIndex then
 				constant.reference = assert.index(self.constants, constant.referenceIndex)
@@ -460,9 +716,23 @@ function JavaClassData:readData(data)
 	-- (since constants has out-of-order refs)
 	self.constants = deepCopy(self.constants)
 
-	self.accessFlags = blob:readu2()
-	self.thisClass = deepCopyIndex(blob:readu2())
-	self.superClass = deepCopyIndex(blob:readu2())
+	-- aka "modifiers" ?
+	local function readAccessFlags(t, value)
+		t.isPublic = 0 ~= bit.band(value, 1) or nil
+		t.isFinal = 0 ~= bit.band(value, 0x10) or nil
+		t.isSuper = 0 ~= bit.band(value, 0x20) or nil
+		t.isInterface = 0 ~= bit.band(value, 0x200) or nil
+		t.isAbstract = 0 ~= bit.band(value, 0x400) or nil
+		t.isSynthetic = 0 ~= bit.band(value, 0x1000) or nil
+		t.isAnnotation = 0 ~= bit.band(value, 0x2000) or nil
+		t.isEnum = 0 ~= bit.band(value, 0x4000) or nil
+		t.isModule = 0 ~= bit.band(value, 0x8000) or nil
+	end
+	--self.accessFlags = blob:readu2()
+	readAccessFlags(self, blob:readu2())
+
+	self.thisClass = readClassName(self, blob:readu2())
+	self.superClass = readClassName(self, blob:readu2())
 
 	local interfaceCount = blob:readu2()
 	if interfaceCount > 0 then
@@ -477,10 +747,12 @@ function JavaClassData:readData(data)
 	self.fields = table()
 	for i=0,fieldCount-1 do
 		local field = {}
-		field.accessFlags = blob:readu2()
+
+		--field.accessFlags = blob:readu2()
+		readAccessFlags(field, blob:readu2())
 
 		field.name = deepCopyIndex(blob:readu2())
-		field.descriptor = deepCopyIndex(blob:readu2())
+		field.sig = deepCopyIndex(blob:readu2())
 
 		local attrs = readAttrs(blob)
 		if attrs then
@@ -499,54 +771,56 @@ function JavaClassData:readData(data)
 	self.methods = table()
 	for i=0,methodCount-1 do
 		local method = {}
-		method.accessFlags = blob:readu2()
-		
+
+		--method.accessFlags = blob:readu2()
+		readAccessFlags(method, blob:readu2())
+
 		method.name = deepCopyIndex(blob:readu2())
-		method.descriptor = deepCopyIndex(blob:readu2())
-	
+		method.sig = deepCopyIndex(blob:readu2())
+
 		-- method attribute #1 = code attribute
 		local attrs = readAttrs(blob)
 		if attrs then
 			assert.len(attrs, 1)
 			local codeAttr = attrs[1]
 
-			local code = {}
-			code.name = codeAttr.name
+			local code = table()
+			local codeName = codeAttr.name
+			assert.eq(codeName, 'Code')	-- always?
 
 			local cblob = Blob(codeAttr.data)
-			code.maxStack = cblob:readu2()
-			code.maxLocals = cblob:readu2()
-			
+			method.maxStack = cblob:readu2()
+			method.maxLocals = cblob:readu2()
+
 			local codeLength = cblob:readu4()
 			local insns = cblob:readString(codeLength)
-			
+
 			-- [[
 			do
 				local insBlob = Blob(insns)
-				code.insts = table()
 				while not insBlob:done() do
 					local op = insBlob:readu1()
 					local instDesc = assert.index(instDescForOp, op)
 					local inst = table()
 					inst:insert((assert.index(instDesc, 'name')))
-					local argDesc = instDesc.arg
+					local argDesc = instDesc.args
 					if argDesc then
 						if type(argDesc) == 'table' then
 							for _,ctype in ipairs(argDesc) do
 								inst:insert((insBlob:read(ctype)))
 							end
 						elseif type(argDesc) == 'function' then
-							print'WARNING THIS ISNT IMPLEMENTED YET'
+							argDesc(inst, insBlob, self)
 						else
 							error'here'
 						end
 					end
-					code.insts:insert(inst)
+					code:insert(inst)
 				end
 				insBlob:assertDone()
 			end
 			--]]
-			
+
 			local exceptionCount = cblob:readu2()
 			if exceptionCount > 0 then
 				code.exceptions = table()
@@ -568,10 +842,10 @@ function JavaClassData:readData(data)
 				local stackmap = {}
 				stackmap.name = smAttr.name
 
-				--[[
+				--[[ TODO or not if you dont have to
 				local smBlob = Blob(smAttr.data)
 				local numEntries = smBlob:readu2()
-print('numEntries', numEntries)				
+print('numEntries', numEntries)
 				stackmap.entries = {}
 				for i=1,numEntries do
 					local smFrame = {}
@@ -589,13 +863,13 @@ print('numEntries', numEntries)
 							typeinfo.value = deepCopyIndex(smBlob:readu2())
 						elseif tag == 8 then	-- uninitialized
 							typeinfo.offset = smBlob:readu2()
-						
-						elseif tag == 4	-- long 
-						or tag == 5		-- double 
+
+						elseif tag == 4	-- long
+						or tag == 5		-- double
 						then
 							-- for double and long:
 							-- "requires two locations in the local varaibles array"
-							-- ... does that mean we skip 2 here as well? 
+							-- ... does that mean we skip 2 here as well?
 							-- wait am I supposed to be reading the u2 that the others use as well?
 							-- but it's long and double ... do I read u4? that's not in specs.
 							-- do I just skip the next u1 tag? weird.
@@ -609,7 +883,7 @@ print('numEntries', numEntries)
 					end
 
 					local frameType = smBlob:readu1()
-print('reading entry', frameType)					
+print('reading entry', frameType)
 					smFrame.type = frameType
 					if frameType < 64 then
 						-- "same"
@@ -661,8 +935,8 @@ print('found reseved stack map frame type', frameType)
 					stackmap.entries[i] = smFrame
 				end
 				smBlob:assertDone()
-				--]]
 				code.stackmap = stackmap
+				--]]
 			end
 
 			cblob:assertDone()
@@ -671,9 +945,27 @@ print('found reseved stack map frame type', frameType)
 		self.methods:insert(method)
 	end
 
-	self.attrs = readAttrs(blob)
+	local classAttrs = readAttrs(blob)
+	if classAttrs then
+		for _,attr in ipairs(classAttrs) do
+			if attr.name == 'SourceFile' then
+				-- attr.data is a uint16_t into the constants ...
+			else
+				print("idk how ot handle this attribute yet:", attr.name)
+			end
+		end
+	end
 
 	blob:assertDone()
 end
+
+
+-------------------------------- WRITING --------------------------------
+
+
+function JavaClassData:compile()
+	-- build constants fresh?  why not?
+end
+
 
 return JavaClassData
