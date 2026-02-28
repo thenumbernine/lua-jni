@@ -218,7 +218,7 @@ local instDescForOp = {
 			instPushConst(inst, insBlob, cldata, insBlob:readu1())
 		end,
 		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopConst(inst, 2, cldata))
+			insBlob:writeu1(instPopConst(inst, 2, cldata))
 		end,
 	},
 
@@ -664,6 +664,7 @@ function ReadBlob:read(ctype)
 		result = tmp[0]
 	end
 	self.ofs = self.ofs + size
+--DEBUG:print('read', self.ofs, ctype, result)	
 	return result
 end
 function ReadBlob:readString(size)
@@ -672,6 +673,7 @@ function ReadBlob:readString(size)
 	end
 	local result = ffi.string(self.ptr + self.ofs, size)
 	self.ofs = self.ofs + size
+--DEBUG:print('readstring', self.ofs, result)	
 	return result
 end
 function ReadBlob:readBlob(size)
@@ -876,7 +878,7 @@ print('reading const', i, require 'ext.tolua'(const))
 	local interfaceCount = blob:readu2()
 	if interfaceCount > 0 then
 		self.interfaces = table()
-		for i=0,interfaceCount-1 do
+		for i=1,interfaceCount do
 			local interface = deepCopyIndex(blob:readu2())
 			self.interfaces:insert(interface)
 		end
@@ -884,7 +886,7 @@ print('reading const', i, require 'ext.tolua'(const))
 
 	local fieldCount = blob:readu2()
 	self.fields = table()
-	for i=0,fieldCount-1 do
+	for fieldIndex=1,fieldCount do
 		local field = {}
 
 		--field.accessFlags = blob:readu2()
@@ -906,12 +908,12 @@ print('reading const', i, require 'ext.tolua'(const))
 			attrblob:assertDone()
 		end
 		self.fields:insert(field)
-print('reading field', i, require 'ext.tolua'(field))	
+print('reading field', fieldIndex, require 'ext.tolua'(field))	
 	end
 
 	local methodCount = blob:readu2()
 	self.methods = table()
-	for i=0,methodCount-1 do
+	for methodIndex=1,methodCount do
 		local method = {}
 
 		--method.accessFlags = blob:readu2()
@@ -925,167 +927,176 @@ print('reading field', i, require 'ext.tolua'(field))
 		if attrs then
 			assert.len(attrs, 1)
 			local codeAttr = attrs[1]
+print('reading method '..methodIndex..' codeAttr data '..#codeAttr.data)
+print(require 'ext.string'.hexdump(codeAttr.data))
 
 			local code = table()
 			local codeName = codeAttr.name
 			assert.eq(codeName, 'Code')	-- always?
 
-			local cblob = ReadBlob(codeAttr.data)
-			method.maxStack = cblob:readu2()
-			method.maxLocals = cblob:readu2()
+			assert(xpcall(function()
+				local cblob = ReadBlob(codeAttr.data)
+				method.maxStack = cblob:readu2()
+				method.maxLocals = cblob:readu2()
+print('reading method stack locals', method.maxStack, method.maxLocals)
 
-			local codeLength = cblob:readu4()
-			local insns = cblob:readString(codeLength)
-
-			-- [[
-			do
-				local insBlob = ReadBlob(insns)
-				while not insBlob:done() do
-					local op = insBlob:readu1()
-					local instDesc = assert.index(instDescForOp, op)
-					local inst = table()
-					inst:insert((assert.index(instDesc, 'name')))
-					local argDesc = instDesc.args
-					if argDesc then
-						if type(argDesc) == 'table' then
-							for _,ctype in ipairs(argDesc) do
-								inst:insert((insBlob:read(ctype)))
+				local insnDataLength = cblob:readu4()
+				local insBlobData = cblob:readString(insnDataLength)
+print('reading method '..methodIndex..' insn blob '..#insBlobData)
+print(require 'ext.string'.hexdump(insBlobData))
+				-- [[
+				do
+					local insBlob = ReadBlob(insBlobData)
+					while not insBlob:done() do
+						local op = insBlob:readu1()
+						local instDesc = assert.index(instDescForOp, op)
+						local inst = table()
+						inst:insert((assert.index(instDesc, 'name')))
+						local argDesc = instDesc.args
+						if argDesc then
+							if type(argDesc) == 'table' then
+								for _,ctype in ipairs(argDesc) do
+									inst:insert((insBlob:read(ctype)))
+								end
+							elseif type(argDesc) == 'function' then
+								argDesc(inst, insBlob, self)
+							else
+								error'here'
 							end
-						elseif type(argDesc) == 'function' then
-							argDesc(inst, insBlob, self)
-						else
-							error'here'
 						end
+						code:insert(inst)
 					end
-					code:insert(inst)
+					insBlob:assertDone()
 				end
-				insBlob:assertDone()
-			end
-			--]]
-
-			local exceptionCount = cblob:readu2()
-			if exceptionCount > 0 then
-				method.exceptions = table()
-				for i=0,exceptionCount-1 do
-					local ex = {}
-					ex.startPC = cblob:readu2()
-					ex.endPC = cblob:readu2()
-					ex.handlerPC = cblob:readu2()
-					ex.catchType = deepCopyIndex(cblob:readu2())
-					method.exceptions:insert(ex)
-				end
-			end
-
-			-- code attribute #1 = stack map attribute
-			local codeAttrs = readAttrs(cblob)
-			if codeAttrs then
-				assert.len(codeAttrs, 1)
-				local smAttr = codeAttrs[1]
-				local stackmap = {}
-				stackmap.name = smAttr.name
-
-				--[[ TODO or not if you dont have to
-				local smBlob = ReadBlob(smAttr.data)
-				local numEntries = smBlob:readu2()
-print('numEntries', numEntries)
-				stackmap.entries = {}
-				for i=1,numEntries do
-					local smFrame = {}
-
-					local function readVerificationTypeInfo()
-						local typeinfo = {}
-						typeinfo.tag = smBlob:readu1()
-						if tag == 0 then -- top
-						elseif tag == 1 then -- integer
-						elseif tag == 2 then -- float
-						elseif tag == 5 then -- null
-						elseif tag == 6 then -- uninitialized 'this'
-						elseif tag == 7 then -- object
-						elseif tag == 7 then	-- object
-							typeinfo.value = deepCopyIndex(smBlob:readu2())
-						elseif tag == 8 then	-- uninitialized
-							typeinfo.offset = smBlob:readu2()
-
-						elseif tag == 4	-- long
-						or tag == 5		-- double
-						then
-							-- for double and long:
-							-- "requires two locations in the local varaibles array"
-							-- ... does that mean we skip 2 here as well?
-							-- wait am I supposed to be reading the u2 that the others use as well?
-							-- but it's long and double ... do I read u4? that's not in specs.
-							-- do I just skip the next u1 tag? weird.
-							--smBlob:readu1()
-							--smBlob:readu2()
-							--smBlob:readu4()
-						else
-							error("unknown verification type tag "..tostring(tag))
-						end
-						return typeinfo
-					end
-
-					local frameType = smBlob:readu1()
-print('reading entry', frameType)
-					smFrame.type = frameType
-					if frameType < 64 then
-						-- "same"
-					elseif frameType < 128 then
-						-- "locals 1 stack item"
-						smFrame.stack = readVerificationTypeInfo()
-					elseif frameType < 247 then
-						-- 128-247 = reserved
-print('found reseved stack map frame type', frameType)
-					elseif frameType == 247 then
-						-- "locals 1 stack item extended"
-						smFrame.stack = readVerificationTypeInfo()
-					elseif frameType < 251 then
-						-- "chop frame"
-						smFrame.offsetDelta = smBlob:readu2()
-					elseif frameType == 251 then
-						-- "same frame extended"
-						smFrame.offsetDelta = smBlob:readu2()
-					elseif frameType < 255 then
-						-- "append"
-						smFrame.offsetDelta = smBlob:readu2()
-						local numLocals = frameType - 251
-						if numLocals > 0 then
-							smFrame.locals = {}
-							for i=1,numLocals do
-								smFrame.locals[i] = readVerificationTypeInfo()
-							end
-						end
-					else
-						assert.eq(frameType, 255)
-						-- "full frame"
-						smFrame.offsetDelta = smBlob:readu2()
-						local numLocals = smBlob:readu2()
-						if numLocals > 0 then
-							smFrame.locals = {}
-							for i=1,numLocals do
-								smFrame.locals[i] = readVerificationTypeInfo()
-							end
-						end
-						local numStackItems = smBlob:readu2()
-						if numStackItems > 0 then
-							smFrame.stackItems = {}
-							for i=1,numStackItems do
-								smFrame.stackItems[i] = readVerificationTypeInfo()
-							end
-						end
-					end
-
-					stackmap.entries[i] = smFrame
-				end
-				smBlob:assertDone()
-				method.stackmap = stackmap
 				--]]
-			end
 
-			cblob:assertDone()
-			method.code = code
+				local exceptionCount = cblob:readu2()
+				if exceptionCount > 0 then
+					method.exceptions = table()
+					for exceptionIndex=1,exceptionCount do
+						local ex = {}
+						ex.startPC = cblob:readu2()
+						ex.endPC = cblob:readu2()
+						ex.handlerPC = cblob:readu2()
+						ex.catchType = deepCopyIndex(cblob:readu2())
+						method.exceptions:insert(ex)
+					end
+				end
+
+				-- code attribute #1 = stack map attribute
+				local codeAttrs = readAttrs(cblob)
+				if codeAttrs then
+					assert.len(codeAttrs, 1)
+					local smAttr = codeAttrs[1]
+					local stackmap = {}
+					stackmap.name = smAttr.name
+
+					--[[ TODO or not if you dont have to
+					local smBlob = ReadBlob(smAttr.data)
+					local numEntries = smBlob:readu2()
+	print('numEntries', numEntries)
+					stackmap.entries = {}
+					for entryIndex=1,numEntries do
+						local smFrame = {}
+
+						local function readVerificationTypeInfo()
+							local typeinfo = {}
+							typeinfo.tag = smBlob:readu1()
+							if tag == 0 then -- top
+							elseif tag == 1 then -- integer
+							elseif tag == 2 then -- float
+							elseif tag == 5 then -- null
+							elseif tag == 6 then -- uninitialized 'this'
+							elseif tag == 7 then -- object
+							elseif tag == 7 then	-- object
+								typeinfo.value = deepCopyIndex(smBlob:readu2())
+							elseif tag == 8 then	-- uninitialized
+								typeinfo.offset = smBlob:readu2()
+
+							elseif tag == 4	-- long
+							or tag == 5		-- double
+							then
+								-- for double and long:
+								-- "requires two locations in the local varaibles array"
+								-- ... does that mean we skip 2 here as well?
+								-- wait am I supposed to be reading the u2 that the others use as well?
+								-- but it's long and double ... do I read u4? that's not in specs.
+								-- do I just skip the next u1 tag? weird.
+								--smBlob:readu1()
+								--smBlob:readu2()
+								--smBlob:readu4()
+							else
+								error("unknown verification type tag "..tostring(tag))
+							end
+							return typeinfo
+						end
+
+						local frameType = smBlob:readu1()
+	print('reading entry', frameType)
+						smFrame.type = frameType
+						if frameType < 64 then
+							-- "same"
+						elseif frameType < 128 then
+							-- "locals 1 stack item"
+							smFrame.stack = readVerificationTypeInfo()
+						elseif frameType < 247 then
+							-- 128-247 = reserved
+	print('found reseved stack map frame type', frameType)
+						elseif frameType == 247 then
+							-- "locals 1 stack item extended"
+							smFrame.stack = readVerificationTypeInfo()
+						elseif frameType < 251 then
+							-- "chop frame"
+							smFrame.offsetDelta = smBlob:readu2()
+						elseif frameType == 251 then
+							-- "same frame extended"
+							smFrame.offsetDelta = smBlob:readu2()
+						elseif frameType < 255 then
+							-- "append"
+							smFrame.offsetDelta = smBlob:readu2()
+							local numLocals = frameType - 251
+							if numLocals > 0 then
+								smFrame.locals = {}
+								for localIndex=1,numLocals do
+									smFrame.locals[localIndex] = readVerificationTypeInfo()
+								end
+							end
+						else
+							assert.eq(frameType, 255)
+							-- "full frame"
+							smFrame.offsetDelta = smBlob:readu2()
+							local numLocals = smBlob:readu2()
+							if numLocals > 0 then
+								smFrame.locals = {}
+								for localIndex=1,numLocals do
+									smFrame.locals[localIndex] = readVerificationTypeInfo()
+								end
+							end
+							local numStackItems = smBlob:readu2()
+							if numStackItems > 0 then
+								smFrame.stackItems = {}
+								for stackItemIndex=1,numStackItems do
+									smFrame.stackItems[stackItemIndex] = readVerificationTypeInfo()
+								end
+							end
+						end
+
+						stackmap.entries[entryIndex] = smFrame
+					end
+					smBlob:assertDone()
+					method.stackmap = stackmap
+					--]]
+				end
+
+				cblob:assertDone()
+				method.code = code
+			end, function(err)
+				return 'in method '..methodIndex..':\n'
+					..err..'\n'..debug.traceback()
+			end))
 		end
 		self.methods:insert(method)
-print('reading method', i, require 'ext.tolua'(method))	
+print('reading method', methodIndex, require 'ext.tolua'(method))	
 	end
 
 	local classAttrs = readAttrs(blob)
@@ -1111,6 +1122,7 @@ function WriteBlob:init()
 end
 function WriteBlob:write(ctype, value)
 	assert.type(value, 'number')	-- or cdata for long?
+--DEBUG:print('write', #self.data, ctype, value)	
 	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
 	local result
@@ -1129,6 +1141,7 @@ function WriteBlob:writeu1(...) return self:write('uint8_t', ...) end
 function WriteBlob:writeu2(...) return self:write('uint16_t', ...) end
 function WriteBlob:writeu4(...) return self:write('uint32_t', ...) end
 function WriteBlob:writeString(s)
+--DEBUG:print('writestring', #self.data, s)
 	return self.data:insert((assert.type(s, 'string')))
 end
 
@@ -1312,6 +1325,21 @@ function JavaClassData:compile()
 	end
 	self.addConstClass = addConstClass
 
+	-- opposite of readAttrs
+	local function writeAttrs(attrs, b)
+		if not attrs then
+			return b:writeu2(0)
+		end
+		b:writeu2(#attrs)
+		for _,attr in ipairs(attrs) do
+			b:writeu2(attr.nameIndex)
+			assert.type(attr.data, 'string')
+			b:writeu4(#attr.data)
+			b:writeString(attr.data)
+		end
+	end
+
+
 
 	-- first we have to cycle everything and build constants.
 
@@ -1328,7 +1356,8 @@ function JavaClassData:compile()
 	end
 
 	if self.fields then
-		for _,field in ipairs(self.fields) do
+		for i,field in ipairs(self.fields) do
+print('writing field', i, require 'ext.tolua'(field))	
 			field.nameIndex = addConstUnique(field.name)
 			field.name = nil	-- necessary or nah?
 			field.sigIndex = addConstUnique(field.sig)
@@ -1351,7 +1380,8 @@ function JavaClassData:compile()
 	end
 
 	if self.methods then
-		for _,method in ipairs(self.methods) do
+		for i,method in ipairs(self.methods) do
+print('writing method', i, require 'ext.tolua'(method))	
 			method.nameIndex = addConstUnique(method.name)
 			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
@@ -1361,6 +1391,7 @@ function JavaClassData:compile()
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack)
 				cblob:writeu2(method.maxLocals)
+print('writing method stack locals', method.maxStack, method.maxLocals)
 				
 				local insBlob = WriteBlob()
 				for _,inst in ipairs(method.code) do
@@ -1380,7 +1411,10 @@ function JavaClassData:compile()
 						end
 					end
 				end
+
 				local insBlobData = insBlob:compile()
+print('writing method '..i..' insn blob '..#insBlobData)
+print(require 'ext.string'.hexdump(insBlobData))
 				cblob:writeu4(#insBlobData)
 				cblob:writeString(insBlobData)
 
@@ -1396,6 +1430,10 @@ function JavaClassData:compile()
 					end
 				end
 				
+				-- TODO stack frame
+				local codeAttrs = {}
+				writeAttrs(codeAttrs, cblob)
+				
 				-- TODO now add method.stackmap as attrs at the end of cblob
 				
 				local cblobData = cblob:compile()
@@ -1403,10 +1441,12 @@ function JavaClassData:compile()
 				attrBlob:writeu4(#cblobData)
 				attrBlob:writeString(cblobData)
 				
-				local attr = {}
-				attr.nameIndex = addConstUnique'Code'
-				attr.data = attrBlob:compile()
-				method.attrs = {attr}
+				local codeAttr = {}
+				codeAttr.nameIndex = addConstUnique'Code'
+				codeAttr.data = attrBlob:compile()
+print('writing method '..i..' codeAttr data '..#codeAttr.data)
+print(require'ext.string'.hexdump(codeAttr.data))
+				method.attrs = {codeAttr}
 
 				method.name = nil
 				method.code = nil
@@ -1419,6 +1459,7 @@ function JavaClassData:compile()
 
 	if self.attrs then
 		for _,attr in ipairs(self.attrs) do
+			-- TODO index fields
 		end
 	end
 
@@ -1544,27 +1585,13 @@ print('writing const', i, require 'ext.tolua'(const))
 		end
 	end
 
-	-- opposite of readAttrs
-	local function writeAttrs(attrs, b)
-		if not attrs then
-			return b:writeu2(0)
-		end
-		b:writeu2(#attrs)
-		for _,attr in ipairs(attrs) do
-			b:writeu2(attr.nameIndex)
-			assert.type(attr.data, 'string')
-			b:writeu4(#attr.data)
-			b:writeString(attr.data)
-		end
-	end
-
 	-- write out fields
 	if not self.fields then
 		blob:writeu2(0)
 	else
 		blob:writeu2(#self.fields)
-		for _,field in ipairs(self.fields) do
-print('writing field', i, require 'ext.tolua'(field))	
+		for i,field in ipairs(self.fields) do
+print('writing field refd', i, require 'ext.tolua'(field))
 			writeAccessFlags(field)
 			blob:writeu2(field.nameIndex)
 			blob:writeu2(field.sigIndex)
@@ -1577,8 +1604,8 @@ print('writing field', i, require 'ext.tolua'(field))
 		blob:writeu2(0)
 	else
 		blob:writeu2(#self.methods)
-		for _,method in ipairs(self.methods) do
-print('writing method', i, require 'ext.tolua'(method))	
+		for i,method in ipairs(self.methods) do
+print('writing method refd', i, require 'ext.tolua'(method))	
 			writeAccessFlags(method)
 			blob:writeu2(method.nameIndex)
 			blob:writeu2(method.sigIndex)
@@ -1586,6 +1613,7 @@ print('writing method', i, require 'ext.tolua'(method))
 		end
 	end
 
+assert(not self.attrs)
 	writeAttrs(self.attrs, blob)
 
 	return blob.data:concat()
