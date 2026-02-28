@@ -26,6 +26,7 @@ print('in Lua:')
 print(require'ext.tolua'(cldata))
 print()
 
+--[=[
 -- write
 local bytes = cldata:compile()
 print'compiled:'
@@ -46,5 +47,6 @@ print'DONE'
 -- write our new
 path'Test.class':write(bytes)
 
--- flushing is out of order or something
+-- stdout / stderr flush issues, when piping even >&1 it is out of order 
 --os.exec'javap Test.class'
+--]=]

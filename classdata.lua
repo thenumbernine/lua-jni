@@ -913,15 +913,17 @@ end
 		field.name = deepCopyIndex(blob:readu2())
 		field.sig = deepCopyIndex(blob:readu2())
 
-		local readFieldAttr
-		readAttrs(blob, function(name, length)
-			assert(not readFieldAttr, "got two field attrs")
-			readFieldAttr = true
-		
-			field.attrName = name
-			assert.eq(length, 2)
+		local readFieldAttr_ConstantValue
+		readAttrs(blob, function(fieldAttrName, fieldAttrLen)
+			if fieldAttrName ~= 'ConstantValue' then
+				error("field attr not supported yet: "..fieldAttrName)
+			end
 
-			-- TODO convert this from constant table?
+			assert(not readFieldAttr_ConstantValue, "got two field attrs")
+			readFieldAttr_ConstantValue = true
+		
+			field.attrName = fieldAttrName
+			assert.eq(fieldAttrLen, 2)
 			field.constantValue = deepCopyIndex(blob:readu2())
 		end)
 		self.fields:insert(field)
@@ -940,16 +942,17 @@ print('reading field', fieldIndex, require 'ext.tolua'(field))
 		method.sig = deepCopyIndex(blob:readu2())
 
 		-- method attribute #1 = code attribute
-		local readCodeAttr 
-		readAttrs(blob, function(codeAttrName, codeAttrLen)
-			assert(not readCodeAttr, "got two code attrs")
-			readCodeAttr = true
+		local readMethodAttr_Code 
+		readAttrs(blob, function(methodAttrName, methodAttrLen)
+			if methodAttrName ~= 'Code' then
+				error("method attr not supported yet: "..methodAttrName)
+			end
+			assert(not readMethodAttr_Code, "got two code attrs")
+			readMethodAttr_Code = true
 
-local codeAttrData = blob.data:sub(blob.ofs+1, blob.ofs+codeAttrLen)
-print('reading method '..methodIndex..' codeAttrData '..#codeAttrData)
-print(require 'ext.string'.hexdump(codeAttrData))
-
-			assert.eq(codeAttrName, 'Code')	-- always?
+local methodAttrData = blob.data:sub(blob.ofs+1, blob.ofs+methodAttrLen)
+print('reading method '..methodIndex..' methodAttrData '..#methodAttrData)
+print(require 'ext.string'.hexdump(methodAttrData))
 
 			local code = table()
 			assert(xpcall(function()
@@ -1000,111 +1003,135 @@ print(require 'ext.string'.hexdump(insBlobData))
 				end
 
 				-- code attribute #1 = stack map attribute
-				local readStackMapAttr
-				readAttrs(blob, function(smAttrName, smAttrLen)
-					assert(not readStackMapAttr, "expected one stack map attr")
-					readStackMapAttr = true
+				local readCodeAttr_StackMapTable
+				readAttrs(blob, function(codeAttrName, codeAttrLen)
+-- [[ TODO
+					if codeAttrName == 'StackMapTable' then
+						local smAttrData = blob:readString(codeAttrLen)
+						local smAttrBlob = ReadBlob(smAttrData)
 
-					local stackmap = {}
-					stackmap.name = smAttrName
+						assert(not readCodeAttr_StackMapTable, "expected one stack map attr")
+						readCodeAttr_StackMapTable = true
 
-					local smAttrData = blob:readString(smAttrLen)
+						local stackmap = {}
+print('smAttrData')
+print(require'ext.string'.hexdump(smAttrData))
 
-					--[[ TODO or not if you dont have to
-					local smBlob = ReadBlob(smAttrData)
-					local numEntries = smBlob:readu2()
-	print('numEntries', numEntries)
-					stackmap.entries = {}
-					for entryIndex=1,numEntries do
-						local smFrame = {}
+						local numEntries = smAttrBlob:readu2()
+print('stackmap numEntries', numEntries)
+						stackmap.entries = {}
+						for entryIndex=1,numEntries do
+							local smFrame = {}
 
-						local function readVerificationTypeInfo()
-							local typeinfo = {}
-							typeinfo.tag = smBlob:readu1()
-							if tag == 0 then -- top
-							elseif tag == 1 then -- integer
-							elseif tag == 2 then -- float
-							elseif tag == 5 then -- null
-							elseif tag == 6 then -- uninitialized 'this'
-							elseif tag == 7 then -- object
-							elseif tag == 7 then	-- object
-								typeinfo.value = deepCopyIndex(smBlob:readu2())
-							elseif tag == 8 then	-- uninitialized
-								typeinfo.offset = smBlob:readu2()
+							local function readVerificationTypeInfo()
+								local typeinfo = {}
+								typeinfo.tag = smAttrBlob:readu1()
+print('reading verification tag type', typeinfo.tag)							
+								if tag == 0 then -- top
+								elseif tag == 1 then -- integer
+								elseif tag == 2 then -- float
+								elseif tag == 5 then -- null
+								elseif tag == 6 then -- uninitialized 'this'
+								elseif tag == 7 then -- object
+								elseif tag == 7 then	-- object
+									typeinfo.value = deepCopyIndex(smAttrBlob:readu2())
+print('reading verification tag value', typeinfo.value)							
+								elseif tag == 8 then	-- uninitialized
+									typeinfo.offset = smAttrBlob:readu2()
+print('reading verification tag offset', typeinfo.offset)							
 
-							elseif tag == 4	-- long
-							or tag == 5		-- double
-							then
-								-- for double and long:
-								-- "requires two locations in the local varaibles array"
-								-- ... does that mean we skip 2 here as well?
-								-- wait am I supposed to be reading the u2 that the others use as well?
-								-- but it's long and double ... do I read u4? that's not in specs.
-								-- do I just skip the next u1 tag? weird.
-								--smBlob:readu1()
-								--smBlob:readu2()
-								--smBlob:readu4()
+								elseif tag == 4	-- long
+								or tag == 5		-- double
+								then
+									-- for double and long:
+									-- "requires two locations in the local varaibles array"
+									-- ... does that mean we skip 2 here as well?
+									-- wait am I supposed to be reading the u2 that the others use as well?
+									-- but it's long and double ... do I read u4? that's not in specs.
+									-- do I just skip the next u1 tag? weird.
+									--smAttrBlob:readu1()
+									--smAttrBlob:readu2()
+									--smAttrBlob:readu4()
+								else
+									error("unknown verification type tag "..tostring(tag))
+								end
+								return typeinfo
+							end
+
+							local frameType = smAttrBlob:readu1()
+print('reading frameType', frameType)
+							smFrame.type = frameType
+							if frameType < 64 then
+								-- "same"
+							elseif frameType < 128 then
+								-- "locals 1 stack item"
+								smFrame.stack = readVerificationTypeInfo()
+							elseif frameType < 247 then
+								-- 128-247 = reserved
+print('found reseved stack map frame type', frameType)
+							elseif frameType == 247 then
+								-- "locals 1 stack item extended"
+								smFrame.stack = readVerificationTypeInfo()
+							elseif frameType < 251 then
+								-- "chop frame"
+								smFrame.offsetDelta = smAttrBlob:readu2()
+print('reading smFrame offsetDelta', smFrame.offsetDelta)
+							elseif frameType == 251 then
+								-- "same frame extended"
+								smFrame.offsetDelta = smAttrBlob:readu2()
+print('reading smFrame offsetDelta', smFrame.offsetDelta)
+							elseif frameType < 255 then
+								-- "append"
+								smFrame.offsetDelta = smAttrBlob:readu2()
+print('reading smFrame offsetDelta', smFrame.offsetDelta)
+								local numLocals = frameType - 251
+								if numLocals > 0 then
+									smFrame.locals = {}
+									for localIndex=1,numLocals do
+										smFrame.locals[localIndex] = readVerificationTypeInfo()
+									end
+								end
 							else
-								error("unknown verification type tag "..tostring(tag))
+								assert.eq(frameType, 255)
+								-- "full frame"
+								smFrame.offsetDelta = smAttrBlob:readu2()
+print('reading smFrame offsetDelta', smFrame.offsetDelta)
+								local numLocals = smAttrBlob:readu2()
+print('reading smFrame numLocals', numLocals)
+								if numLocals > 0 then
+									smFrame.locals = {}
+									for localIndex=1,numLocals do
+										smFrame.locals[localIndex] = readVerificationTypeInfo()
+									end
+								end
+								local numStackItems = smAttrBlob:readu2()
+print('reading smFrame numStackItems', numStackItems)
+								if numStackItems > 0 then
+									smFrame.stackItems = {}
+									for stackItemIndex=1,numStackItems do
+										smFrame.stackItems[stackItemIndex] = readVerificationTypeInfo()
+									end
+								end
 							end
-							return typeinfo
-						end
 
-						local frameType = smBlob:readu1()
-	print('reading entry', frameType)
-						smFrame.type = frameType
-						if frameType < 64 then
-							-- "same"
-						elseif frameType < 128 then
-							-- "locals 1 stack item"
-							smFrame.stack = readVerificationTypeInfo()
-						elseif frameType < 247 then
-							-- 128-247 = reserved
-	print('found reseved stack map frame type', frameType)
-						elseif frameType == 247 then
-							-- "locals 1 stack item extended"
-							smFrame.stack = readVerificationTypeInfo()
-						elseif frameType < 251 then
-							-- "chop frame"
-							smFrame.offsetDelta = smBlob:readu2()
-						elseif frameType == 251 then
-							-- "same frame extended"
-							smFrame.offsetDelta = smBlob:readu2()
-						elseif frameType < 255 then
-							-- "append"
-							smFrame.offsetDelta = smBlob:readu2()
-							local numLocals = frameType - 251
-							if numLocals > 0 then
-								smFrame.locals = {}
-								for localIndex=1,numLocals do
-									smFrame.locals[localIndex] = readVerificationTypeInfo()
-								end
-							end
-						else
-							assert.eq(frameType, 255)
-							-- "full frame"
-							smFrame.offsetDelta = smBlob:readu2()
-							local numLocals = smBlob:readu2()
-							if numLocals > 0 then
-								smFrame.locals = {}
-								for localIndex=1,numLocals do
-									smFrame.locals[localIndex] = readVerificationTypeInfo()
-								end
-							end
-							local numStackItems = smBlob:readu2()
-							if numStackItems > 0 then
-								smFrame.stackItems = {}
-								for stackItemIndex=1,numStackItems do
-									smFrame.stackItems[stackItemIndex] = readVerificationTypeInfo()
-								end
-							end
+							stackmap.entries[entryIndex] = smFrame
 						end
-
-						stackmap.entries[entryIndex] = smFrame
+						smAttrBlob:assertDone()
+						method.stackmap = stackmap
+					elseif codeAttrName == 'LineNumberTable' then
+						-- TODO
+						local numLineNos = blob:readu2()
+						method.lineNos = table()
+						for i=1,numLineNos do
+							local lineNo = {}
+							lineNo.startPC = blob:readu2()
+							lineNo.lineNo = blob:readu2()
+							method.lineNos:insert(lineNo)
+						end
+					else
+						error("code attr not supported yet: "..codeAttrName)
 					end
-					smBlob:assertDone()
-					method.stackmap = stackmap
-					--]]
+--]]
 				end)
 
 				method.code = code
@@ -1429,6 +1456,8 @@ print('writing method', i, require 'ext.tolua'(method))
 			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
 			method.sig = nil
+			
+			method.attrs = table()
 		
 			if method.code then
 				local cblob = WriteBlob()
@@ -1473,30 +1502,46 @@ print(require 'ext.string'.hexdump(insBlobData))
 					end
 				end
 				
-				local codeAttrs = {
-					-- TODO stack frame
-				}
+				local codeAttrs = table()
+			
+				-- TODO handle StackMapTable here
+				-- codeAttrs:insert(smAttr)
+
+				if method.lineNos then
+					local attrBlob = WriteBlob()
+					attrBlob:writeu2(#method.lineNos)
+					for _,lineNo in ipairs(method.lineNos) do
+						attrBlob:writeu2(lineNo.startPC)
+						attrBlob:writeu2(lineNo.lineNo)
+					end
+					codeAttrs:insert{
+						nameIndex = addConstUnique'LineNumberTable',
+						data = attrBlob:compress(),
+					}
+					method.lineNos = nil
+				end
+
 				writeAttrs(codeAttrs, cblob)
-				
+
 				-- TODO now add method.stackmap as attrs at the end of cblob
 				
 				local codeAttrData = cblob:compile()
-				
 print('writing method '..i..' codeAttrData '..#codeAttrData)
 print(require'ext.string'.hexdump(codeAttrData))
-				method.attrs = {
-					{
-						nameIndex = addConstUnique'Code',
-						data = codeAttrData, 
-					},
+				method.attrs:insert{
+					nameIndex = addConstUnique'Code',
+					data = codeAttrData,
 				}
 
-				method.name = nil
+				-- fields for code
 				method.code = nil
 				method.maxStack = nil
 				method.maxLocals = nil
 				method.exceptions = nil
 			end
+
+
+			method.name = nil
 		end
 	end
 
@@ -1518,7 +1563,6 @@ print(require'ext.string'.hexdump(codeAttrData))
 			assert.index(attr, 'data')
 		end
 	end
-
 
 
 	-- table-of-strings that I concat() at the end
