@@ -31,17 +31,24 @@ local function deepCopy(t)
 	return t2
 end
 
+-- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
 local function readClassName(cldata, index)
 	local const = cldata.constants[index]
 	assert.eq(const.tag, 'class')
 	return assert.type(const.name, 'string')
 end
 
-local function instInsertClass(inst, insBlob, cldata)
+local function instPushClass(inst, insBlob, cldata)
 	inst:insert((readClassName(cldata, insBlob:readu2())))
 end
+local function insPopClass(inst, index, cldata)
+	return cldata.addConst{
+		tag = 'class',
+		name = inst[index],
+	}, index+1
+end
 
-local function instInsertMethod(inst, insBlob, cldata)
+local function instPushMethod(inst, insBlob, cldata)
 	local methodIndex = insBlob:readu2()
 	local method = assert.index(cldata.constants, methodIndex)
 	assert.eq(method.tag, 'methodRef')
@@ -49,8 +56,19 @@ local function instInsertMethod(inst, insBlob, cldata)
 	inst:insert(method.nameAndType.name)
 	inst:insert(method.nameAndType.sig)
 end
+local function instPopMethod(inst, index, cldata)
+	return cldata.addConst{
+		tag = 'methodRef',
+		class = inst[index],
+		nameAndType = {
+			tag = 'nameAndType',
+			name = inst[index+1],
+			sig = inst[index+2],
+		},
+	}, index+3
+end
 
-local function instInsertField(inst, insBlob, cldata)
+local function instPushField(inst, insBlob, cldata)
 	local fieldIndex = insBlob:readu2()
 	local field = assert.index(cldata.constants, fieldIndex)
 	assert.eq(field.tag, 'fieldRef')
@@ -58,9 +76,19 @@ local function instInsertField(inst, insBlob, cldata)
 	inst:insert(field.nameAndType.name)
 	inst:insert(field.nameAndType.sig)
 end
+local function instPopField(inst, index, cldata)
+	return cldata.addConst{
+		tag = 'fieldRef',
+		class = inst[index],
+		nameAndType = {
+			tag = 'nameAndType',
+			name = inst[index+1],
+			sig = inst[index+2],
+		},
+	}, index+3
+end
 
-
-local function instInsertConst(inst, insBlob, cldata, constIndex)
+local function instPushConst(inst, insBlob, cldata, constIndex)
 	local const = cldata.constants[constIndex]
 	if not const then
 		-- how do we notice 'dynamic index' ?
@@ -92,8 +120,42 @@ local function instInsertConst(inst, insBlob, cldata, constIndex)
 		end
 	end
 end
+local function instPopConst(inst, index, cldata)
+	local tag = inst[index] index=index+1
+	if type(tag) == 'number' then
+		return tag, index
+	elseif tag == 'class' then
+		return cldata.addConst{
+			tag = tag,
+			name = inst[index],
+		}, index+1
+	elseif tag == 'methodHandle' then
+		return cldata.addConst{
+			tag = tag,
+			refKind = inst[index],
+			reference = inst[index+1],
+		}, index+2
+	elseif tag == 'methodType' then
+		return cldata.addConst{
+			tag = tag,
+			sig = inst[index],
+		}, index+1
+	elseif tag == 'float' or tag == 'int' then
+		return cldata.addConst{
+			tag = tag,
+			value = inst[index],
+		}, index+1
+	elseif tag == 'string' then
+		return cldata.addConst{
+			tag = tag,
+			value = inst[index],
+		}, index+1
+	else
+		error'here'
+	end
+end
 
-local function instInsertConst2(inst, insBlob, cldata, constIndex)
+local function instPushConst2(inst, insBlob, cldata, constIndex)
 	local const = cldata.constants[constIndex]
 	if not const then
 		-- how do we notice 'dynamic index' ?
@@ -111,6 +173,20 @@ local function instInsertConst2(inst, insBlob, cldata, constIndex)
 		end
 	end
 end
+local function instPopConst2(inst, index, cldata)
+	local tag = inst[index] index=index+1
+	if type(tag) == 'number' then
+		return tag, index
+	elseif tag == 'long' or tag == 'double' then
+		return cldata.addConst{
+			tag = tag,
+			value = inst[index],
+		}, index+1
+	else
+		error'here'
+	end
+end
+
 
 -- https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 local instDescForOp = {
@@ -138,7 +214,10 @@ local instDescForOp = {
 		name='ldc',
 		--args={'uint8_t'},	-- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
 		args = function(inst, insBlob, cldata)
-			instInsertConst(inst, insBlob, cldata, insBlob:readu1())
+			instPushConst(inst, insBlob, cldata, insBlob:readu1())
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopConst(inst, 2, cldata))
 		end,
 	},
 
@@ -147,7 +226,10 @@ local instDescForOp = {
 		name='ldc_w',
 		args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertConst(inst, insBlob, cldata, insBlob:readu2())
+			instPushConst(inst, insBlob, cldata, insBlob:readu2())
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopConst(inst, 2, cldata))
 		end,
 	},
 
@@ -156,7 +238,10 @@ local instDescForOp = {
 		name='ldc2_w',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertConst2(inst, insBlob, cldata, insBlob:readu2())
+			instPushConst2(inst, insBlob, cldata, insBlob:readu2())
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopConst2(inst, 2, cldata))
 		end,
 	},
 
@@ -327,7 +412,10 @@ local instDescForOp = {
 		name='getstatic',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertField(inst, insBlob, cldata)
+			instPushField(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopField(inst, 2, cldata))
 		end,
 	},
 
@@ -336,7 +424,10 @@ local instDescForOp = {
 		name='putstatic',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertField(inst, insBlob, cldata)
+			instPushField(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopField(inst, 2, cldata))
 		end,
 	},
 
@@ -345,7 +436,10 @@ local instDescForOp = {
 		name='getfield',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertField(inst, insBlob, cldata)
+			instPushField(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopField(inst, 2, cldata))
 		end,
 	},
 
@@ -354,7 +448,10 @@ local instDescForOp = {
 		name='putfield',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertField(inst, insBlob, cldata)
+			instPushField(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopField(inst, 2, cldata))
 		end,
 	},
 
@@ -362,7 +459,10 @@ local instDescForOp = {
 	[0xb6] = {
 		name='invokevirtual',
 		args = function(inst, insBlob, cldata)
-			instInsertMethod(inst, insBlob, cldata)
+			instPushMethod(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopMethod(inst, 2, cldata))
 		end,
 	},
 
@@ -370,7 +470,10 @@ local instDescForOp = {
 	[0xb7] = {
 		name='invokespecial',
 		args = function(inst, insBlob, cldata)
-			instInsertMethod(inst, insBlob, cldata)
+			instPushMethod(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopMethod(inst, 2, cldata))
 		end,
 	},
 
@@ -378,7 +481,10 @@ local instDescForOp = {
 	[0xb8] = {
 		name='invokestatic',
 		args = function(inst, insBlob, cldata)
-			instInsertMethod(inst, insBlob, cldata)
+			instPushMethod(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopMethod(inst, 2, cldata))
 		end,
 	},
 
@@ -386,9 +492,15 @@ local instDescForOp = {
 	[0xb9] = {
 		name='invokeinterface',
 		args = function(inst, insBlob, cldata)
-			instInsertMethod(inst, insBlob, cldata)
+			instPushMethod(inst, insBlob, cldata)
 			inst:insert(insBlob:readu1())	-- count ... what's count for?
 			assert.eq(insBlob:readu1(), 0)	-- 0
+		end,
+		write = function(inst, insBlob, cldata)
+			local methodIndex, index = instPopMethod(inst, 2, cldata)
+			insBlob:writeu2(methodIndex)
+			insBlob:writeu1(inst[index])
+			insBlob:writeu1(0)
 		end,
 	},
 
@@ -397,8 +509,12 @@ local instDescForOp = {
 		name='invokedynamic',
 		args={'uint16_t', 'uint8_t', 'uint8_t'},
 		args = function(inst, insBlob, cldata)
-			instInsertMethod(inst, insBlob, cldata)
+			instPushMethod(inst, insBlob, cldata)
 			assert.eq(insBlob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(instPopMethod(inst, 2, cldata))
+			insBlob:writeu2(0)
 		end,
 	},
 
@@ -407,7 +523,10 @@ local instDescForOp = {
 		name='new',
 		--args={'uint16_t'},
 		args = function(inst, isnBlob, cldata)
-			instInsertClass(inst, insBlob, cldata)
+			instPushClass(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(insPopClass(inst, 2, cldata))
 		end,
 	},
 
@@ -423,7 +542,10 @@ local instDescForOp = {
 		name='anewarray',
 		--args={'uint16_t'},
 		args = function(inst, isnBlob, cldata)
-			instInsertClass(inst, insBlob, cldata)
+			instPushClass(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(insPopClass(inst, 2, cldata))
 		end,
 	},
 
@@ -435,7 +557,10 @@ local instDescForOp = {
 		name='checkcast',
 		--args={'uint16_t'},
 		args = function(inst, isnBlob, cldata)
-			instInsertClass(inst, insBlob, cldata)
+			instPushClass(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(insPopClass(inst, 2, cldata))
 		end,
 	},
 
@@ -444,7 +569,10 @@ local instDescForOp = {
 		name='instanceof',
 		--args={'uint16_t'},
 		args = function(inst, isnBlob, cldata)
-			instInsertClass(inst, insBlob, cldata)
+			instPushClass(inst, insBlob, cldata)
+		end,
+		write = function(inst, insBlob, cldata)
+			insBlob:writeu2(insPopClass(inst, 2, cldata))
 		end,
 	},
 
@@ -457,8 +585,13 @@ local instDescForOp = {
 		name='multianewarray',
 		--args={'uint16_t', 'uint8_t'}
 		args = function(inst, isnBlob, cldata)
-			instInsertClass(inst, insBlob, cldata)
-			inst:insert(insBlob:readu8())
+			instPushClass(inst, insBlob, cldata)
+			inst:insert(insBlob:readu1())
+		end,
+		write = function(inst, insBlob, cldata)
+			local classIndex, index = insPopClass(inst, 2, cldata)
+			insBlob:writeu2(classIndex)
+			insBlob:writeu1(inst[index])
 		end,
 	},
 
@@ -471,6 +604,10 @@ local instDescForOp = {
 	[0xff] = {name='impdep2'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
 	--(no name)	cb-fd				these values are currently unassigned for opcodes and are reserved for future use
 }
+
+local opForInstName = table.map(instDescForOp, function(inst,op)
+	return op, inst.name
+end)
 
 
 local JavaClassData = class()
@@ -500,14 +637,15 @@ function JavaClassData:fromFile(filename)
 	return o
 end
 
-local Blob = class()
-function Blob:init(data)
+local ReadBlob = class()
+function ReadBlob:init(data)
 	self.data = assert.type(data, 'string')
 	self.len = #self.data
 	self.ptr = ffi.cast('uint8_t*', self.data)
 	self.ofs = 0
 end
-function Blob:read(ctype)
+function ReadBlob:read(ctype)
+	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
 	if size + self.ofs > self.len then
 		error("read past the end")
@@ -517,7 +655,7 @@ function Blob:read(ctype)
 	if ffi.abi'be' then
 		result = ffi.cast(ffi.typeof('$*', ctype), self.ptr + self.ofs)[0]
 	else -- if ffi.abi'le' then
-		local tmp = ffi.typeof('$[1]', ffi.typeof(ctype))()
+		local tmp = ffi.typeof('$[1]', ctype)()
 		local tmpb = ffi.cast('uint8_t*', tmp)
 		for i=0,ffi.sizeof(ctype)-1 do
 			tmpb[i] = self.ptr[self.ofs + ffi.sizeof(ctype)-1-i]
@@ -527,7 +665,7 @@ function Blob:read(ctype)
 	self.ofs = self.ofs + size
 	return result
 end
-function Blob:readString(size)
+function ReadBlob:readString(size)
 	if size + self.ofs > self.len then
 		error("read past the end")
 	end
@@ -535,14 +673,14 @@ function Blob:readString(size)
 	self.ofs = self.ofs + size
 	return result
 end
-function Blob:readBlob(size)
-	return Blob(self:readString(size))
+function ReadBlob:readBlob(size)
+	return ReadBlob(self:readString(size))
 end
-function Blob:readu1() return self:read'uint8_t' end
-function Blob:readu2() return self:read'uint16_t' end
-function Blob:readu4() return self:read'uint32_t' end
-function Blob:done() return self.ofs == self.len end
-function Blob:assertDone()
+function ReadBlob:readu1() return self:read'uint8_t' end
+function ReadBlob:readu2() return self:read'uint16_t' end
+function ReadBlob:readu4() return self:read'uint32_t' end
+function ReadBlob:done() return self.ofs == self.len end
+function ReadBlob:assertDone()
 	if self.ofs < self.len then
 		error('still have '..(self.len-self.ofs)..' bytes remaining')
 	end
@@ -568,12 +706,11 @@ function JavaClassData:readData(data)
 		return attrs
 	end
 
-	local blob = Blob(data)
+	local blob = ReadBlob(data)
 	local magic = blob:readu4()
 	assert.eq(magic, 0xcafebabe)
-	local minorVersion = blob:readu2()
-	local majorVersion = blob:readu2()
---print(majorVersion..'.'..minorVersion)
+	local version = blob:readu4()
+print(('verison 0x%x'):format(version))
 	-- store version info or nah?
 	local constantCount = blob:readu2()
 	self.constants = table()
@@ -582,59 +719,59 @@ function JavaClassData:readData(data)
 		for i=1,constantCount-1 do
 			if not skipnext then
 				local tag = blob:readu1()
-				local constant = {index=i, tag=tag}
+				local const = {index=i, tag=tag}
 				if tag == 7 then		-- class
-					constant.tag = 'class'
-					constant.nameIndex = blob:readu2()
+					const.tag = 'class'
+					const.nameIndex = blob:readu2()
 				elseif tag == 9 then		-- fieldref
-					constant.tag = 'fieldRef'
-					constant.classIndex = blob:readu2()
-					constant.nameAndTypeIndex = blob:readu2()
+					const.tag = 'fieldRef'
+					const.classIndex = blob:readu2()
+					const.nameAndTypeIndex = blob:readu2()
 				elseif tag == 10 then			-- methodref
-					constant.tag = 'methodRef'
-					constant.classIndex = blob:readu2()
-					constant.nameAndTypeIndex = blob:readu2()
+					const.tag = 'methodRef'
+					const.classIndex = blob:readu2()
+					const.nameAndTypeIndex = blob:readu2()
 				elseif tag == 11 then 			-- interfaceMethodRef
-					constant.tag = 'interfaceMethodRef'
-					constant.classIndex = blob:readu2()
-					constant.nameAndTypeIndex = blob:readu2()
+					const.tag = 'interfaceMethodRef'
+					const.classIndex = blob:readu2()
+					const.nameAndTypeIndex = blob:readu2()
 
 				elseif tag == 8 then	-- string ... string literal
-					constant.tag = 'string'
-					constant.valueIndex = blob:readu2()
+					const.tag = 'string'
+					const.valueIndex = blob:readu2()
 				elseif tag == 3 then	-- integer
-					constant.tag = 'int'
-					constant.value = blob:read'int32_t'
+					const.tag = 'int'
+					const.value = blob:read'int32_t'
 				elseif tag == 4 then	-- float
-					constant.tag = 'float'
-					constant.value = blob:read'float'
+					const.tag = 'float'
+					const.value = blob:read'float'
 				elseif tag == 5 then	-- long
-					constant.tag = 'long'
-					constant.value = blob:read'int64_t'
-					-- "all 8-byte constants take up 2 entries in the constant pool ..." wrt their data only, right? no extra tag in there right?
+					const.tag = 'long'
+					const.value = blob:read'int64_t'
+					-- "all 8-byte constants take up 2 entries in the const pool ..." wrt their data only, right? no extra tag in there right?
 					skipnext = true
 				elseif tag == 6 then	-- double
-					constant.tag = 'double'
-					constant.value = blob:read'double'
+					const.tag = 'double'
+					const.value = blob:read'double'
 					skipnext = true
 
 				elseif tag == 12 then	-- nameAndType
-					constant.tag = 'nameAndType'
-					constant.nameIndex = blob:readu2()
-					constant.sigIndex = blob:readu2()
+					const.tag = 'nameAndType'
+					const.nameIndex = blob:readu2()
+					const.sigIndex = blob:readu2()
 				elseif tag == 1 then 	-- utf8string ... the string data
 					local length = blob:readu2()
 					--[[ keep a table?
-					constant.tag = 'utf8string'
-					constant.value = blob:readString(length)
+					const.tag = 'utf8string'
+					const.value = blob:readString(length)
 					--]]
 					-- [[ or nah?
-					constant = blob:readString(length)
+					const = blob:readString(length)
 					--]]
 				elseif tag == 15 then	-- methodHandle
-					constant.tag = 'methodHandle'
+					const.tag = 'methodHandle'
 					local refKind = blob:readu2()
-					constant.refKind = assert.index({
+					const.refKind = assert.index({
 						'getField',
 						'getStatic',
 						'putField',
@@ -645,26 +782,26 @@ function JavaClassData:readData(data)
 						'newInvokeSpecial',
 						'invokeInterface',
 					}, refKind)
-					constant.referenceIndex = blob:readu2()
+					const.referenceIndex = blob:readu2()
 				elseif tag == 16 then	-- methodType
-					constant.tag = 'methodType'
-					constant.sigIndex = blob:readu2()
+					const.tag = 'methodType'
+					const.sigIndex = blob:readu2()
 				elseif tag == 18 then	-- invokeDynamic
-					constant.tag = 'invokeDynamic'
-					constant.boostrapMethodAttrIndex = blob:readu2()
-					constant.nameAndTypeIndex = blob:readu2()
+					const.tag = 'invokeDynamic'
+					const.bootstrapMethodAttrIndex = blob:readu2()
+					const.nameAndTypeIndex = blob:readu2()
 				elseif tag == 19 then	-- module
-					constant.tag = 'module'
-					constant.nameIndex = blob:readu2()
+					const.tag = 'module'
+					const.nameIndex = blob:readu2()
 				elseif tag == 20 then	-- package
-					constant.tag = 'package'
-					constant.nameIndex = blob:readu2()
+					const.tag = 'package'
+					const.nameIndex = blob:readu2()
 				else
 					error('unknown tag '..tostring(tag)..' / 0x'..bit.tohex(tag, 2)
 						..' at offset 0x'..bit.tohex(ofs)
 					)
 				end
-				self.constants:insert(constant)
+				self.constants:insert(const)
 			else
 				self.constants:insert(false)
 				skipnext = false
@@ -676,38 +813,38 @@ function JavaClassData:readData(data)
 	-- but the reference order is not always increasing,
 	--  so I'll have to process it afterwards
 	-- there's no recursive references, right?
-	for _,constant in ipairs(self.constants) do
-		if type(constant) == 'table' then 	-- skip fillers for double and long
-			constant.index = nil
+	for _,const in ipairs(self.constants) do
+		if type(const) == 'table' then 	-- skip fillers for double and long
+			const.index = nil
 			-- TODO TODO also assert matching type?
-			if constant.nameIndex then
-				constant.name = assert.index(self.constants, constant.nameIndex)
-				constant.nameIndex = nil
+			if const.nameIndex then
+				const.name = assert.type(assert.index(self.constants, const.nameIndex), 'string')
+				const.nameIndex = nil
 			end
-			if constant.classIndex then
-				constant.class = assert.index(self.constants, constant.classIndex)
-				constant.classIndex = nil
+			if const.classIndex then
+				const.class = assert.index(self.constants, const.classIndex)
+				const.classIndex = nil
 			end
-			if constant.nameAndTypeIndex then
-				constant.nameAndType = assert.index(self.constants, constant.nameAndTypeIndex)
-				constant.nameAndTypeIndex = nil
+			if const.nameAndTypeIndex then
+				const.nameAndType = assert.index(self.constants, const.nameAndTypeIndex)
+				const.nameAndTypeIndex = nil
 			end
-			if constant.valueIndex then
-				constant.value = assert.index(self.constants, constant.valueIndex)
-				constant.valueIndex = nil
+			if const.valueIndex then
+				const.value = assert.index(self.constants, const.valueIndex)
+				const.valueIndex = nil
 			end
-			if constant.sigIndex then
-				constant.sig = assert.index(self.constants, constant.sigIndex)
-				constant.sigIndex = nil
+			if const.sigIndex then
+				const.sig = assert.index(self.constants, const.sigIndex)
+				const.sigIndex = nil
 			end
-			if constant.referenceIndex then
-				constant.reference = assert.index(self.constants, constant.referenceIndex)
-				constant.referenceIndex = nil
+			if const.referenceIndex then
+				const.reference = assert.index(self.constants, const.referenceIndex)
+				const.referenceIndex = nil
 			-- maybe this is to the attrs[] list?
 			end
-			if constant.bootstrapMethodAttrIndex then
-				constant.bootstrapMethodAttr = assert.index(self.constants, constant.bootstrapMethodAttrIndex)
-				constant.bootstrapMethodAttrIndex = nil
+			if const.bootstrapMethodAttrIndex then
+				const.bootstrapMethodAttr = assert.index(self.constants, const.bootstrapMethodAttrIndex)
+				const.bootstrapMethodAttrIndex = nil
 			end
 		end
 	end
@@ -760,8 +897,10 @@ function JavaClassData:readData(data)
 			local attr = attrs[1]
 			field.attrName = attr.name
 			assert.len(attr.data, 2)
-			local attrblob = Blob(attr.data)
-			field.constantValue = attrblob:readu2()
+			local attrblob = ReadBlob(attr.data)
+
+			-- TODO convert this from constant table?
+			field.constantValue = deepCopyIndex(attrblob:readu2())
 			attrblob:assertDone()
 		end
 		self.fields:insert(field)
@@ -788,7 +927,7 @@ function JavaClassData:readData(data)
 			local codeName = codeAttr.name
 			assert.eq(codeName, 'Code')	-- always?
 
-			local cblob = Blob(codeAttr.data)
+			local cblob = ReadBlob(codeAttr.data)
 			method.maxStack = cblob:readu2()
 			method.maxLocals = cblob:readu2()
 
@@ -797,7 +936,7 @@ function JavaClassData:readData(data)
 
 			-- [[
 			do
-				local insBlob = Blob(insns)
+				local insBlob = ReadBlob(insns)
 				while not insBlob:done() do
 					local op = insBlob:readu1()
 					local instDesc = assert.index(instDescForOp, op)
@@ -823,14 +962,14 @@ function JavaClassData:readData(data)
 
 			local exceptionCount = cblob:readu2()
 			if exceptionCount > 0 then
-				code.exceptions = table()
+				method.exceptions = table()
 				for i=0,exceptionCount-1 do
 					local ex = {}
 					ex.startPC = cblob:readu2()
 					ex.endPC = cblob:readu2()
 					ex.handlerPC = cblob:readu2()
-					ex.catchType = cblob:readu2()
-					code.exceptions:insert(ex)
+					ex.catchType = deepCopyIndex(cblob:readu2())
+					method.exceptions:insert(ex)
 				end
 			end
 
@@ -843,7 +982,7 @@ function JavaClassData:readData(data)
 				stackmap.name = smAttr.name
 
 				--[[ TODO or not if you dont have to
-				local smBlob = Blob(smAttr.data)
+				local smBlob = ReadBlob(smAttr.data)
 				local numEntries = smBlob:readu2()
 print('numEntries', numEntries)
 				stackmap.entries = {}
@@ -935,7 +1074,7 @@ print('found reseved stack map frame type', frameType)
 					stackmap.entries[i] = smFrame
 				end
 				smBlob:assertDone()
-				code.stackmap = stackmap
+				method.stackmap = stackmap
 				--]]
 			end
 
@@ -962,9 +1101,470 @@ end
 
 -------------------------------- WRITING --------------------------------
 
+local WriteBlob = class()
+function WriteBlob:init()
+	self.data = table()	-- table-of-strings ... TODO luajit string.buffer ?
+end
+function WriteBlob:write(ctype, value)
+	assert.type(value, 'number')	-- or cdata for long?
+	ctype = ffi.typeof(ctype)
+	local size = ffi.sizeof(ctype)
+	local result
+	local data = ffi.typeof('$[1]', ctype)()
+	data[0] = value
+	if ffi.abi'be' then
+		self.data:insert(ffi.string(data, size))
+	else
+		local ptr = ffi.cast('uint8_t*', data)
+		for i=0,size-1 do
+			self.data:insert((string.char(ptr[size-1-i])))
+		end
+	end
+end
+function WriteBlob:writeu1(...) return self:write('uint8_t', ...) end
+function WriteBlob:writeu2(...) return self:write('uint16_t', ...) end
+function WriteBlob:writeu4(...) return self:write('uint32_t', ...) end
+function WriteBlob:writeString(s)
+	return self.data:insert((assert.type(s, 'string')))
+end
+
+function WriteBlob:compile()
+	self.data = table{(self.data:concat())}
+	return self.data[1]
+end
 
 function JavaClassData:compile()
-	-- build constants fresh?  why not?
+	--[[
+	build constants fresh?  why not?
+	cycle through all fields and all methods and their instructions
+	accumulate unique constants
+	--]]
+	local constants = table()
+
+	-- these methods are for compressing unique constants
+	-- and for replacing deep-copies with *Index constant-table-reference fields
+
+	local function addConstUnique(x)
+		if type(x) == 'string' then
+			for i,const in ipairs(constants) do
+				-- TODO .tag==1 here?
+				-- too many layers to the same structure...
+				if type(const) == 'string' 
+				and const == x then 
+					return i 
+				end
+			end
+		elseif type(x) == 'table' then
+			assert.index(x, 'tag')
+			-- TODO TODO per-tag compare
+			-- maybe I should make subclasses
+			-- mmeh I'm lazy
+			local xkeys = table.keys(x):sort()
+			for i,const in ipairs(constants) do
+				if type(const) == 'table' then
+					local okeys = table.keys(const):sort()
+					if #xkeys == #okeys then
+						local differ
+						for j=1,#xkeys do
+							if xkeys[j] ~= okeys[j] then
+								differ = true
+								break
+							end
+						end
+						if not differ then
+							return i
+						end
+					end
+				end
+			end
+		else
+			error("idk how to check for uniqueness "..type(x))
+		end
+		constants:insert(x)
+		return #constants
+	end
+
+	local function addConstNameAndType(const)
+		return addConstUnique{
+			tag = 'nameAndType',
+			nameIndex = addConstUnique(const.name),	-- utf8string
+			sigIndex = addConstUnique(const.sig),	-- utf8string
+		}
+	end
+
+	local function addConstClass(name)
+		assert.type(name, 'string')
+		local nameIndex = addConstUnique(name)
+		-- make sure it's not already there
+		for i,const in ipairs(constants) do
+			if type(const) == 'table'
+			and const.tag == 'class' 
+			and const.nameIndex == nameIndex
+			then
+				return i
+			end
+		end
+		-- if not, add new
+		constants:insert{tag='class', nameIndex=nameIndex}
+		return #constants
+	end
+	self.addConstClass = addConstClass
+
+
+	-- for converting from deep copy trees to constant index refs
+	local function addConst(const)
+		if type(const) == 'string' then
+			return addConstUnique(const)
+		end
+		assert.type(const, 'table')
+		if const.tag == 'class' then
+			return addConstClass(const.name)
+		end
+		if const.tag == 'fieldRef' then
+			return addConstUnique{
+				tag = const.tag,
+				classIndex = addConstClass(const.class),
+				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
+			}
+		end
+		if const.tag == 'methodRef' then
+			return addConstUnique{
+				tag = const.tag,
+				classIndex = addConstClass(const.class),
+				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
+			}
+		end
+		if const.tag == 'interfaceMethodRef' then
+			return addConstUnique{
+				tag = const.tag,
+				classIndex = addConstClass(const.class),
+				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
+			}
+		end
+		if const.tag == 'string' then
+			return addConstUnique{
+				tag = const.tag,
+				valueIndex = addConstUnique(const.value),	-- utf8string
+			}
+		end
+		if const.tag == 'int' then
+			return addConstUnique{
+				tag = const.tag,
+				valueIndex = const.value,
+			}
+		end
+		if const.tag == 'float' then
+			return addConstUnique{
+				tag = const.tag,
+				valueIndex = const.value,
+			}
+		end
+		if const.tag == 'long' then
+			return addConstUnique{
+				tag = const.tag,
+				valueIndex = const.value,
+			}
+		end
+		if const.tag == 'double' then
+			return addConstUnique{
+				tag = const.tag,
+				valueIndex = const.value,
+			}
+		end
+		if const.tag == 'nameAndType' then
+			return addConstUnique{
+				tag = const.tag,
+				nameIndex = addConstUnique(const.name),	-- utf8string?
+				sigIndex = addConstUnique(const.sig),	-- utf8string?
+			}
+		end
+		if const.tag == 'methodHandle' then
+			return addConstUnique{
+				tag = const.tag,
+				refKind = assert.type(assert.index(const, 'refKind'), 'string'),
+				referenceIndex = addConstUnique(const.reference),	-- utf8string?
+			}
+		end
+		if const.tag == 'methodType' then
+			return addConstUnique{
+				tag = const.tag,
+				sigIndex = addConstUnique(const.sig),	-- utf8string
+			}
+		end
+		if const.tag == 'invokeDynamic' then
+			return addConstUnique{
+				tag = const.tag,
+				bootstrapMethodAttrIndex = addConst(const.bootstrapMethodAttr),
+				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
+			}
+		end
+		if const.tag == 'module' then
+			return addConstUnique{
+				tag = const.tag,
+				nameIndex = addConstUnique(const.name),	-- utf8string?
+			}
+		end
+		if const.tag == 'package' then
+			return addConstUnique{
+				tag = const.tag,
+				nameIndex = addConstUnique(const.name),	-- utf8string?
+			}
+		end
+		error("idk how to encode const of tag "..tostring(const.tag))
+	end
+	self.addConst = addConst
+
+	-- first we have to cycle everything and build constants.
+
+	self.thisClass = addConstClass((assert.type(assert.index(self, 'thisClass'), 'string')))
+	self.superClass = addConstClass((assert.type(assert.index(self, 'superClass'), 'string')))
+
+	if self.fields then
+		for _,field in ipairs(self.fields) do
+			field.nameIndex = addConstUnique(field.name)
+			field.name = nil	-- necessary or nah?
+			field.sigIndex = addConstUnique(field.sig)
+			field.sig = nil
+
+			-- convert field.attrName / constantValue into field.attrs[]
+			-- where each attr has {uint16_t name; string data;}
+			if field.attrName then
+				local attrBlob = WriteBlob()
+				attrBlob:writeu2(addConst(field.constantValue))
+				local attr = {}
+				attr.nameIndex = addConstUnique(field.attrName)
+				attr.data = attrBlob:compile()
+				field.attrs = {attr}
+
+				field.attrName = nil
+				field.constantValue = nil
+			end
+		end
+	end
+
+	if self.methods then
+		for _,method in ipairs(self.methods) do
+			method.nameIndex = addConstUnique(method.name)
+			method.name = nil	-- necessary or nah?
+			method.sigIndex = addConstUnique(method.sig)
+			method.sig = nil
+		
+			if method.code then
+				local cblob = WriteBlob()
+				cblob:writeu2(method.maxStack)
+				cblob:writeu2(method.maxLocals)
+				
+				local insBlob = WriteBlob()
+				for _,inst in ipairs(method.code) do
+					local op = assert.index(opForInstName, inst[1])
+					insBlob:writeu1(op)
+					local instDesc = assert.index(instDescForOp, op)
+					local argDesc = instDesc.args
+					if argDesc then
+						if type(argDesc) == 'table' then
+							for i,ctype in ipairs(argDesc) do
+								insBlob:write(ctype, inst[i+1])
+							end
+						elseif type(argDesc) == 'function' then
+							assert.index(instDesc, 'write')(inst, insBlob, self)
+						else
+							error'here'
+						end
+					end
+				end
+				local insBlobData = insBlob:compile()
+				cblob:writeu4(#insBlobData)
+				cblob:writeString(insBlobData)
+
+				if not method.exceptions then
+					cblob:writeu2(0)
+				else
+					cblob:writeu2(#method.exceptions)
+					for _,ex in ipairs(method.exceptions) do
+						cblob:writeu2(ex.startPC)
+						cblob:writeu2(ex.endPC)
+						cblob:writeu2(ex.handlerPC)
+						cblob:writeu2(addConstUnique(ex.catchType))
+					end
+				end
+				
+				-- TODO now add method.stackmap as attrs at the end of cblob
+				
+				local cblobData = cblob:compile()
+				local attrBlob = WriteBlob()
+				attrBlob:writeu4(#cblobData)
+				attrBlob:writeString(cblobData)
+				
+				local attr = {}
+				attr.nameIndex = addConstUnique'Code'
+				attr.data = attrBlob:compile()
+				method.attrs = {attr}
+
+				method.name = nil
+				method.code = nil
+				method.maxStack = nil
+				method.maxLocals = nil
+				method.exceptions = nil
+			end
+		end
+	end
+
+	if self.attrs then
+		for _,attr in ipairs(self.attrs) do
+		end
+	end
+
+
+	-- then insert padding after 64-bit constants
+	for i=#constants,1,-1 do
+		local const = constants[i]
+		if type(const) == 'table'
+		and (const.tag == 'long' or const.tag == 'dobule')
+		then
+			constants:insert(i+1, false)
+		end
+	end
+
+
+	-- table-of-strings that I concat() at the end
+	local blob = WriteBlob()
+	blob:writeu4(0xcafebabe)
+	blob:writeu4(0x41)		-- version
+	
+	-- write out constants
+	blob:writeu2(#constants+1)
+	for _,const in ipairs(constants) do
+		if const == false then
+			-- skip long/double padding
+		elseif type(const) == 'string' then
+			blob:writeu1(1)	-- utf8string
+			blob:writeString(const)
+		elseif const.tag == 'class' then
+			blob:writeu1(7)
+			blob:writeu2(const.nameIndex)
+		elseif const.tag == 'fieldRef' then
+			blob:writeu1(9)
+			blob:writeu2(const.classIndex)
+			blob:writeu2(const.nameAndTypeIndex)
+		elseif const.tag == 'methodRef' then
+			blob:writeu1(10)
+			blob:writeu2(const.classIndex)
+			blob:writeu2(const.nameAndTypeIndex)
+		elseif const.tag == 'interfaceMethodRef' then
+			blob:writeu1(11)
+			blob:writeu2(const.classIndex)
+			blob:writeu2(const.nameAndTypeIndex)
+		elseif const.tag == 'string' then
+			blob:writeu1(8)
+			blob:writeu2(const.valueIndex)
+		elseif const.tag == 'int' then
+			blob:writeu1(3)
+			blob:write('int32_t', const.value)
+		elseif const.tag == 'float' then
+			blob:writeu1(4)
+			blob:write('float', const.value)
+		elseif const.tag == 'long' then
+			blob:writeu1(5)
+			blob:write('int64_t', const.value)
+		elseif const.tag == 'double' then
+			blob:writeu1(6)
+			blob:write('double', const.value)
+		elseif const.tag == 'nameAndType' then
+			blob:writeu1(12)
+			blob:writeu2(const.nameIndex)
+			blob:writeu2(const.sigIndex)
+		elseif const.tag == 'methodHandle' then
+			blob:writeu1(15)
+			local refKindIndex = assert.index({
+				getField = 1,
+				getStatic = 2,
+				putField = 3,
+				putStatic = 4,
+				invokeVirtual = 5,
+				invokeStatic = 6,
+				invokeSpecial = 7,
+				newInvokeSpecial = 8,
+				invokeInterface = 9,			
+			}, const.refKind)
+			blob:writeu2(refKindIndex)
+			blob:writeu2(const.referenceIndex)
+		elseif const.tag == 'methodType' then
+			blob:writeu1(16)
+			blob:writeu2(const.sigIndex)
+		elseif const.tag == 'invokeDynamic' then
+			blob:writeu1(18)
+			blob:writeu2(const.bootstrapMethodAttrIndex)
+			blob:writeu2(const.nameAndTypeIndex)
+		elseif const.tag == 'module' then
+			blob:writeu1(19)
+			blob:writeu2(const.nameIndex)
+		elseif const.tag == 'package' then
+			blob:writeu1(19)
+			blob:writeu2(const.nameIndex)
+		else
+			error'TODO'
+		end
+	end
+
+	-- opposite of readAccessFlags above
+	local function writeAccessFlags(t)
+		blob:writeu2(bit.bor(
+			t.isPublic and 1 or 0,
+			t.isFinal and 0x10 or 0,
+			t.isSuper and 0x20 or 0,
+			t.isInterface and 0x200 or 0,
+			t.isAbstract and 0x400 or 0,
+			t.isSynthetic and 0x1000 or 0,
+			t.isAnnotation and 0x2000 or 0,
+			t.isEnum and 0x4000 or 0,
+			t.isModule and 0x8000 or 0
+		))
+	end
+	writeAccessFlags(self)
+
+	-- opposite of readAttrs
+	local function writeAttrs(attrs, b)
+		if not attrs then
+			return b:writeu2(0)
+		end
+		b:writeu2(#attrs)
+		for _,attr in ipairs(attrs) do
+			b:writeu2(attr.nameIndex)
+			assert.type(attr.data, 'string')
+			b:writeu4(#attr.data)
+			b:writeString(attr.data)
+		end
+	end
+
+	-- write out fields
+	if not self.fields then
+		blob:writeu2(0)
+	else
+		blob:writeu2(#self.fields)
+		for _,field in ipairs(self.fields) do
+			writeAccessFlags(field)
+			blob:writeu2(field.nameIndex)
+			blob:writeu2(field.sigIndex)
+			writeAttrs(field.attrs, blob)
+		end
+	end
+
+	-- write out methods
+	if not self.methods then
+		blob:writeu2(0)
+	else
+		blob:writeu2(#self.methods)
+		for _,method in ipairs(self.methods) do
+			writeAccessFlags(method)
+			blob:writeu2(method.nameIndex)
+			blob:writeu2(method.sigIndex)
+			writeAttrs(method.attrs, blob)
+		end
+	end
+
+	writeAttrs(self.attrs, blob)
+
+	return blob.data:concat()
 end
 
 

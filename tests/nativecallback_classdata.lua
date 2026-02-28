@@ -19,7 +19,7 @@ return function(J)
 	local runMethodName = 'run'
 
 	local cw = JavaClassData{
-		version = 0x4100,	-- major in high byte, minor in low byte ...
+		version = 0x41,
 		isPublic = true,
 		thisClass = newClassNameSlashSep,
 		isSuper = true,	-- "Treat superclass methods specially when invoked by the invokespecial instruction."
