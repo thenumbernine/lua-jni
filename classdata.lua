@@ -58,7 +58,7 @@ local function instPushMethod(inst, insBlob, cldata)
 	inst:insert(method.nameAndType.sig)
 end
 local function instPopMethod(inst, index, cldata)
-	return cldata.addConst{
+	local methodIndex = cldata.addConst{
 		tag = 'methodRef',
 		class = inst[index],
 		nameAndType = {
@@ -66,7 +66,9 @@ local function instPopMethod(inst, index, cldata)
 			name = inst[index+1],
 			sig = inst[index+2],
 		},
-	}, index+3
+	}
+assert.eq('methodRef', assert.index(assert.index(cldata.constants, methodIndex), 'tag'))
+	return methodIndex, index+3
 end
 
 local function instPushField(inst, insBlob, cldata)
@@ -78,7 +80,7 @@ local function instPushField(inst, insBlob, cldata)
 	inst:insert(field.nameAndType.sig)
 end
 local function instPopField(inst, index, cldata)
-	return cldata.addConst{
+	local fieldIndex = cldata.addConst{
 		tag = 'fieldRef',
 		class = inst[index],
 		nameAndType = {
@@ -86,7 +88,9 @@ local function instPopField(inst, index, cldata)
 			name = inst[index+1],
 			sig = inst[index+2],
 		},
-	}, index+3
+	}
+assert.eq('fieldRef', assert.index(assert.index(cldata.constants, fieldIndex), 'tag'))
+	return fieldIndex, index+3
 end
 
 local function instPushConst(inst, insBlob, cldata, constIndex)
@@ -181,7 +185,7 @@ local function instPopConst2(inst, index, cldata)
 	elseif tag == 'long' or tag == 'double' then
 		return cldata.addConst{
 			tag = tag,
-			value = inst[index],
+			value = assert.type(inst[index], 'number'),
 		}, index+1
 	else
 		error'here'
@@ -449,10 +453,16 @@ local instDescForOp = {
 		name='putfield',
 		--args={'uint16_t'},
 		args = function(inst, insBlob, cldata)
-			instPushField(inst, insBlob, cldata)
+			assert(xpcall(function()
+				instPushField(inst, insBlob, cldata)
+			end, function(err)
+				return 'at putfield at ofs='..insBlob.ofs..'\n'..err
+			end))
 		end,
 		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopField(inst, 2, cldata))
+			local fieldIndex = instPopField(inst, 2, cldata)
+print('write putfield '..fieldIndex)			
+			insBlob:writeu2(fieldIndex)
 		end,
 	},
 
@@ -726,7 +736,7 @@ print(('verison 0x%x'):format(version))
 		for i=1,constantCount-1 do
 			if not skipnext then
 				local tag = blob:readu1()
-				local const = {tag=tag}
+				local const = {index=i, tag=tag}
 				if tag == 7 then		-- class
 					const.tag = 'class'
 					const.nameIndex = blob:readu2()
@@ -821,7 +831,7 @@ print('reading const', i, require 'ext.tolua'(const))
 	-- but the reference order is not always increasing,
 	--  so I'll have to process it afterwards
 	-- there's no recursive references, right?
-	for _,const in ipairs(self.constants) do
+	for constIndex,const in ipairs(self.constants) do
 		if type(const) == 'table' then 	-- skip fillers for double and long
 			const.index = nil
 			-- TODO TODO also assert matching type?
@@ -834,7 +844,10 @@ print('reading const', i, require 'ext.tolua'(const))
 				const.classIndex = nil
 			end
 			if const.nameAndTypeIndex then
-				const.nameAndType = assert.index(self.constants, const.nameAndTypeIndex)
+				const.nameAndType = self.constants[const.nameAndTypeIndex]
+if not const.nameAndType then
+	error('const '..constIndex..' tag '..const.tag..' has nameAndType oob '..const.nameAndTypeIndex)
+end
 				const.nameAndTypeIndex = nil
 			end
 			if const.valueIndex then
@@ -1095,8 +1108,7 @@ print(require 'ext.string'.hexdump(insBlobData))
 
 				method.code = code
 			end, function(err)
-				return 'in method '..methodIndex..':\n'
-					..err..'\n'..debug.traceback()
+				return 'in method '..methodIndex..':\n'..err
 			end))
 		end)
 		self.methods:insert(method)
@@ -1166,6 +1178,10 @@ function JavaClassData:compile()
 	--]]
 	local constants = table()
 
+-- overwrite mind you ...
+-- but here I rebuild them anyways so
+self.constants = constants
+
 	-- these methods are for compressing unique constants
 	-- and for replacing deep-copies with *Index constant-table-reference fields
 
@@ -1189,14 +1205,14 @@ function JavaClassData:compile()
 				if type(const) == 'table' then
 					local okeys = table.keys(const):sort()
 					if #xkeys == #okeys then
-						local differ
+						local same = true
 						for j=1,#xkeys do
-							if xkeys[j] ~= okeys[j] then
-								differ = true
+							if x[xkeys[j]] ~= const[okeys[j]] then
+								same = false
 								break
 							end
 						end
-						if not differ then
+						if same then
 							return i
 						end
 					end
@@ -1205,8 +1221,18 @@ function JavaClassData:compile()
 		else
 			error("idk how to check for uniqueness "..type(x))
 		end
+		
 		constants:insert(x)
-		return #constants
+		local index = #constants	
+
+		-- add padding for 64bit constants
+		if type(x) == 'table'
+		and (x.tag == 'double' or x.tag == 'long')
+		then
+			constants:insert(false)
+		end
+
+		return index
 	end
 
 	local function addConstNameAndType(const)
@@ -1261,25 +1287,25 @@ function JavaClassData:compile()
 		if const.tag == 'int' then
 			return addConstUnique{
 				tag = const.tag,
-				valueIndex = const.value,
+				value = const.value,
 			}
 		end
 		if const.tag == 'float' then
 			return addConstUnique{
 				tag = const.tag,
-				valueIndex = const.value,
+				value = const.value,
 			}
 		end
 		if const.tag == 'long' then
 			return addConstUnique{
 				tag = const.tag,
-				valueIndex = const.value,
+				value = const.value,
 			}
 		end
 		if const.tag == 'double' then
 			return addConstUnique{
 				tag = const.tag,
-				valueIndex = const.value,
+				value = const.value,
 			}
 		end
 		if const.tag == 'nameAndType' then
@@ -1627,6 +1653,5 @@ print('writing method refd', i, require 'ext.tolua'(method))
 
 	return blob.data:concat()
 end
-
 
 return JavaClassData
