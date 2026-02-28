@@ -19,10 +19,21 @@ print()
 
 -- read
 local cldata = JavaClassData(classFileData)
+print('in Lua:')
 print(require'ext.tolua'(cldata))
 print()
 
 -- write
 local bytes = cldata:compile()
 print'compiled:'
+print(string.hexdump(bytes))
+print()
+
+print('2nd try, in Lua:')
+local try2 = JavaClassData(bytes)
+print(require'ext.tolua'(try2))
+print()
+
+local bytes = try2:compile()
+print'2nd try, compiled:'
 print(string.hexdump(bytes))

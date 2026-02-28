@@ -33,8 +33,9 @@ end
 
 -- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
 local function readClassName(cldata, index)
-	local const = cldata.constants[index]
-	assert.eq(const.tag, 'class')
+	local const = assert.index(cldata.constants, index, 'classData.constants')
+	assert.type(const, 'table', 'const class type')
+	assert.eq(const.tag, 'class', 'const class tag')
 	return assert.type(const.name, 'string')
 end
 
@@ -719,7 +720,7 @@ print(('verison 0x%x'):format(version))
 		for i=1,constantCount-1 do
 			if not skipnext then
 				local tag = blob:readu1()
-				local const = {index=i, tag=tag}
+				local const = {tag=tag}
 				if tag == 7 then		-- class
 					const.tag = 'class'
 					const.nameIndex = blob:readu2()
@@ -801,6 +802,7 @@ print(('verison 0x%x'):format(version))
 						..' at offset 0x'..bit.tohex(ofs)
 					)
 				end
+print('reading const', i, require 'ext.tolua'(const))				
 				self.constants:insert(const)
 			else
 				self.constants:insert(false)
@@ -904,6 +906,7 @@ print(('verison 0x%x'):format(version))
 			attrblob:assertDone()
 		end
 		self.fields:insert(field)
+print('reading field', i, require 'ext.tolua'(field))	
 	end
 
 	local methodCount = blob:readu2()
@@ -1082,6 +1085,7 @@ print('found reseved stack map frame type', frameType)
 			method.code = code
 		end
 		self.methods:insert(method)
+print('reading method', i, require 'ext.tolua'(method))	
 	end
 
 	local classAttrs = readAttrs(blob)
@@ -1192,24 +1196,7 @@ function JavaClassData:compile()
 		}
 	end
 
-	local function addConstClass(name)
-		assert.type(name, 'string')
-		local nameIndex = addConstUnique(name)
-		-- make sure it's not already there
-		for i,const in ipairs(constants) do
-			if type(const) == 'table'
-			and const.tag == 'class' 
-			and const.nameIndex == nameIndex
-			then
-				return i
-			end
-		end
-		-- if not, add new
-		constants:insert{tag='class', nameIndex=nameIndex}
-		return #constants
-	end
-	self.addConstClass = addConstClass
-
+	local addConstClass
 
 	-- for converting from deep copy trees to constant index refs
 	local function addConst(const)
@@ -1218,7 +1205,10 @@ function JavaClassData:compile()
 		end
 		assert.type(const, 'table')
 		if const.tag == 'class' then
-			return addConstClass(const.name)
+			return addConstUnique{
+				tag = const.tag,
+				nameIndex = addConstUnique(const.name),
+			}
 		end
 		if const.tag == 'fieldRef' then
 			return addConstUnique{
@@ -1314,10 +1304,28 @@ function JavaClassData:compile()
 	end
 	self.addConst = addConst
 
+	function addConstClass(name)
+		return addConst{
+			tag = 'class',
+			name = assert.type(name, 'string'),
+		}
+	end
+	self.addConstClass = addConstClass
+
+
 	-- first we have to cycle everything and build constants.
 
-	self.thisClass = addConstClass((assert.type(assert.index(self, 'thisClass'), 'string')))
-	self.superClass = addConstClass((assert.type(assert.index(self, 'superClass'), 'string')))
+	-- collect class constants
+	self.thisClassIndex = addConstClass((assert.type(assert.index(self, 'thisClass'), 'string')))
+	self.thisClass = nil
+	self.superClassIndex = addConstClass((assert.type(assert.index(self, 'superClass'), 'string')))
+	self.superClass = nil
+
+	if self.interfaces then
+		for i=1,#self.interfaces do
+			self.interfaces[i] = addConst(self.interfaces[i])
+		end
+	end
 
 	if self.fields then
 		for _,field in ipairs(self.fields) do
@@ -1430,14 +1438,16 @@ function JavaClassData:compile()
 	local blob = WriteBlob()
 	blob:writeu4(0xcafebabe)
 	blob:writeu4(0x41)		-- version
-	
+
 	-- write out constants
 	blob:writeu2(#constants+1)
-	for _,const in ipairs(constants) do
+	for i,const in ipairs(constants) do
+print('writing const', i, require 'ext.tolua'(const))				
 		if const == false then
 			-- skip long/double padding
 		elseif type(const) == 'string' then
 			blob:writeu1(1)	-- utf8string
+			blob:writeu2(#const)
 			blob:writeString(const)
 		elseif const.tag == 'class' then
 			blob:writeu1(7)
@@ -1522,6 +1532,18 @@ function JavaClassData:compile()
 	end
 	writeAccessFlags(self)
 
+	blob:writeu2(self.thisClassIndex)
+	blob:writeu2(self.superClassIndex)
+
+	if not self.interfaces then
+		blob:writeu2(0)
+	else
+		blob:writeu2(#self.interfaces)
+		for _,iface in ipairs(self.interfaces) do
+			self:writeu2(iface)
+		end
+	end
+
 	-- opposite of readAttrs
 	local function writeAttrs(attrs, b)
 		if not attrs then
@@ -1542,6 +1564,7 @@ function JavaClassData:compile()
 	else
 		blob:writeu2(#self.fields)
 		for _,field in ipairs(self.fields) do
+print('writing field', i, require 'ext.tolua'(field))	
 			writeAccessFlags(field)
 			blob:writeu2(field.nameIndex)
 			blob:writeu2(field.sigIndex)
@@ -1555,6 +1578,7 @@ function JavaClassData:compile()
 	else
 		blob:writeu2(#self.methods)
 		for _,method in ipairs(self.methods) do
+print('writing method', i, require 'ext.tolua'(method))	
 			writeAccessFlags(method)
 			blob:writeu2(method.nameIndex)
 			blob:writeu2(method.sigIndex)
