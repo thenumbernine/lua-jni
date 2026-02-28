@@ -461,7 +461,7 @@ local instDescForOp = {
 		end,
 		write = function(inst, insBlob, cldata)
 			local fieldIndex = instPopField(inst, 2, cldata)
-print('write putfield '..fieldIndex)			
+--DEBUG:print('write putfield '..fieldIndex)			
 			insBlob:writeu2(fieldIndex)
 		end,
 	},
@@ -727,7 +727,7 @@ function JavaClassData:readData(data)
 	local magic = blob:readu4()
 	assert.eq(magic, 0xcafebabe)
 	local version = blob:readu4()
-print(('verison 0x%x'):format(version))
+--DEBUG:print(('verison 0x%x'):format(version))
 	-- store version info or nah?
 	local constantCount = blob:readu2()
 	self.constants = table()
@@ -818,7 +818,7 @@ print(('verison 0x%x'):format(version))
 						..' at offset 0x'..bit.tohex(ofs)
 					)
 				end
-print('reading const', i, require 'ext.tolua'(const))				
+--DEBUG:print('reading const', i, require 'ext.tolua'(const))				
 				self.constants:insert(const)
 			else
 				self.constants:insert(false)
@@ -924,7 +924,7 @@ end
 			field.constantValue = deepCopyIndex(blob:readu2())
 		end)
 		self.fields:insert(field)
-print('reading field', fieldIndex, require 'ext.tolua'(field))	
+--DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))	
 	end
 
 	local methodCount = blob:readu2()
@@ -944,9 +944,9 @@ print('reading field', fieldIndex, require 'ext.tolua'(field))
 			assert(not readCodeAttr, "got two code attrs")
 			readCodeAttr = true
 
-local codeAttrData = blob.data:sub(blob.ofs+1, blob.ofs+codeAttrLen)
-print('reading method '..methodIndex..' codeAttr data '..#codeAttrData)
-print(require 'ext.string'.hexdump(codeAttrData))
+--DEBUG:local codeAttrData = blob.data:sub(blob.ofs+1, blob.ofs+codeAttrLen)
+--DEBUG:print('reading method '..methodIndex..' codeAttrData '..#codeAttrData)
+--DEBUG:print(require 'ext.string'.hexdump(codeAttrData))
 
 			assert.eq(codeAttrName, 'Code')	-- always?
 
@@ -954,14 +954,14 @@ print(require 'ext.string'.hexdump(codeAttrData))
 			assert(xpcall(function()
 				method.maxStack = blob:readu2()
 				method.maxLocals = blob:readu2()
-print('reading method stack locals', method.maxStack, method.maxLocals)
+--DEBUG:print('reading method stack locals', method.maxStack, method.maxLocals)
 
 				local insnDataLength = blob:readu4()
 				local insnStartOfs = blob.ofs
 				local insnEndOfs = insnStartOfs + insnDataLength 
 				local insBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
-print('reading method '..methodIndex..' insn blob '..#insBlobData)
-print(require 'ext.string'.hexdump(insBlobData))
+--DEBUG:print('reading method '..methodIndex..' insn blob '..#insBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(insBlobData))
 				-- [[
 				while blob.ofs < insnEndOfs do
 					local op = blob:readu1()
@@ -1112,7 +1112,7 @@ print(require 'ext.string'.hexdump(insBlobData))
 			end))
 		end)
 		self.methods:insert(method)
-print('reading method', methodIndex, require 'ext.tolua'(method))	
+--DEBUG:print('reading method', methodIndex, require 'ext.tolua'(method))	
 	end
 
 	self.attrs = table()
@@ -1391,7 +1391,7 @@ self.constants = constants
 
 	if self.fields then
 		for i,field in ipairs(self.fields) do
-print('writing field', i, require 'ext.tolua'(field))	
+--DEBUG:print('writing field', i, require 'ext.tolua'(field))	
 			field.nameIndex = addConstUnique(field.name)
 			field.name = nil	-- necessary or nah?
 			field.sigIndex = addConstUnique(field.sig)
@@ -1402,10 +1402,13 @@ print('writing field', i, require 'ext.tolua'(field))
 			if field.attrName then
 				local attrBlob = WriteBlob()
 				attrBlob:writeu2(addConst(field.constantValue))
-				local attr = {}
-				attr.nameIndex = addConstUnique(field.attrName)
-				attr.data = attrBlob:compile()
-				field.attrs = {attr}
+
+				field.attrs = {
+					{
+						nameIndex = addConstUnique(field.attrName),
+						data = attrBlob:compile(),
+					},
+				}
 
 				field.attrName = nil
 				field.constantValue = nil
@@ -1415,7 +1418,7 @@ print('writing field', i, require 'ext.tolua'(field))
 
 	if self.methods then
 		for i,method in ipairs(self.methods) do
-print('writing method', i, require 'ext.tolua'(method))	
+--DEBUG:print('writing method', i, require 'ext.tolua'(method))	
 			method.nameIndex = addConstUnique(method.name)
 			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
@@ -1425,7 +1428,7 @@ print('writing method', i, require 'ext.tolua'(method))
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack)
 				cblob:writeu2(method.maxLocals)
-print('writing method stack locals', method.maxStack, method.maxLocals)
+--DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
 				
 				local insBlob = WriteBlob()
 				for _,inst in ipairs(method.code) do
@@ -1447,8 +1450,8 @@ print('writing method stack locals', method.maxStack, method.maxLocals)
 				end
 
 				local insBlobData = insBlob:compile()
-print('writing method '..i..' insn blob '..#insBlobData)
-print(require 'ext.string'.hexdump(insBlobData))
+--DEBUG:print('writing method '..i..' insn blob '..#insBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(insBlobData))
 				cblob:writeu4(#insBlobData)
 				cblob:writeString(insBlobData)
 
@@ -1464,23 +1467,23 @@ print(require 'ext.string'.hexdump(insBlobData))
 					end
 				end
 				
-				-- TODO stack frame
-				local codeAttrs = {}
+				local codeAttrs = {
+					-- TODO stack frame
+				}
 				writeAttrs(codeAttrs, cblob)
 				
 				-- TODO now add method.stackmap as attrs at the end of cblob
 				
-				local cblobData = cblob:compile()
-				local attrBlob = WriteBlob()
-				attrBlob:writeu4(#cblobData)
-				attrBlob:writeString(cblobData)
+				local codeAttrData = cblob:compile()
 				
-				local codeAttr = {}
-				codeAttr.nameIndex = addConstUnique'Code'
-				codeAttr.data = attrBlob:compile()
-print('writing method '..i..' codeAttr data '..#codeAttr.data)
-print(require'ext.string'.hexdump(codeAttr.data))
-				method.attrs = {codeAttr}
+--DEBUG:print('writing method '..i..' codeAttrData '..#codeAttrData)
+--DEBUG:print(require'ext.string'.hexdump(codeAttrData))
+				method.attrs = {
+					{
+						nameIndex = addConstUnique'Code',
+						data = codeAttrData, 
+					},
+				}
 
 				method.name = nil
 				method.code = nil
@@ -1519,7 +1522,7 @@ print(require'ext.string'.hexdump(codeAttr.data))
 	-- write out constants
 	blob:writeu2(#constants+1)
 	for i,const in ipairs(constants) do
-print('writing const', i, require 'ext.tolua'(const))				
+--DEBUG:print('writing const', i, require 'ext.tolua'(const))				
 		if const == false then
 			-- skip long/double padding
 		elseif type(const) == 'string' then
@@ -1627,7 +1630,7 @@ print('writing const', i, require 'ext.tolua'(const))
 	else
 		blob:writeu2(#self.fields)
 		for i,field in ipairs(self.fields) do
-print('writing field refd', i, require 'ext.tolua'(field))
+--DEBUG:print('writing field refd', i, require 'ext.tolua'(field))
 			writeAccessFlags(field)
 			blob:writeu2(field.nameIndex)
 			blob:writeu2(field.sigIndex)
@@ -1641,7 +1644,7 @@ print('writing field refd', i, require 'ext.tolua'(field))
 	else
 		blob:writeu2(#self.methods)
 		for i,method in ipairs(self.methods) do
-print('writing method refd', i, require 'ext.tolua'(method))	
+--DEBUG:print('writing method refd', i, require 'ext.tolua'(method))	
 			writeAccessFlags(method)
 			blob:writeu2(method.nameIndex)
 			blob:writeu2(method.sigIndex)
