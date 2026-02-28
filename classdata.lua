@@ -694,19 +694,23 @@ function JavaClassData:readData(data)
 		return deepCopy(assert.index(self.constants, index))
 	end
 
-	-- this uses deepCopyIndex but does so only after self.constants is deep-copied
-	local function readAttrs(b)
+	--[[ 
+	this uses deepCopyIndex on name
+	but does so only after self.constants is deep-copied
+	also assets the name is a string.
+	this reads the length but then leaves it up to the callback to read the proper data
+	--]]	
+	local function readAttrs(b, callback)
 		local attrCount = b:readu2()
 		if attrCount == 0 then return end
-		local attrs = table()
 		for i=0,attrCount-1 do
-			local attr = {}
-			attr.name = deepCopyIndex(b:readu2())	-- index into constants[]
+			local name = deepCopyIndex(b:readu2())	-- index into constants[]
+			assert.type(name, 'string')
 			local length = b:readu4()
-			attr.data = b:readString(length)
-			attrs:insert(attr)
+			local startOfs = b.ofs
+			callback(name, length, i)
+			assert.eq(startOfs + length, b.ofs, "readAttrs callback read wrong")
 		end
-		return attrs
 	end
 
 	local blob = ReadBlob(data)
@@ -895,18 +899,17 @@ print('reading const', i, require 'ext.tolua'(const))
 		field.name = deepCopyIndex(blob:readu2())
 		field.sig = deepCopyIndex(blob:readu2())
 
-		local attrs = readAttrs(blob)
-		if attrs then
-			assert.len(attrs, 1)
-			local attr = attrs[1]
-			field.attrName = attr.name
-			assert.len(attr.data, 2)
-			local attrblob = ReadBlob(attr.data)
+		local readFieldAttr
+		readAttrs(blob, function(name, length)
+			assert(not readFieldAttr, "got two field attrs")
+			readFieldAttr = true
+		
+			field.attrName = name
+			assert.eq(length, 2)
 
 			-- TODO convert this from constant table?
-			field.constantValue = deepCopyIndex(attrblob:readu2())
-			attrblob:assertDone()
-		end
+			field.constantValue = deepCopyIndex(blob:readu2())
+		end)
 		self.fields:insert(field)
 print('reading field', fieldIndex, require 'ext.tolua'(field))	
 	end
@@ -923,76 +926,78 @@ print('reading field', fieldIndex, require 'ext.tolua'(field))
 		method.sig = deepCopyIndex(blob:readu2())
 
 		-- method attribute #1 = code attribute
-		local attrs = readAttrs(blob)
-		if attrs then
-			assert.len(attrs, 1)
-			local codeAttr = attrs[1]
-print('reading method '..methodIndex..' codeAttr data '..#codeAttr.data)
-print(require 'ext.string'.hexdump(codeAttr.data))
+		local readCodeAttr 
+		readAttrs(blob, function(codeAttrName, codeAttrLen)
+			assert(not readCodeAttr, "got two code attrs")
+			readCodeAttr = true
+
+local codeAttrData = blob.data:sub(blob.ofs+1, blob.ofs+codeAttrLen)
+print('reading method '..methodIndex..' codeAttr data '..#codeAttrData)
+print(require 'ext.string'.hexdump(codeAttrData))
+
+			assert.eq(codeAttrName, 'Code')	-- always?
 
 			local code = table()
-			local codeName = codeAttr.name
-			assert.eq(codeName, 'Code')	-- always?
-
 			assert(xpcall(function()
-				local cblob = ReadBlob(codeAttr.data)
-				method.maxStack = cblob:readu2()
-				method.maxLocals = cblob:readu2()
+				method.maxStack = blob:readu2()
+				method.maxLocals = blob:readu2()
 print('reading method stack locals', method.maxStack, method.maxLocals)
 
-				local insnDataLength = cblob:readu4()
-				local insBlobData = cblob:readString(insnDataLength)
+				local insnDataLength = blob:readu4()
+				local insnStartOfs = blob.ofs
+				local insnEndOfs = insnStartOfs + insnDataLength 
+				local insBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
 print('reading method '..methodIndex..' insn blob '..#insBlobData)
 print(require 'ext.string'.hexdump(insBlobData))
 				-- [[
-				do
-					local insBlob = ReadBlob(insBlobData)
-					while not insBlob:done() do
-						local op = insBlob:readu1()
-						local instDesc = assert.index(instDescForOp, op)
-						local inst = table()
-						inst:insert((assert.index(instDesc, 'name')))
-						local argDesc = instDesc.args
-						if argDesc then
-							if type(argDesc) == 'table' then
-								for _,ctype in ipairs(argDesc) do
-									inst:insert((insBlob:read(ctype)))
-								end
-							elseif type(argDesc) == 'function' then
-								argDesc(inst, insBlob, self)
-							else
-								error'here'
+				while blob.ofs < insnEndOfs do
+					local op = blob:readu1()
+					local instDesc = assert.index(instDescForOp, op)
+					local inst = table()
+					inst:insert((assert.index(instDesc, 'name')))
+					local argDesc = instDesc.args
+					if argDesc then
+						if type(argDesc) == 'table' then
+							for _,ctype in ipairs(argDesc) do
+								inst:insert((blob:read(ctype)))
 							end
+						elseif type(argDesc) == 'function' then
+							argDesc(inst, blob, self)
+						else
+							error'here'
 						end
-						code:insert(inst)
 					end
-					insBlob:assertDone()
+					code:insert(inst)
 				end
+				assert.eq(blob.ofs, insnEndOfs)
 				--]]
 
-				local exceptionCount = cblob:readu2()
+				local exceptionCount = blob:readu2()
 				if exceptionCount > 0 then
 					method.exceptions = table()
 					for exceptionIndex=1,exceptionCount do
 						local ex = {}
-						ex.startPC = cblob:readu2()
-						ex.endPC = cblob:readu2()
-						ex.handlerPC = cblob:readu2()
-						ex.catchType = deepCopyIndex(cblob:readu2())
+						ex.startPC = blob:readu2()
+						ex.endPC = blob:readu2()
+						ex.handlerPC = blob:readu2()
+						ex.catchType = deepCopyIndex(blob:readu2())
 						method.exceptions:insert(ex)
 					end
 				end
 
 				-- code attribute #1 = stack map attribute
-				local codeAttrs = readAttrs(cblob)
-				if codeAttrs then
-					assert.len(codeAttrs, 1)
-					local smAttr = codeAttrs[1]
+				local readStackMapAttr
+				readAttrs(blob, function(smAttrName, smAttrLen)
+					assert(not readStackMapAttr, "expected one stack map attr")
+					readStackMapAttr = true
+
 					local stackmap = {}
-					stackmap.name = smAttr.name
+					stackmap.name = smAttrName
+
+					local smAttrData = blob:readString(smAttrLen)
 
 					--[[ TODO or not if you dont have to
-					local smBlob = ReadBlob(smAttr.data)
+					local smBlob = ReadBlob(smAttrData)
 					local numEntries = smBlob:readu2()
 	print('numEntries', numEntries)
 					stackmap.entries = {}
@@ -1086,27 +1091,30 @@ print(require 'ext.string'.hexdump(insBlobData))
 					smBlob:assertDone()
 					method.stackmap = stackmap
 					--]]
-				end
+				end)
 
-				cblob:assertDone()
 				method.code = code
 			end, function(err)
 				return 'in method '..methodIndex..':\n'
 					..err..'\n'..debug.traceback()
 			end))
-		end
+		end)
 		self.methods:insert(method)
 print('reading method', methodIndex, require 'ext.tolua'(method))	
 	end
 
-	local classAttrs = readAttrs(blob)
-	if classAttrs then
-		for _,attr in ipairs(classAttrs) do
-			if attr.name == 'SourceFile' then
-				-- attr.data is a uint16_t into the constants ...
-			else
-				print("idk how ot handle this attribute yet:", attr.name)
-			end
+	self.attrs = table()
+	readAttrs(blob, function(name, len)
+		self.attrs:insert{
+			name = name,
+			data = blob:readString(len),
+		}
+	end)
+	for _,attr in ipairs(self.attrs) do
+		if attr.name == 'SourceFile' then
+			-- attr.data is a uint16_t into the constants ...
+		else
+			print("idk how ot handle this attribute yet:", attr.name)
 		end
 	end
 
@@ -1460,6 +1468,8 @@ print(require'ext.string'.hexdump(codeAttr.data))
 	if self.attrs then
 		for _,attr in ipairs(self.attrs) do
 			-- TODO index fields
+			attr.nameIndex = addConstUnique(attr.name)
+			attr.name = nil
 		end
 	end
 
@@ -1613,7 +1623,6 @@ print('writing method refd', i, require 'ext.tolua'(method))
 		end
 	end
 
-assert(not self.attrs)
 	writeAttrs(self.attrs, blob)
 
 	return blob.data:concat()
