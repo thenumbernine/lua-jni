@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
+-- run from java/tests/classdata/
 
 -- child thread:
-
 local thread = require 'thread.lite'{
 	code = [=[
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
@@ -28,17 +28,12 @@ print('parent thread pthread_self', pthread.pthread_self())
 
 local J = require 'java.vm'{
 	props = {
-		['java.class.path'] = table.concat({
-			'.',
-			'asm-9.9.1.jar',		-- needed for ASM
-		}, ':'),
+		['java.class.path'] = '.',
 		['java.library.path'] = '.',
 	},
 }.jniEnv
 
---local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
---local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
-local NativeRunnable = require 'java.tests.nativerunnable_classdata'(J)	-- "WE'LL DO IT LIVE!!!!"
+local NativeRunnable = require 'java.tests.classdata.nativerunnable_classdata'(J)	-- "WE'LL DO IT LIVE!!!!"
 
 -- before I was passing J._vm._ptr as the arg
 -- now I can't because JNI expects it to be jobject and will poke inside the memory

@@ -1,4 +1,6 @@
 --[[
+This is used by a few of the tests.
+
 How to load a class from bytecode?
 
 It'd be nice to have a method that worked without file-writes, without extra javac's

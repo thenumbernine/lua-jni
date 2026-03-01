@@ -4,7 +4,7 @@ nativerunnable uut using JavaClassData instead of Java-ASM
 local path = require 'ext.path'
 local JavaClassData = require 'java.classdata'
 return function(J)
-	local NativeCallback = require 'java.tests.nativecallback_classdata'(J)
+	local NativeCallback = require 'java.tests.classdata.nativecallback_classdata'(J)
 
 	local newClassName = 'io.github.thenumbernine.NativeRunnable'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')
