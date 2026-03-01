@@ -95,7 +95,7 @@ args:
 function M:run(args)
 	local J = assert.index(args, 'env')
 
-	local NativeCallback = require 'java.tests.classdata.nativecallback_classdata'(J)
+	local NativeCallback = require 'java.tests.nativecallback'(J)
 
 	local classname = args.name
 	if not classname then

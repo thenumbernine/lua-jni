@@ -1231,6 +1231,7 @@ function WriteBlob:compile()
 	return self.data[1]
 end
 
+-- hmm maybe 'toByteCode()' ?
 function JavaClassData:compile()
 	--[[
 	build constants fresh?  why not?
@@ -1440,9 +1441,9 @@ self.constants = constants
 
 	-- collect class constants
 	self.thisClassIndex = addConstClass((assert.type(assert.index(self, 'thisClass'), 'string')))
-	self.thisClass = nil
 	self.superClassIndex = addConstClass((assert.type(assert.index(self, 'superClass'), 'string')))
-	self.superClass = nil
+--	self.thisClass = nil
+--	self.superClass = nil
 
 	if self.interfaces then
 		for i=1,#self.interfaces do
@@ -1454,8 +1455,8 @@ self.constants = constants
 		for i,field in ipairs(self.fields) do
 --DEBUG:print('writing field', i, require 'ext.tolua'(field))
 			field.nameIndex = addConstUnique(field.name)
-			field.name = nil	-- necessary or nah?
 			field.sigIndex = addConstUnique(field.sig)
+			field.name = nil	-- necessary or nah?
 			field.sig = nil
 
 			-- convert field.attrName / constantValue into field.attrs[]
@@ -1721,6 +1722,11 @@ self.constants = constants
 	writeAttrs(self.attrs, blob)
 
 	return blob.data:concat()
+end
+
+-- shorthand for env:_defineClass(self, ...)
+function JavaClassData:_defineClass(env, ...)
+	return env:_defineClass(self, ...)
 end
 
 return JavaClassData

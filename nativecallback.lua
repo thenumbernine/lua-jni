@@ -1,13 +1,18 @@
--- nativecallback but using JavaClassData
+--[[
+io.github.thenumbernine.NativeCallback class but implemented with JavaClassData
+
+This still requires the libio_github_thenumbernine_NativeCallback.so file to be present
+--]]
 local path = require 'ext.path'
 local JavaClassData = require 'java.classdata'
-return function(J)
-	-- need to build the jni .c side
-	require 'java.build'.C{
-		src = 'io_github_thenumbernine_NativeCallback.c',
-		dst = 'libio_github_thenumbernine_NativeCallback.so',
-	}
 
+local M = {}
+
+-- find where we are, assume libio_github_thenumbernine_NativeCallback.so is also there
+-- change it later if you can't build in this dir
+M.srcDir = path(package.searchpath('java.nativecallback', package.path)):getdir()
+
+function M:run(J)
 	local newClassName = 'io.github.thenumbernine.NativeCallback'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')
 
@@ -20,7 +25,15 @@ return function(J)
 		return cl
 	end
 
-	local cw = JavaClassData{
+	-- still need to build the jni .c side
+	local srcFp = self.srcDir/'io_github_thenumbernine_NativeCallback.c'
+	local soFp = self.srcDir/'libio_github_thenumbernine_NativeCallback.so'
+	require 'java.build'.C{
+		src = srcFp.path,
+		dst = soFp.path,
+	}
+
+	local classData = JavaClassData{
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,
@@ -56,7 +69,7 @@ return function(J)
 				name = '<clinit>',
 				sig = '()V',
 				code = {
-					{'ldc', 'string', (path:cwd()/'libio_github_thenumbernine_NativeCallback.so').path},
+					{'ldc', 'string', soFp.path},
 					{'invokestatic', 'java/lang/System', 'load','(Ljava/lang/String;)V'},
 					{'return'},
 				},
@@ -72,9 +85,11 @@ return function(J)
 		},
 	}
 
-	local code = cw:compile()
-	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
-	local cl = J:_getClassForJClass(classAsObj._ptr)
+	local cl = J:_defineClass(classData)
 	rawset(cl, '_runMethodName', runMethodName)
 	return cl
 end
+
+return setmetatable(M, {
+	__call = M.run,
+})

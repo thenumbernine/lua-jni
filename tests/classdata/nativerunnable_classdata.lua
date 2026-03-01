@@ -2,7 +2,7 @@
 local path = require 'ext.path'
 local JavaClassData = require 'java.classdata'
 return function(J)
-	local NativeCallback = require 'java.tests.classdata.nativecallback_classdata'(J)
+	local NativeCallback = require 'java.nativecallback'(J)
 
 	local newClassName = 'io.github.thenumbernine.NativeRunnable'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')

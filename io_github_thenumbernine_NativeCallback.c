@@ -1,4 +1,9 @@
-// gcc -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -shared -fPIC -o libio_github_thenumbernine_NativeCallback.so io_github_thenumbernine_NativeCallback.c
+/*
+This is the only entry point required to do the rest of the LuaJIT -> Java -> LuaJIT stuff.
+Maybe somehow I'll modify the symbol table live and then write this at runtime from a LuaJIT closure myself.
+Until then, compile with:
+> gcc -shared -fPIC -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -o libio_github_thenumbernine_NativeCallback.so io_github_thenumbernine_NativeCallback.c
+*/
 #include <jni.h>
 #include <stdio.h>
 

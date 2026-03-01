@@ -101,6 +101,9 @@ local J = jvm.jniEnv
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
 - - ex: `J.java.lang.String` retrieves the JavaClass `java.lang.String`
 
+- `cl = J:_defineClass(javaClassData)` = generate a new class at runtime from a JavaClassData object.
+- `cl = J:_defineClass(bytecode, newClassName)` = same but with bytecode as a Lua string, and new class name.
+
 I put primitives in the root namespace to map to LuaJIT FFI cdata types.
 This way it is consistent that the J.path.to.class matches with whatever the Lua functions expect as input/output.
 And this is so that you can more easily cast your data for calling Java functions using `J.int(x), J.char(y), J.double(z)` etc for correct function overload resolution matching.
@@ -256,8 +259,17 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 ### JavaClassData
 `JavaClassData = require 'java.classdata'`
 
-This is a bytecode reader/writer.  Still WIP.  It is meant to be an equivalent / replacement for Java-ASM.
+- `cl = javaClassData:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
+
+This is a bytecode reader/writer.
+It is meant to be an equivalent / replacement for Java-ASM.
 Lets you write java assembler in text and generate bytecode and run it live, no `javac` needed.
+
+### NativeRunnable
+`NativeRunnable = require 'java.nativerunnable`
+
+This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
+Maybe someday I'll figure out how to modify the symbol table at runtime, and then I'll get rid of this.
 
 <hr>
 

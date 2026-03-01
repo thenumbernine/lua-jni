@@ -933,4 +933,40 @@ assert.eq(true, env._ignoringExceptions)
 	return Name{env=env, name=classpath}
 end
 
+-- _defineClass points to JavaClassData = require 'java.classdata'
+--[[
+'arg' can be a JavaClassData, or a Lua string of bytecode (returned with :compile() above)
+'newClassName' = classname, not necessary if using a JavaClassData to call this.
+--]]
+function JNIEnv:_defineClass(arg, newClassName)
+	local JavaClassData = require 'java.classdata'
+	local code
+	if type(arg) == 'string' then
+		code = arg
+	elseif JavaClassData:isa(arg) then
+		code = arg:compile()
+		newClassName = newClassName or arg.thisClass
+	else
+		error('JavaClassData.defineClass accepts its own objects or Lua strings')
+	end
+
+	newClassName = newClassName:gsub('%.', '/')
+
+	local loader = self.Thread:currentThread():getContextClassLoader()
+	self:_checkExceptions()
+	local jclass = self._ptr[0].DefineClass(
+		self._ptr,
+		newClassName,
+		loader._ptr,
+		code,
+		#code)
+	self:_checkExceptions()
+	-- is DefineClass supposed to throw an exception on failure?
+	-- cuz on Android it's not...
+	if jclass == nil then
+		error("JNI DefineClass failed to load "..tostring(newClassName))
+	end
+	return self:_getClassForJClass(jclass)
+end
+
 return JNIEnv
