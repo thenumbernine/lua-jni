@@ -1,4 +1,5 @@
 -- this is the loader for the io.github.thenumbernine.NativeRunnable class
+-- this expects to be run from the java/tests/javac/ folder
 local assert = require 'ext.assert'
 return function(J)
 	-- build the jni
