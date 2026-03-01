@@ -318,23 +318,29 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/println.lua` is a simple `System.out.println` demo.
 
-`java/tests/*` tests centered around interfacing with the `Test.java` / `Test.class` (that it compiles with `javac`). 
+`java/tests/info/info.lua` shows some `System:getProperties()` of the JVM.
 
-`java/tests/runnable.lua` shows how to create and run a thin wrapper class in `java/tests/io/github/thenumbernine/NativeRunnable.java` to native code in `java/tests/io_github_thenumbernine_NativeRunnable.c` to run your C (or LuaJIT-cloure) callback.
+`java/tests/basic-tests/*.lua` are some basic tests that don't require any external `.class` files.  They are not very organized.
 
-`java/tests/runnable_mt.lua` shows how to use this to run LuaJIT code on a new Java thread, in conjunction with my [`lua lite thread class`](https://github.com/thenumbernine/lua-thread/blob/master/lite.lua).
+`java/tests/test.lua` tests centered around interfacing with the `Test.java` / `Test.class` (that it compiles with `javac`). 
 
-`java/tests/runnable_sam.lua` = Runnable subclass auto-cast from a Single-Abstract-Method subclass auto-generator.
+`java/tests/inheritence/inheritence.lua` tests inheritence properties.  It requires `javac`.
 
-`java/tests/runnable_lua_java.lua` = Runnable subclass auto-cast based on Lua-Java runtime class generation. 
+`java/tests/classdata/runnable.lua` = demonstrates `java.lang.Runnable` using this library's JavaClassData (realtime bytecode assembler).
 
-`java/tests/applet.lua` shows a simple Swing application demo, though it can't do much without subclassing live or with running installed `javac`.
+`java/tests/classdata/runnable_mt.lua` = demonstrates `java.lang.Runnable` and `java.lang.Thread` using this library's JavaClassData and lua-thread's LiteThread.
 
-`java/tests/ffm.lua` uses Java Foreign Function Interface, so I don't need external classes like `io.github.thenumbernine.NativeRunnable` or dependency jars like "ByteBuddy".  Works but sad my Android doesn't support it.
+`java/tests/classdata/applet.lua` = demonstrates Java Swing application example using JavaClassData.
 
-`java/tests/test-java-asm.lua` uses Java-ASM to create classes at runtime to invoke LuaJIT calls, so I don't need external classes (except that last hurdle of loading a class from bytecode within a JNI C app...), but I'd still need external `asm.jar`...
+`java/tests/classdata/javafx.lua` = WIP demo of JavaFX with JavaClassData.
 
-`java/tests/runnable-asm.lua` uses Java-ASM to create a `java.lang.Runnable` subclass at runtime with native `.so` to invoke LuaJIT calls.  It requires no extra Java classes, however it still requires one extra native method compiled in C to forward back to LuaJIT callbacks.
+`java/tests/java-asm/*.lua` = a lot of demos that use Java-ASM for accessing NativeCallback and creating subclasses at runtime and breaking out of the Java reservation. 
+
+`java/tests/javac/*.lua` = a lot of demos that depend on calling `javac` to create classes at runtime.
+
+`java/tests/ffm/*.lua` = a test to use Java FFM (Java's version of FFI) to access LuaJIT callbacks, so no need for NativeCallback and a compiled `.so`/`.dll`.
+
+`java/tests/applet-lambdas/*.lua` = test Swing application but using the JavaLuaClass API to dynamically create a class based on Java-lambdas based on Lua functions at runtime. 
 
 # TODO
 
