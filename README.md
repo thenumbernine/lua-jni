@@ -7,7 +7,7 @@ This library includes...
 - Some Lua-wrapping classes for JavaVM, JNIEnv, etc.
 - `JavaObject`s and `JavaClass`es, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
 - A `JavaClassData`-assembler in LuaJIT.  Create new classes at runtime -- no more `javac` required!
-- Java-native callback and Lua binding layer.  Create new Java classes from Lua functions! 
+- Java-native callback and Lua binding layer.  Create new Java classes from Lua functions!
 
 # Start:
 
@@ -157,7 +157,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `obj = JavaObject._createObjectForClassPath(args)` = helper to create the appropriate Lua wrapper object, with arguments, depending on `args.classpath`.
 
-- `#obj` aka `obj:__len()` 
+- `#obj` aka `obj:__len()`
 - - if it is a `java.lang.String` then this returns the Java string length.
 - - if tt is an array then this return the length.
 - - otherwise it will return the Java field `obj.length` or Java method `obj.length()` depending on which is present.
@@ -232,7 +232,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `ptr` = `jmethodID`
 - - `sig` = signature table, first argument is the return type (default `void`), rest are method arguments.
 - - `nonvirtual` = whether this method call will be nonvirtual or not.  Useful for `super.whatever` in Java which relies on non-polymorphic explicit class calls.
-- - `isVarArgs` = true when `Method.isVarArgs()` is true, means that the call will convert the args into an array before calling. 
+- - `isVarArgs` = true when `Method.isVarArgs()` is true, means that the call will convert the args into an array before calling.
 - - `isStatic` = whether this method is static or not.
 
 - `result = method(...)` = invoke ` call on the method using C API `JNIEnv.Call*Method`.
@@ -314,6 +314,9 @@ Lets you write java assembler in text and generate bytecode and run it live, no 
 `JavaLuaClass = require 'java.luaclass'`
 
 This acts on top of `JavaClassData` to build a translation layer for converting arguments between Lua and Java and closure-capture.
+- Maybe I will slowly merge its features into JavaClassData.
+- Maybe I will introduce JavaDalvikData and make it and JavaClassData interechangeable underneath JavaLuaClass.
+- Maybe I will just make the `.class` versus `.dex` file instruction set interchangeable and then I'll have to rename `JavaClassData` to something like `JavaAsm`.
 
 `NewClass = JavaLuaClass(args)` = build a new `JavaClass` object with methods and constructors from provided Lua functions.
 
@@ -344,7 +347,7 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/basic-tests/*.lua` are some basic tests that don't require any external `.class` files.  They are not very organized.
 
-`java/tests/test.lua` tests centered around interfacing with the `Test.java` / `Test.class` (that it compiles with `javac`). 
+`java/tests/test.lua` tests centered around interfacing with the `Test.java` / `Test.class` (that it compiles with `javac`).
 
 `java/tests/inheritence/inheritence.lua` tests inheritence properties.  It requires `javac`.
 
@@ -356,13 +359,13 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/classdata/javafx.lua` = WIP demo of JavaFX with JavaClassData.
 
-`java/tests/java-asm/*.lua` = a lot of demos that use Java-ASM for accessing NativeCallback and creating subclasses at runtime and breaking out of the Java reservation. 
+`java/tests/java-asm/*.lua` = a lot of demos that use Java-ASM for accessing NativeCallback and creating subclasses at runtime and breaking out of the Java reservation.
 
 `java/tests/javac/*.lua` = a lot of demos that depend on calling `javac` to create classes at runtime.
 
 `java/tests/ffm/*.lua` = a test to use Java FFM (Java's version of FFI) to access LuaJIT callbacks, so no need for NativeCallback and a compiled `.so`/`.dll`.
 
-`java/tests/applet-lambdas/*.lua` = test Swing application but using the JavaLuaClass API to dynamically create a class based on Java-lambdas based on Lua functions at runtime. 
+`java/tests/applet-lambdas/*.lua` = test Swing application but using the JavaLuaClass API to dynamically create a class based on Java-lambdas based on Lua functions at runtime.
 
 # TODO
 
@@ -373,4 +376,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
-- Unify the fields.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ... 
+- Add fields to JavaClass, JavaField, and JavaMethod.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ...
+- make a full `.javasm` parser for JavaClassData.
+- make JavaClassData fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...
