@@ -462,6 +462,11 @@ function JavaClass:_field(args)
 end
 
 function JavaClass:_new(...)
+	-- shorthand for building a class from a Java-lambda equivalent Lua-function
+	if type((...)) == 'function' then
+		return self:_cb(...)
+	end
+
 	local ctors = self._ctors
 	if not ctors or #ctors == 0 then
 		error("can't new, no constructors present for "..self._classpath)
@@ -573,6 +578,42 @@ function JavaClass:__index(k)
 			options = methodsForName,
 		}
 	end
+end
+
+-- build the subclass used for _cb()
+function JavaClass:_cbClass(func)
+	local env = self._env
+
+	local samMethod = self._samMethod
+
+	local parentClass, interfaces
+	if self._isInterface then
+		parentClass = 'java.lang.Object'
+		interfaces = {self._classpath}
+	else
+		parentClass = self._classpath
+	end
+
+	local JavaLuaClass = require 'java.luaclass'
+	local cl = JavaLuaClass{
+		env = env,
+		extends = parentClass,
+		interfaces = interfaces,
+		methods = {
+			{
+				name = samMethod._name,
+				sig = samMethod._sig,
+				func = func,
+			},
+		},
+	}
+
+	return cl
+end
+
+-- build a subclass of "single-abstract-method" class for a Java-lamdba-equivalent for a Lua-function
+function JavaClass:_cb(func, ...)
+	return self:_cbClass(func)(...)
 end
 
 return JavaClass

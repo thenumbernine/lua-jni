@@ -2,7 +2,14 @@
 
 I'm sure this has been done before, but here's my version.
 
-# Quick Start:
+This library includes...
+- LuaJIT binding file for `jni.h`
+- Some Lua-wrapping classes for JavaVM, JNIEnv, etc.
+- `JavaObject`s and `JavaClass`es, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
+- A `JavaClassData`-assembler in LuaJIT.  Create new classes at runtime -- no more `javac` required!
+- Java-native callback and Lua binding layer.  Create new Java classes from Lua functions! 
+
+# Start:
 
 `J = require 'java'`
 
@@ -20,6 +27,12 @@ local jvm = JVM{
 	},
 }
 local J = jvm.jniEnv
+```
+
+From there:
+
+```
+J.System.out:println("hello java")
 ```
 
 # Reference
@@ -160,7 +173,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `ptr` = the `jclass`
 - - `classpath` = the classpath of this class
 
-- `cl:_new(...)` = create a new JavaObject.
+- `cl:_new(...)` = create a new JavaObject.  Arguments are forwarded to the Java constructor.  If the argument is a Lua function then it is forwarded to `cl:_cb(...)`.
 
 - `cl(...)` aka `cl:__call(...)` = shorthand for `cl:_new(...)`
 
@@ -173,6 +186,10 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `cl.class` = equivalent of java code `ClassName.class`, i.e. return the JavaObject jobject instance of a `java.lang.Class` that is associated with this jclass.
 
 - `cl:_class()` = the method underlying `cl.class`.
+
+- `cl:_cb(func)` = for single-abstract-method classes, create a subclass that calls the function and return a `JavaObject` instance of that anonymous subclass.
+
+- `cl:_cbClass(func)` = build a Java subclass of this class with the `_samMethod` overridden.
 
 - `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
 
@@ -259,17 +276,30 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 ### JavaClassData
 `JavaClassData = require 'java.classdata'`
 
-- `cl = javaClassData:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
-
 This is a bytecode reader/writer.
 It is meant to be an equivalent / replacement for Java-ASM.
 Lets you write java assembler in text and generate bytecode and run it live, no `javac` needed.
+
+- `classData = JavaClassData(bytecode)` = build a `JavaClassData` object from a Java `.class` file contents.
+
+- `classData = JavaClassData(args)` = build a `JavaClassData` from a table of properties.
+
+- `bytecode = classData:compile()` = compiles the properties of a `JavaClassData` object into Java bytecode, suitable for a `.class` file.
+
+- `cl = javaClassData:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
 
 ### NativeRunnable
 `NativeRunnable = require 'java.nativerunnable`
 
 This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
 Maybe someday I'll figure out how to modify the symbol table at runtime, and then I'll get rid of this.
+
+### JavaLuaClass
+`JavaLuaClass = require 'java.luaclass'`
+
+This acts on top of `JavaClassData` to build a translation layer for converting arguments between Lua and Java and closure-capture.
+
+`NewClass = JavaLuaClass(args)` = build a new `JavaClass` object with methods and constructors from provided Lua functions.
 
 <hr>
 

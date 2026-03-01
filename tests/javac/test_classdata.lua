@@ -31,7 +31,7 @@ local J = require 'java.vm'{
 	props = {
 		['java.class.path'] = table.concat({
 			'.',
-			'asm-9.9.1.jar',		-- needed for ASM
+			'asm-9.9.1.jar',		-- needed for ASM, for ClassReader, for validating integrity of class
 		}, ':'),
 		['java.library.path'] = '.',
 	},

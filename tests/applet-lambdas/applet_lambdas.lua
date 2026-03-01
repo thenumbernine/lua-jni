@@ -5,8 +5,6 @@ local thread = require 'thread.lite'{
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
 
-	local LuaJavaClass = require 'java.tests.classdata.lua_java_class'	-- include to modify JavaClass (until I implement it in java/class.lua ...)
-
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
 	frame:setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
@@ -39,8 +37,6 @@ local thread = require 'thread.lite'{
 		local buttons = JPanel(GridBagLayout())
 
 		local JButton = J.javax.swing.JButton
-
-		local ffi = require 'ffi'
 		local ActionListener = J.java.awt.event.ActionListener
 
 		local btn1 = JButton'Btn1'
@@ -90,18 +86,11 @@ local thread = require 'thread.lite'{
 ]=],
 }
 
-local J = require 'java.vm'{
-	props = {
-		['java.class.path'] = '.',
-		['java.library.path'] = '.',
-	},
-}.jniEnv
-
+local J = require 'java'
 
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
-local LuaJavaClass = require 'java.tests.classdata.lua_java_class'
 J.javax.swing.SwingUtilities:invokeAndWait(
 	J.Runnable:_cb(thread.funcptr)
 )

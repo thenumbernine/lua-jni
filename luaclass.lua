@@ -95,7 +95,7 @@ args:
 function M:run(args)
 	local J = assert.index(args, 'env')
 
-	local NativeCallback = require 'java.tests.nativecallback'(J)
+	local NativeCallback = require 'java.nativecallback'(J)
 
 	local classname = args.name
 	if not classname then
@@ -318,38 +318,8 @@ function M:run(args)
 		buildLuaWrapperMethod(method)
 	end
 
-	local code = JavaClassData(classDataArgs):compile()
-
-	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, classnameSlashSep)
-	local cl = J:_getClassForJClass(classAsObj._ptr)
-	return cl
+	return J:_defineClass(JavaClassData(classDataArgs))
 end
-
--- [[
--- TODO while we're here, make this default behavior
--- change JavaClass ctor to accept functions, auto-subclass, and return their instances
-function JavaClass:_cb(func)
-	local LuaJavaClassFromSAM = require 'java.tests.classdata.lua_java_class_from_sam'
-	local newsubclass = LuaJavaClassFromSAM{
-		env = self._env,
-		class = self,
-		func = func,
-	}
-	return newsubclass()
-end
-
-local oldJavaClassNew = JavaClass._new
-function JavaClass:_new(...)
-	-- if it's a function then subclass JavaClass and return an instance of the subclass
-	local arg = ...
-	if type(arg) == 'function' then
-		return self:_cb(...)
-	else
-		return oldJavaClassNew(self, ...)
-	end
-end
---]]
 
 return setmetatable(M, {
 	__call = M.run,

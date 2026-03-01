@@ -1,9 +1,9 @@
 -- NativeActionListener using JavaClassData
--- TODO just use SAM? or at least use lua_java_class ... much more concise
+-- TODO just use SAM? or at least use java.luacass ... much more concise
 local path = require 'ext.path'
 local JavaClassData = require 'java.classdata'
 return function(J)
-	local NativeCallback = require 'java.tests.nativecallback'(J)
+	local NativeCallback = require 'java.nativecallback'(J)
 
 	local newClassName = 'io.github.thenumbernine.NativeActionListener'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')
