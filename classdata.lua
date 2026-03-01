@@ -31,6 +31,27 @@ local methodAccessFlags = require 'java.util'.methodAccessFlags
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 
+local function assertIsNumberOrJPrim(value)
+	if not (
+		type(value) == 'number'
+		or (
+			type(value) == 'cdata' 
+			and (
+				ffi.typeof(value) == ffi.typeof'jlong'
+				or ffi.typeof(value) == ffi.typeof'jdouble'
+			)
+		)
+	) then
+		error("I expected a lua number or cdata jlong or jdouble. "
+			..' found type='..type(value)
+			..(type(value) == 'cdata' 
+				and (' typeof='..tostring(ffi.typeof(value)))
+				or ''
+			)
+		)
+	end
+end
+
 local function deepCopy(t)
 	if type(t) ~= 'table' then return t end
 	local t2 = table(t)
@@ -192,9 +213,11 @@ local function instPopConst2(inst, index, cldata)
 	if type(tag) == 'number' then
 		return tag, index
 	elseif tag == 'long' or tag == 'double' then
+		local value = assert.index(inst, index)
+		assertIsNumberOrJPrim(value)
 		return cldata.addConst{
 			tag = tag,
-			value = assert.type(inst[index], 'number'),
+			value = value,
 		}, index+1
 	else
 		error('instPopConst2 with unsupported tag '..tag)
@@ -766,18 +789,18 @@ function JavaClassData:readData(data)
 					const.valueIndex = blob:readu2()
 				elseif tag == 3 then	-- integer
 					const.tag = 'int'
-					const.value = blob:read'int32_t'
+					const.value = blob:read'jint'
 				elseif tag == 4 then	-- float
 					const.tag = 'float'
-					const.value = blob:read'float'
+					const.value = blob:read'jfloat'
 				elseif tag == 5 then	-- long
 					const.tag = 'long'
-					const.value = blob:read'int64_t'
+					const.value = blob:read'jlong'
 					-- "all 8-byte constants take up 2 entries in the const pool ..." wrt their data only, right? no extra tag in there right?
 					skipnext = true
 				elseif tag == 6 then	-- double
 					const.tag = 'double'
-					const.value = blob:read'double'
+					const.value = blob:read'jdouble'
 					skipnext = true
 
 				elseif tag == 12 then	-- nameAndType
@@ -1179,7 +1202,7 @@ function WriteBlob:init()
 	self.data = table()	-- table-of-strings ... TODO luajit string.buffer ?
 end
 function WriteBlob:write(ctype, value)
-	assert.type(value, 'number')	-- or cdata for long?
+	assertIsNumberOrJPrim(value)
 --DEBUG(@5):print('write', #self.data, ctype, value)
 	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
@@ -1605,16 +1628,16 @@ self.constants = constants
 			blob:writeu2(const.valueIndex)
 		elseif const.tag == 'int' then
 			blob:writeu1(3)
-			blob:write('int32_t', const.value)
+			blob:write('jint', const.value)
 		elseif const.tag == 'float' then
 			blob:writeu1(4)
-			blob:write('float', const.value)
+			blob:write('jfloat', const.value)
 		elseif const.tag == 'long' then
 			blob:writeu1(5)
-			blob:write('int64_t', const.value)
+			blob:write('jlong', const.value)
 		elseif const.tag == 'double' then
 			blob:writeu1(6)
-			blob:write('double', const.value)
+			blob:write('jdouble', const.value)
 		elseif const.tag == 'nameAndType' then
 			blob:writeu1(12)
 			blob:writeu2(const.nameIndex)
