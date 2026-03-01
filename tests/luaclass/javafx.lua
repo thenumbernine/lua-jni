@@ -36,13 +36,6 @@ local jvm = require 'java.vm'{
 		['--module-path'] = '/usr/share/openjfx/lib',
 		['--add-modules'] = 'javafx.controls,javafx.fxml',
 	},
-	props = {
-		['java.class.path'] = table.concat({
-			'asm-9.9.1.jar',		-- needed for ASM
-			'.',
-		}, ':'),
-		--['java.library.path'] = '.',
-	}
 }
 local J = jvm.jniEnv
 print('JNIEnv', J._ptr)
