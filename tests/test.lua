@@ -18,6 +18,10 @@ print('java.lang.Class', J:_findClass'java.lang.Class')
 
 --public class Test {
 local Test = J:_findClass'Test'
+if not require 'java.class':isa(Test) then
+	error("failed to find Test.class")
+end
+
 print("Test from J:_findClass'Test'", Test)
 -- J:_findClass returns a JavaClass wrapper to a jclass pointer
 -- so Test._ptr is a ... jobject ... of the class

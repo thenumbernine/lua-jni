@@ -14,13 +14,22 @@ I might as well keep it exploded.
 ...
 Every classname is slash-separated and every signature will be the JNI style.
 If I translated them then I'd have to translate to and from the compiled bytecode, which is too much.
+
+My best attempt at interpreting. ..
+https://docs.oracle.com/javase/specs/jvms/se10/html/jvms-4.html
+https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 --]]
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'
 local path = require 'ext.path'
 local class = require 'ext.class'
-
+local classAccessFlags = require 'java.util'.classAccessFlags
+local nestedClassAccessFlags = require 'java.util'.nestedClassAccessFlags
+local fieldAccessFlags = require 'java.util'.fieldAccessFlags
+local methodAccessFlags = require 'java.util'.methodAccessFlags
+local setFlagsToObj = require 'java.util'.setFlagsToObj 
+local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 
 local function deepCopy(t)
 	if type(t) ~= 'table' then return t end
@@ -193,7 +202,6 @@ local function instPopConst2(inst, index, cldata)
 end
 
 
--- https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 local instDescForOp = {
 	[0x00] = {name='nop'},	-- [No change]	perform no operation
 	[0x01] = {name='aconst_null'},	-- → null	push a null reference onto the stack
@@ -461,7 +469,7 @@ local instDescForOp = {
 		end,
 		write = function(inst, insBlob, cldata)
 			local fieldIndex = instPopField(inst, 2, cldata)
-print('write putfield '..fieldIndex)			
+--DEBUG:print('write putfield '..fieldIndex)			
 			insBlob:writeu2(fieldIndex)
 		end,
 	},
@@ -727,7 +735,7 @@ function JavaClassData:readData(data)
 	local magic = blob:readu4()
 	assert.eq(magic, 0xcafebabe)
 	local version = blob:readu4()
-print(('verison 0x%x'):format(version))
+--DEBUG:print(('version 0x%x'):format(version))
 	-- store version info or nah?
 	local constantCount = blob:readu2()
 	self.constants = table()
@@ -818,7 +826,7 @@ print(('verison 0x%x'):format(version))
 						..' at offset 0x'..bit.tohex(ofs)
 					)
 				end
-print('reading const', i, require 'ext.tolua'(const))				
+--DEBUG:print('reading const', i, require 'ext.tolua'(const))				
 				self.constants:insert(const)
 			else
 				self.constants:insert(false)
@@ -874,20 +882,9 @@ end
 	-- (since constants has out-of-order refs)
 	self.constants = deepCopy(self.constants)
 
-	-- aka "modifiers" ?
-	local function readAccessFlags(t, value)
-		t.isPublic = 0 ~= bit.band(value, 1) or nil
-		t.isFinal = 0 ~= bit.band(value, 0x10) or nil
-		t.isSuper = 0 ~= bit.band(value, 0x20) or nil
-		t.isInterface = 0 ~= bit.band(value, 0x200) or nil
-		t.isAbstract = 0 ~= bit.band(value, 0x400) or nil
-		t.isSynthetic = 0 ~= bit.band(value, 0x1000) or nil
-		t.isAnnotation = 0 ~= bit.band(value, 0x2000) or nil
-		t.isEnum = 0 ~= bit.band(value, 0x4000) or nil
-		t.isModule = 0 ~= bit.band(value, 0x8000) or nil
-	end
+
 	--self.accessFlags = blob:readu2()
-	readAccessFlags(self, blob:readu2())
+	setFlagsToObj(self, blob:readu2(), classAccessFlags)
 
 	self.thisClass = readClassName(self, blob:readu2())
 	self.superClass = readClassName(self, blob:readu2())
@@ -908,7 +905,7 @@ end
 		local field = {}
 
 		--field.accessFlags = blob:readu2()
-		readAccessFlags(field, blob:readu2())
+		setFlagsToObj(field, blob:readu2(), fieldAccessFlags)
 
 		field.name = deepCopyIndex(blob:readu2())
 		field.sig = deepCopyIndex(blob:readu2())
@@ -927,7 +924,7 @@ end
 			field.constantValue = deepCopyIndex(blob:readu2())
 		end)
 		self.fields:insert(field)
-print('reading field', fieldIndex, require 'ext.tolua'(field))	
+--DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))	
 	end
 
 	local methodCount = blob:readu2()
@@ -936,7 +933,7 @@ print('reading field', fieldIndex, require 'ext.tolua'(field))
 		local method = {}
 
 		--method.accessFlags = blob:readu2()
-		readAccessFlags(method, blob:readu2())
+		setFlagsToObj(method, blob:readu2(), methodAccessFlags)
 
 		method.name = deepCopyIndex(blob:readu2())
 		method.sig = deepCopyIndex(blob:readu2())
@@ -950,22 +947,22 @@ print('reading field', fieldIndex, require 'ext.tolua'(field))
 			assert(not readMethodAttr_Code, "got two code attrs")
 			readMethodAttr_Code = true
 
-local methodAttrData = blob.data:sub(blob.ofs+1, blob.ofs+methodAttrLen)
-print('reading method '..methodIndex..' methodAttrData '..#methodAttrData)
-print(require 'ext.string'.hexdump(methodAttrData))
+--DEBUG:local methodAttrData = blob.data:sub(blob.ofs+1, blob.ofs+methodAttrLen)
+--DEBUG:print('reading method '..methodIndex..' methodAttrData '..#methodAttrData)
+--DEBUG:print(require 'ext.string'.hexdump(methodAttrData))
 
 			local code = table()
 			assert(xpcall(function()
 				method.maxStack = blob:readu2()
 				method.maxLocals = blob:readu2()
-print('reading method stack locals', method.maxStack, method.maxLocals)
+--DEBUG:print('reading method stack locals', method.maxStack, method.maxLocals)
 
 				local insnDataLength = blob:readu4()
 				local insnStartOfs = blob.ofs
 				local insnEndOfs = insnStartOfs + insnDataLength 
 				local insBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
-print('reading method '..methodIndex..' insn blob '..#insBlobData)
-print(require 'ext.string'.hexdump(insBlobData))
+--DEBUG:print('reading method '..methodIndex..' insn blob '..#insBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(insBlobData))
 				-- [[
 				while blob.ofs < insnEndOfs do
 					local op = blob:readu1()
@@ -1005,40 +1002,48 @@ print(require 'ext.string'.hexdump(insBlobData))
 				-- code attribute #1 = stack map attribute
 				local readCodeAttr_StackMapTable
 				readAttrs(blob, function(codeAttrName, codeAttrLen)
--- [[ TODO
 					if codeAttrName == 'StackMapTable' then
 						local smAttrData = blob:readString(codeAttrLen)
-						local smAttrBlob = ReadBlob(smAttrData)
 
 						assert(not readCodeAttr_StackMapTable, "expected one stack map attr")
 						readCodeAttr_StackMapTable = true
-
+io.stderr:write'TODO handle StackMapTable\n'
+--[===[ TODO
+						local smAttrBlob = ReadBlob(smAttrData)
 						local stackmap = {}
-print('smAttrData')
-print(require'ext.string'.hexdump(smAttrData))
+--DEBUG:print('smAttrData')
+--DEBUG:print(require'ext.string'.hexdump(smAttrData))
 
 						local numEntries = smAttrBlob:readu2()
-print('stackmap numEntries', numEntries)
-						stackmap.entries = {}
+method.stackMapTableNumEntries = numEntries
+						stackmap.frames = table()
+						
+						-- next comes an implicit frame ...
+						local frame = {}
+						-- it has # locals 'maxLocals' and # stacks 'maxStacks' previously read ...
+						frame.locals = {}
+						stackmap.frames:insert(frame)
+						-- do we init the locals to the args?  including 'this' if its not a static method?
+
+
 						for entryIndex=1,numEntries do
 							local smFrame = {}
 
 							local function readVerificationTypeInfo()
 								local typeinfo = {}
 								typeinfo.tag = smAttrBlob:readu1()
-print('reading verification tag type', typeinfo.tag)							
+--DEBUG:print('reading verification tag type', typeinfo.tag)							
 								if tag == 0 then -- top
 								elseif tag == 1 then -- integer
 								elseif tag == 2 then -- float
 								elseif tag == 5 then -- null
 								elseif tag == 6 then -- uninitialized 'this'
-								elseif tag == 7 then -- object
 								elseif tag == 7 then	-- object
 									typeinfo.value = deepCopyIndex(smAttrBlob:readu2())
-print('reading verification tag value', typeinfo.value)							
+--DEBUG:print('reading verification tag value', typeinfo.value)							
 								elseif tag == 8 then	-- uninitialized
 									typeinfo.offset = smAttrBlob:readu2()
-print('reading verification tag offset', typeinfo.offset)							
+--DEBUG:print('reading verification tag offset', typeinfo.offset)							
 
 								elseif tag == 4	-- long
 								or tag == 5		-- double
@@ -1059,7 +1064,7 @@ print('reading verification tag offset', typeinfo.offset)
 							end
 
 							local frameType = smAttrBlob:readu1()
-print('reading frameType', frameType)
+--DEBUG:print('reading frameType', frameType)
 							smFrame.type = frameType
 							if frameType < 64 then
 								-- "same"
@@ -1068,22 +1073,22 @@ print('reading frameType', frameType)
 								smFrame.stack = readVerificationTypeInfo()
 							elseif frameType < 247 then
 								-- 128-247 = reserved
-print('found reseved stack map frame type', frameType)
+--DEBUG:print('found reseved stack map frame type', frameType)
 							elseif frameType == 247 then
 								-- "locals 1 stack item extended"
 								smFrame.stack = readVerificationTypeInfo()
 							elseif frameType < 251 then
 								-- "chop frame"
 								smFrame.offsetDelta = smAttrBlob:readu2()
-print('reading smFrame offsetDelta', smFrame.offsetDelta)
+--DEBUG:print('reading smFrame offsetDelta', smFrame.offsetDelta)
 							elseif frameType == 251 then
 								-- "same frame extended"
 								smFrame.offsetDelta = smAttrBlob:readu2()
-print('reading smFrame offsetDelta', smFrame.offsetDelta)
+--DEBUG:print('reading smFrame offsetDelta', smFrame.offsetDelta)
 							elseif frameType < 255 then
 								-- "append"
 								smFrame.offsetDelta = smAttrBlob:readu2()
-print('reading smFrame offsetDelta', smFrame.offsetDelta)
+--DEBUG:print('reading smFrame offsetDelta', smFrame.offsetDelta)
 								local numLocals = frameType - 251
 								if numLocals > 0 then
 									smFrame.locals = {}
@@ -1095,9 +1100,9 @@ print('reading smFrame offsetDelta', smFrame.offsetDelta)
 								assert.eq(frameType, 255)
 								-- "full frame"
 								smFrame.offsetDelta = smAttrBlob:readu2()
-print('reading smFrame offsetDelta', smFrame.offsetDelta)
+--DEBUG:print('reading smFrame offsetDelta', smFrame.offsetDelta)
 								local numLocals = smAttrBlob:readu2()
-print('reading smFrame numLocals', numLocals)
+--DEBUG:print('reading smFrame numLocals', numLocals)
 								if numLocals > 0 then
 									smFrame.locals = {}
 									for localIndex=1,numLocals do
@@ -1105,7 +1110,7 @@ print('reading smFrame numLocals', numLocals)
 									end
 								end
 								local numStackItems = smAttrBlob:readu2()
-print('reading smFrame numStackItems', numStackItems)
+--DEBUG:print('reading smFrame numStackItems', numStackItems)
 								if numStackItems > 0 then
 									smFrame.stackItems = {}
 									for stackItemIndex=1,numStackItems do
@@ -1114,10 +1119,11 @@ print('reading smFrame numStackItems', numStackItems)
 								end
 							end
 
-							stackmap.entries[entryIndex] = smFrame
+							stackmap.frames[entryIndex] = smFrame
 						end
 						smAttrBlob:assertDone()
 						method.stackmap = stackmap
+--]===]
 					elseif codeAttrName == 'LineNumberTable' then
 						-- TODO
 						local numLineNos = blob:readu2()
@@ -1131,7 +1137,6 @@ print('reading smFrame numStackItems', numStackItems)
 					else
 						error("code attr not supported yet: "..codeAttrName)
 					end
---]]
 				end)
 
 				method.code = code
@@ -1140,7 +1145,7 @@ print('reading smFrame numStackItems', numStackItems)
 			end))
 		end)
 		self.methods:insert(method)
-print('reading method', methodIndex, require 'ext.tolua'(method))	
+--DEBUG:print('reading method', methodIndex, require 'ext.tolua'(method))	
 	end
 
 	self.attrs = table()
@@ -1424,7 +1429,7 @@ self.constants = constants
 
 	if self.fields then
 		for i,field in ipairs(self.fields) do
-print('writing field', i, require 'ext.tolua'(field))	
+--DEBUG:print('writing field', i, require 'ext.tolua'(field))	
 			field.nameIndex = addConstUnique(field.name)
 			field.name = nil	-- necessary or nah?
 			field.sigIndex = addConstUnique(field.sig)
@@ -1451,7 +1456,7 @@ print('writing field', i, require 'ext.tolua'(field))
 
 	if self.methods then
 		for i,method in ipairs(self.methods) do
-print('writing method', i, require 'ext.tolua'(method))	
+--DEBUG:print('writing method', i, require 'ext.tolua'(method))	
 			method.nameIndex = addConstUnique(method.name)
 			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
@@ -1463,7 +1468,7 @@ print('writing method', i, require 'ext.tolua'(method))
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack)
 				cblob:writeu2(method.maxLocals)
-print('writing method stack locals', method.maxStack, method.maxLocals)
+--DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
 				
 				local insBlob = WriteBlob()
 				for _,inst in ipairs(method.code) do
@@ -1485,8 +1490,8 @@ print('writing method stack locals', method.maxStack, method.maxLocals)
 				end
 
 				local insBlobData = insBlob:compile()
-print('writing method '..i..' insn blob '..#insBlobData)
-print(require 'ext.string'.hexdump(insBlobData))
+--DEBUG:print('writing method '..i..' insn blob '..#insBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(insBlobData))
 				cblob:writeu4(#insBlobData)
 				cblob:writeString(insBlobData)
 
@@ -1516,7 +1521,7 @@ print(require 'ext.string'.hexdump(insBlobData))
 					end
 					codeAttrs:insert{
 						nameIndex = addConstUnique'LineNumberTable',
-						data = attrBlob:compress(),
+						data = attrBlob:compile(),
 					}
 					method.lineNos = nil
 				end
@@ -1526,8 +1531,8 @@ print(require 'ext.string'.hexdump(insBlobData))
 				-- TODO now add method.stackmap as attrs at the end of cblob
 				
 				local codeAttrData = cblob:compile()
-print('writing method '..i..' codeAttrData '..#codeAttrData)
-print(require'ext.string'.hexdump(codeAttrData))
+--DEBUG:print('writing method '..i..' codeAttrData '..#codeAttrData)
+--DEBUG:print(require'ext.string'.hexdump(codeAttrData))
 				method.attrs:insert{
 					nameIndex = addConstUnique'Code',
 					data = codeAttrData,
@@ -1573,7 +1578,7 @@ print(require'ext.string'.hexdump(codeAttrData))
 	-- write out constants
 	blob:writeu2(#constants+1)
 	for i,const in ipairs(constants) do
-print('writing const', i, require 'ext.tolua'(const))				
+--DEBUG:print('writing const', i, require 'ext.tolua'(const))				
 		if const == false then
 			-- skip long/double padding
 		elseif type(const) == 'string' then
@@ -1647,21 +1652,8 @@ print('writing const', i, require 'ext.tolua'(const))
 		end
 	end
 
-	-- opposite of readAccessFlags above
-	local function writeAccessFlags(t)
-		blob:writeu2(bit.bor(
-			t.isPublic and 1 or 0,
-			t.isFinal and 0x10 or 0,
-			t.isSuper and 0x20 or 0,
-			t.isInterface and 0x200 or 0,
-			t.isAbstract and 0x400 or 0,
-			t.isSynthetic and 0x1000 or 0,
-			t.isAnnotation and 0x2000 or 0,
-			t.isEnum and 0x4000 or 0,
-			t.isModule and 0x8000 or 0
-		))
-	end
-	writeAccessFlags(self)
+
+	blob:writeu2(getFlagsFromObj(self, classAccessFlags))
 
 	blob:writeu2(self.thisClassIndex)
 	blob:writeu2(self.superClassIndex)
@@ -1681,8 +1673,8 @@ print('writing const', i, require 'ext.tolua'(const))
 	else
 		blob:writeu2(#self.fields)
 		for i,field in ipairs(self.fields) do
-print('writing field refd', i, require 'ext.tolua'(field))
-			writeAccessFlags(field)
+--DEBUG:print('writing field refd', i, require 'ext.tolua'(field))
+			blob:writeu2(getFlagsFromObj(field, fieldAccessFlags))
 			blob:writeu2(field.nameIndex)
 			blob:writeu2(field.sigIndex)
 			writeAttrs(field.attrs, blob)
@@ -1695,8 +1687,8 @@ print('writing field refd', i, require 'ext.tolua'(field))
 	else
 		blob:writeu2(#self.methods)
 		for i,method in ipairs(self.methods) do
-print('writing method refd', i, require 'ext.tolua'(method))	
-			writeAccessFlags(method)
+--DEBUG:print('writing method refd', i, require 'ext.tolua'(method))	
+			blob:writeu2(getFlagsFromObj(method, methodAccessFlags))
 			blob:writeu2(method.nameIndex)
 			blob:writeu2(method.sigIndex)
 			writeAttrs(method.attrs, blob)

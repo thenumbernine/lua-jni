@@ -120,9 +120,109 @@ local function sigStrToObj(s)
 	return nil --error("sigStrToObj "..tostring(s))
 end
 
+-- general access flags
+-- not used, just a merge of the others
+-- each specific (class, fields, methods) access flags is a specialization / subset of this
+local accessFlags = {
+	isPublic = 0x0001,
+	isPrivate = 0x0002,
+	isProtected = 0x0004,
+	isStatic = 0x0008,
+	isFinal = 0x0010,
+	isSuperOrSynchronized = 0x0020,	-- 'isSuper' for class, 'isSynchronzied' for method
+	isVolatileOrBridge = 0x0040,	-- 'isVolatile' for field, 'isBridge' for method
+	isTransientOrVarArgs = 0x0080,	-- 'isTransient' for field, 'isVarArgs' for method
+	isNative = 0x0100,
+	isInterface = 0x0200,
+	isAbstract = 0x0400,
+	isStrict = 0x0800,
+	isSynthetic = 0x1000,
+	isAnnotation = 0x2000,
+	isEnum = 0x4000,
+	isModule = 0x8000,
+}
+
+local classAccessFlags = {
+	isPublic = 0x0001,
+	isFinal = 0x0010,
+	isSuper = 0x0020,	-- 'isSuper' for class, 'isSynchronzied' for method
+	isInterface = 0x0200,
+	isAbstract = 0x0400,
+	isSynthetic = 0x1000,
+	isAnnotation = 0x2000,
+	isEnum = 0x4000,
+	isModule = 0x8000,
+}
+
+local nestedClassAccessFlags = {
+	isPublic = 0x0001,
+	isPrivate = 0x0002,
+	isProtected = 0x0004,
+	isStatic = 0x0008,
+	isFinal = 0x0010,
+	isInterface = 0x0200,
+	isAbstract = 0x0400,
+	isSynthetic = 0x1000,
+	isAnnotation = 0x2000,
+	isEnum = 0x4000,
+}
+
+
+local fieldAccessFlags = {
+	isPublic = 0x0001,
+	isPrivate = 0x0002,
+	isProtected = 0x0004,
+	isStatic = 0x0008,
+	isFinal = 0x0010,
+	isVolatile = 0x0040,	-- 'isVolatile' for field, 'isBridge' for method
+	isTransient = 0x0080,	-- 'isTransient' for field, 'isVarArgs' for method
+	isSynthetic = 0x1000,
+	isEnum = 0x4000,
+}
+
+local methodAccessFlags = table{
+	isPublic = 0x0001,
+	isPrivate = 0x0002,
+	isProtected = 0x0004,
+	isStatic = 0x0008,
+	isFinal = 0x0010,
+	isSynchronized = 0x0020,	-- 'isSuper' for class, 'isSynchronzied' for method
+	isBridge = 0x0040,	-- 'isVolatile' for field, 'isBridge' for method
+	isVarArgs = 0x0080,	-- 'isTransient' for field, 'isVarArgs' for method
+	isNative = 0x0100,
+	isAbstract = 0x0400,
+	isStrict = 0x0800,
+	isSynthetic = 0x1000,
+}
+
+local function setFlagsToObj(obj, flagsValue, flagsTable)
+	for flagName,value in pairs(flagsTable) do
+		if bit.band(flagsValue, value) ~= 0 then
+			obj[flagName] = true
+		end
+	end
+end
+
+-- opposite of setFlagsToObj above
+local function getFlagsFromObj(t, flagsTable)
+	local flagsValue = 0
+	for flagName,value in pairs(flagsTable) do
+		if t[flagName] then
+			flagsValue = bit.bor(flagsValue, value)
+		end
+	end
+	return flagsValue 
+end
+
 return {
 	prims = prims,
 	infoForPrims = infoForPrims,
 	getJNISig = getJNISig,
 	sigStrToObj = sigStrToObj,
+	classAccessFlags = classAccessFlags,
+	nestedClassAccessFlags = nestedClassAccessFlags,
+	fieldAccessFlags = fieldAccessFlags,
+	methodAccessFlags = methodAccessFlags,
+	setFlagsToObj = setFlagsToObj,
+	getFlagsFromObj = getFlagsFromObj,
 }
