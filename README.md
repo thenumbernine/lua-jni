@@ -251,6 +251,12 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `ar._elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
 - `ar._elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
 
+### JavaClassData
+`JavaClassData = require 'java.classdata'`
+
+This is a bytecode reader/writer.  Still WIP.  It is meant to be an equivalent / replacement for Java-ASM.
+Lets you write java assembler in text and generate bytecode and run it live, no `javac` needed.
+
 <hr>
 
 Also for JNI, JavaClass, and JavaObject (and subclasses JavaString and JavaArray),
