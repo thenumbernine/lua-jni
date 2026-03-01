@@ -974,7 +974,6 @@ end
 			assert(not readFieldAttr_ConstantValue, "got two field attrs")
 			readFieldAttr_ConstantValue = true
 
-			field.attrName = fieldAttrName
 			assert.eq(fieldAttrLen, 2)
 			field.constantValue = deepCopyIndex(blob:readu2())
 		end)
@@ -1489,24 +1488,21 @@ self.constants = constants
 			field.nameIndex = addConstUnique(field.name)
 			field.sigIndex = addConstUnique(field.sig)
 
-			-- convert field.attrName / constantValue into field.attrs[]
+			-- convert field.constantValue into field.attrs[]
 			-- where each attr has {uint16_t name; string data;}
-			if field.attrName then
+			field.attrs = table()
+			if field.constantValue then
 				local attrBlob = WriteBlob()
 				attrBlob:writeu2(addConst(field.constantValue))
 
-				field.attrs = {
-					{
-						nameIndex = addConstUnique(field.attrName),
-						data = attrBlob:compile(),
-					},
+				field.attrs:insert{
+					nameIndex = addConstUnique'ConstantValue',
+					data = attrBlob:compile(),
 				}
-
 			end
 
 			--field.name = nil	-- necessary to clear or nah?
 			--field.sig = nil
-			--field.attrName = nil
 			--field.constantValue = nil
 		end
 	end

@@ -283,6 +283,28 @@ Lets you write java assembler in text and generate bytecode and run it live, no 
 - `classData = JavaClassData(bytecode)` = build a `JavaClassData` object from a Java `.class` file contents.
 
 - `classData = JavaClassData(args)` = build a `JavaClassData` from a table of properties.
+- args:
+- - `isPublic` etc `classAccessFlags` found in `java/util.lua`
+- - `thisClass` = slash-separated name of this class.
+- - `superClass` = slash-separated name of parent class.
+- - `interfaces` = list of slash-separated names of interface classes.
+- - `fields = {...}`
+- - - `isPublic` etc `fieldAccessFlags` found in `java/util.lua`
+- - - `name` = field name
+- - - `sig` = field signature
+- - - `constantValue` = optional field constant initialization value.
+- - `methods = {...}`
+- - - `isPublic` etc `methodAccessFlags` found in `java/util.lua`
+- - - `name` = method name
+- - - `sig` = method signature
+- - - `maxLocals`
+- - - `maxStack`
+- - - `code` = optional, method code.
+		If a table then a list of instructions.  Each instruction itself is a list, where the first is the instruction name and the rest are arguments.
+		If a string then this is parsed by line and space-separator, with semicolon (;) as comments.
+- - - `lineNos` = optional
+- - - `attrs = {...}` = optional method attributes.
+- - `attrs = {...}` = optional class attributes.
 
 - `bytecode = classData:compile()` = compiles the properties of a `JavaClassData` object into Java bytecode, suitable for a `.class` file.
 
