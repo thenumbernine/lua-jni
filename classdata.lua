@@ -22,8 +22,10 @@ https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'
+local string = require 'ext.string'
 local path = require 'ext.path'
 local class = require 'ext.class'
+local fromlua = require 'ext.fromlua'
 local classAccessFlags = require 'java.util'.classAccessFlags
 local nestedClassAccessFlags = require 'java.util'.nestedClassAccessFlags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
@@ -31,25 +33,31 @@ local methodAccessFlags = require 'java.util'.methodAccessFlags
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 
-local function assertIsNumberOrJPrim(value)
-	if not (
-		type(value) == 'number'
-		or (
-			type(value) == 'cdata' 
-			and (
-				ffi.typeof(value) == ffi.typeof'jlong'
-				or ffi.typeof(value) == ffi.typeof'jdouble'
-			)
-		)
-	) then
-		error("I expected a lua number or cdata jlong or jdouble. "
-			..' found type='..type(value)
-			..(type(value) == 'cdata' 
-				and (' typeof='..tostring(ffi.typeof(value)))
-				or ''
-			)
-		)
+local function castToNumberOrJPrim(value)
+	if type(value) == 'number' then
+		return value
 	end
+	if type(value) == 'cdata' then
+		-- TODO rest of prims?
+		-- though a few will get default cast to lua number anyways ...
+		if ffi.typeof(value) == ffi.typeof'jlong'
+		or ffi.typeof(value) == ffi.typeof'jdouble'
+		then
+			return value
+		end
+	end
+	if type(value) == 'string' then
+		return assert(fromlua(value))
+	end
+
+	error("I expected a lua number or cdata jlong or jdouble. "
+		..' found type='..type(value)
+		..(type(value) == 'cdata'
+			and (' typeof='..tostring(ffi.typeof(value)))
+			or ''
+		)
+		..' value='..tostring(value)
+	)
 end
 
 local function deepCopy(t)
@@ -214,7 +222,7 @@ local function instPopConst2(inst, index, cldata)
 		return tag, index
 	elseif tag == 'long' or tag == 'double' then
 		local value = assert.index(inst, index)
-		assertIsNumberOrJPrim(value)
+		value = castToNumberOrJPrim(value)
 		return cldata.addConst{
 			tag = tag,
 			value = value,
@@ -654,6 +662,9 @@ end)
 
 local JavaClassData = class()
 JavaClassData.__name = 'JavaClassData'
+
+-- ; is a popular asm comment syntax, right?
+JavaClassData.lineComment = ';'
 
 function JavaClassData:init(args)
 	if type(args) == 'string' then
@@ -1202,7 +1213,7 @@ function WriteBlob:init()
 	self.data = table()	-- table-of-strings ... TODO luajit string.buffer ?
 end
 function WriteBlob:write(ctype, value)
-	assertIsNumberOrJPrim(value)
+	value = castToNumberOrJPrim(value)
 --DEBUG(@5):print('write', #self.data, ctype, value)
 	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
@@ -1442,7 +1453,7 @@ self.constants = constants
 	-- collect class constants
 	self.thisClassIndex = addConstClass((assert.type(assert.index(self, 'thisClass'), 'string')))
 	self.superClassIndex = addConstClass((assert.type(assert.index(self, 'superClass'), 'string')))
---	self.thisClass = nil
+--	self.thisClass = nil	-- necessary to clear or nah?
 --	self.superClass = nil
 
 	if self.interfaces then
@@ -1456,8 +1467,6 @@ self.constants = constants
 --DEBUG:print('writing field', i, require 'ext.tolua'(field))
 			field.nameIndex = addConstUnique(field.name)
 			field.sigIndex = addConstUnique(field.sig)
-			field.name = nil	-- necessary or nah?
-			field.sig = nil
 
 			-- convert field.attrName / constantValue into field.attrs[]
 			-- where each attr has {uint16_t name; string data;}
@@ -1472,9 +1481,12 @@ self.constants = constants
 					},
 				}
 
-				field.attrName = nil
-				field.constantValue = nil
 			end
+
+			--field.name = nil	-- necessary to clear or nah?
+			--field.sig = nil
+			--field.attrName = nil
+			--field.constantValue = nil
 		end
 	end
 
@@ -1482,20 +1494,35 @@ self.constants = constants
 		for i,method in ipairs(self.methods) do
 --DEBUG:print('writing method', i, require 'ext.tolua'(method))
 			method.nameIndex = addConstUnique(method.name)
-			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
-			method.sig = nil
 
 			method.attrs = table()
 
 			if method.code then
+				local srcCode = method.code	-- haha, "source-code", get it? ...
+
+				if type(srcCode) == 'string' then
+					-- argument validation:
+					-- do this here or upon ctor?
+					srcCode = string.split(string.trim(srcCode), '\n')
+						:mapi(function(line)
+							return string.trim(line)
+						end)
+						:filteri(function(line)
+							return line:sub(1, #self.lineComment) ~= self.lineComment
+						end)
+						:mapi(function(line)
+							return string.split(line, '%s+')
+						end)
+				end
+
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack or 0)
 				cblob:writeu2(method.maxLocals or 0)
 --DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
 
 				local insBlob = WriteBlob()
-				for _,inst in ipairs(method.code) do
+				for _,inst in ipairs(srcCode) do
 					local op = assert.index(opForInstName, inst[1])
 					insBlob:writeu1(op)
 					local instDesc = assert.index(instDescForOp, op)
@@ -1547,7 +1574,6 @@ self.constants = constants
 						nameIndex = addConstUnique'LineNumberTable',
 						data = attrBlob:compile(),
 					}
-					method.lineNos = nil
 				end
 
 				writeAttrs(codeAttrs, cblob)
@@ -1561,16 +1587,21 @@ self.constants = constants
 					nameIndex = addConstUnique'Code',
 					data = codeAttrData,
 				}
-
-				-- fields for code
-				method.code = nil
-				method.maxStack = nil
-				method.maxLocals = nil
-				method.exceptions = nil
 			end
 
+			-- necessary to clear or nah?
 
-			method.name = nil
+			--for LineNumberTable:
+			--method.lineNos = nil
+
+			-- Code
+			--method.code = nil
+			--method.maxStack = nil
+			--method.maxLocals = nil
+			--method.exceptions = nil
+
+			--method.name = nil
+			--method.sig = nil
 		end
 	end
 
@@ -1588,8 +1619,9 @@ self.constants = constants
 
 			-- TODO index fields
 			attr.nameIndex = addConstUnique(attr.name)
-			attr.name = nil
 			assert.index(attr, 'data')
+
+			--attr.name = nil
 		end
 	end
 

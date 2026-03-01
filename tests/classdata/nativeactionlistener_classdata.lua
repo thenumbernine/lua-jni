@@ -31,34 +31,33 @@ return function(J)
 				isPublic=true,
 				name='<init>',
 				sig='(J)V',
-				code={
-					{'aload_0'},
-					{'invokespecial', 'java/lang/Object', '<init>', '()V'},
-					{'aload_0'},
-					{'lload_1'},
-					{'putfield', newClassNameSlashSep, 'funcptr', 'J'},
-					{'return'},
-				},
 				maxLocals=3,
 				maxStack=3,
+				code = [[
+aload_0
+invokespecial java/lang/Object <init> ()V
+aload_0
+lload_1
+putfield ]]..newClassNameSlashSep..[[ funcptr J
+return
+]],
 			},
 			{
 				isPublic=true,
 				name='actionPerformed',
 				sig='(Ljava/awt/event/ActionEvent;)V',
-				code={
-					{'aload_0'},
-					{'getfield', newClassNameSlashSep, 'funcptr', 'J'},
-					{'aload_1'},
-					{'invokestatic',
-						NativeCallback._classpath:gsub('%.', '/'),
-						assert(NativeCallback._runMethodName),
-						'(JLjava/lang/Object;)Ljava/lang/Object;'},
-					{'pop'},
-					{'return'},
-				},
 				maxLocals=2,
 				maxStack=3,
+				code = [[
+aload_0
+getfield ]]..newClassNameSlashSep..[[ funcptr J
+aload_1
+invokestatic ]]..NativeCallback._classpath:gsub('%.', '/')
+	..' '..assert(NativeCallback._runMethodName)
+	..[[ (JLjava/lang/Object;)Ljava/lang/Object;
+pop
+return
+]],				
 			}
 		},
 	}

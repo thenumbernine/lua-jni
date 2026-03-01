@@ -35,80 +35,58 @@ return function(J)
 				isPublic=true,
 				name='<init>',
 				sig='(J)V',
-				code={
-					{'aload_0'},
-					{'invokespecial', 'java/lang/Object', '<init>', '()V'},
-					{'aload_0'},
-					{'lload_1'},
-					{'putfield', newClassNameSlashSep, 'funcptr', 'J'},
-					{'return'},
-				},
-				--[[
-				lineNos={
-					{lineNo=7, startPC=0},
-					{lineNo=8, startPC=4},
-					{lineNo=9, startPC=9},
-				},
-				--]]
 				maxLocals=3,
 				maxStack=3,
+				code = [[
+aload_0
+invokespecial java/lang/Object <init> ()V
+aload_0
+lload_1
+putfield ]]..newClassNameSlashSep..[[ funcptr J
+return
+]],
 			},
 			{
 				isPublic=true,
 				name='<init>',
 				sig='(JLjava/lang/Object;)V',
-				code={
-					{'aload_0'},
-					{'invokespecial', 'java/lang/Object', '<init>', '()V'},
-					{'aload_0'},
-					{'lload_1'},
-					{'putfield', newClassNameSlashSep, 'funcptr', 'J'},
-					{'aload_0'},
-					{'aload_3'},
-					{'putfield', newClassNameSlashSep, 'arg', 'Ljava/lang/Object;'},
-					{'return'},
-				},
-				--[[
-				lineNos={
-					{lineNo=11, startPC=0},
-					{lineNo=12, startPC=4},
-					{lineNo=13, startPC=9},
-					{lineNo=14, startPC=14},
-				},
-				--]]
 				maxLocals=4,
 				maxStack=3,
+				code = [[
+aload_0
+invokespecial java/lang/Object <init> ()V
+aload_0
+lload_1
+putfield ]]..newClassNameSlashSep..[[ funcptr J
+aload_0
+aload_3
+putfield ]]..newClassNameSlashSep..[[ arg Ljava/lang/Object;
+return
+]],
 			},
 			{
 				isPublic=true,
 				name='run',
 				sig='()V',
-				code={
-					{'aload_0'},
-					{'getfield', newClassNameSlashSep, 'funcptr', 'J'},
-					{'aload_0'},
-					{'getfield', newClassNameSlashSep, 'arg', 'Ljava/lang/Object;'},
-					{'invokestatic',
-						NativeCallback._classpath:gsub('%.', '/'),
-						assert(NativeCallback._runMethodName),
-						'(JLjava/lang/Object;)Ljava/lang/Object;'},
-					{'pop'},
-					{'return'},
-				},
-				--[[
-				lineNos={
-					{lineNo=18, startPC=0},
-					{lineNo=19, startPC=12},
-				},
-				--]]
 				maxLocals=1,
 				maxStack=3,
-			}
+				code = [[
+aload_0
+getfield ]]..newClassNameSlashSep..[[ funcptr J
+aload_0
+getfield ]]..newClassNameSlashSep..[[ arg Ljava/lang/Object;
+invokestatic ]]..NativeCallback._classpath:gsub('%.', '/')
+..' '..assert(NativeCallback._runMethodName)
+..[[ (JLjava/lang/Object;)Ljava/lang/Object;
+pop
+return
+]],
+			},
 		},
 	}
 
-	local code = cw:compile()
-	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
+	local classByteCode = cw:compile()
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, classByteCode, newClassName)
 	local cl = J:_getClassForJClass(classAsObj._ptr)
 	return cl
 end

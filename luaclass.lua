@@ -298,20 +298,20 @@ function M:run(args)
 
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
-		local code = table()
-		local classDataMethod = {
+		classDataArgs.methods:insert{
 			isPublic = true,
 			name = '<init>',
 			sig = '()V',
-			code = code,
 			maxStack = 3,
 			maxLocals = 1,
+
+			-- provide a default ctor, no need for closure or callback
+			code = [[
+aload 0
+invokespecial ]]..parentClassSlashSep..[[ <init> ()V
+return
+]],
 		}
-		classDataArgs.methods:insert(classDataMethod)
-		-- provide a default ctor, no need for closure or callback
-		code:insert{'aload', 0}
-		code:insert{'invokespecial', parentClassSlashSep, '<init>', '()V'}
-		code:insert{'return'}
 	else
 		for _,ctor in ipairs(args.ctors) do
 			ctor.name = '<init>'
