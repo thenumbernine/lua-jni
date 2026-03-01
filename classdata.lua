@@ -1573,7 +1573,7 @@ self.constants = constants
 	-- table-of-strings that I concat() at the end
 	local blob = WriteBlob()
 	blob:writeu4(0xcafebabe)
-	blob:writeu4(0x41)		-- version
+	blob:writeu4(self.version or 0x41)		-- version
 
 	-- write out constants
 	blob:writeu2(#constants+1)

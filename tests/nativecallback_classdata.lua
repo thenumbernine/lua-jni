@@ -1,7 +1,8 @@
 --[[
 nativecallback but using JavaClassData instead of Java-ASM
 --]]
-local JavaClassData = require 'java.clasdata'
+local path = require 'ext.path'
+local JavaClassData = require 'java.classdata'
 return function(J)
 	-- need to build the jni .c side
 	require 'java.build'.C{
@@ -21,10 +22,34 @@ return function(J)
 	local cw = JavaClassData{
 		version = 0x41,
 		isPublic = true,
-		thisClass = newClassNameSlashSep,
 		isSuper = true,	-- "Treat superclass methods specially when invoked by the invokespecial instruction."
+		thisClass = newClassNameSlashSep,
 		superClass = 'java/lang/Object',
 		methods = {
+			{	-- needs a ctor? even though it's never used?
+				isPublic = true,
+				name = '<init>',
+				sig = '()V',
+				code = {
+					{"aload_0"},
+					{"invokespecial", "java/lang/Object", "<init>", "()V"},
+					{"return"}
+				},
+				maxLocals = 1,
+				maxStack = 1,
+				-- [[ necessary?
+				lineNos={
+					{lineNo=3, startPC=0}
+				},
+				--]]
+			},
+			{
+				isNative = true,
+				isPublic = true,
+				isStatic = true,
+				name = runMethodName,
+				sig = '(JLjava/lang/Object;)Ljava/lang/Object;',
+			},
 			{
 				isStatic = true,
 				name = '<clinit>',
@@ -34,13 +59,14 @@ return function(J)
 					{'invokestatic', 'java/lang/System', 'load','(Ljava/lang/String;)V'},
 					{'return'},
 				},
-			},
-			{
-				isNative = true,
-				isPublic = true,
-				isStatic = true,
-				name = runMethodName,
-				sig = '(JLjava/lang/Object;)Ljava/lang/Object;',
+				maxLocals = 0,
+				maxStack = 1,
+				-- [[ necessary?
+				lineNos={
+					{lineNo=5, startPC=0},
+					{lineNo=6, startPC=5}
+				},
+				--]]
 			},
 		},
 	}

@@ -8,13 +8,23 @@ local string = require 'ext.string'
 local JavaClassData = require 'java.classdata'
 
 
-local TestClassPath = path'Test.class'
+--[[
+local srcClassPath = path'Test.class'
+srcClassPath:remove()
+--]]
+--[[
+local srcClassPath = path'io/github/thenumbernine/NativeCallback.class'
+--]]
+-- [[
+local srcClassPath = path'io/github/thenumbernine/NativeRunnable.class'
+--]]
+
 -- make sure it's built from the original
-TestClassPath:remove()
 require 'java.build'.java{
-	dst = 'Test.class',
-	src = 'Test.java',
+	dst = srcClassPath.path,
+	src = srcClassPath:setext'java',
 }
+
 
 -- validate it with java-asm
 local J = require 'java.vm'{
@@ -32,7 +42,7 @@ assert(require 'java.class':isa(ClassReader), "JRE isn't finding ASM")
 local function validate()
 	print'BEGIN VALIDATION'
 	io.stdout:flush()	-- java stdout/sterr flush issues as always
-	local bytes = assert(TestClassPath:read())
+	local bytes = assert(srcClassPath:read())
 	local jbytes = J:_newArray('byte', #bytes)
 	local ptr = jbytes:_map()
 	local ffi = require 'ffi'
@@ -48,7 +58,7 @@ end
 
 validate()
 
-local classFileData = assert(TestClassPath:read())
+local classFileData = assert(srcClassPath:read())
 
 print('original:')
 print(string.hexdump(classFileData, 16))
@@ -78,12 +88,14 @@ print(string.hexdump(bytes2, 16))
 assert.eq(bytes, bytes2)
 
 -- write our new
-TestClassPath:write(bytes)
+-- overwrite it
+-- I'd keep it separate but meh, it's java, it wants the classname to match the filename
+srcClassPath:write(bytes)
 validate()
 --]=] 
 
 -- stdout / stderr flush issues, when piping even >&1 it is out of order 
---os.exec'javap Test.class'
+--os.exec('javap '..srcClassPath)
 
 
 print'DONE'
