@@ -245,6 +245,8 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `data = ar:_map()` = get a pointer to the raw Java data.  Only works for primitives.
 - `ar:_unmap(data)` = release a pointer got from `ar:_map()`.
 
+- `ar:_toStr()` = convert the Java array to a Lua string.
+
 - `x0, x1, x2, ... = ar:_unpack()` = unpacks and returns all elements of the array.
 
 - `ar._elemFFIType` = for primitives, LuaJIT FFI ctype of the JNI primitive type.

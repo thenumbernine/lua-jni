@@ -12,22 +12,15 @@ local M = {}
 --return function(J, code, newClassName)
 
 M.JNIDefineClass = function(J, code, newClassName)
+	newClassName = newClassName:gsub('%.', '/')
 	local loader = J.Thread:currentThread():getContextClassLoader()
-	local codeptr = code:_map()
 	J:_checkExceptions()
-	local jclass = J._ptr[0].DefineClass(
-		J._ptr,
-		newClassName,
-		loader._ptr,
-		codeptr,
-		#code
-	)
+	local jclass = J._ptr[0].DefineClass(J._ptr, newClassName, loader._ptr, code, #code)
 	J:_checkExceptions()	-- is DefineClass supposed to throw an exception on failure?
 	-- cuz on Android it's not...
 	if jclass == nil then
 		error("JNI DefineClass failed to load "..tostring(newClassName))
 	end
-	code:_unmap(codeptr)
 	return J:_getClassForJClass(jclass)
 end
 
@@ -99,14 +92,11 @@ M.URIClassLoader = function(J, code, newClassName)
 assert(not newClassName:find'%.', "class should be /-separated")
 	local ffi = require 'ffi'
 	local path = require 'ext.path'
-	do	-- TODO put this in the java lua api?
-		-- either a convert-to-C function or even a get-raw-access function (that needs to be manually released...)
-		local codeptr = J._ptr[0].GetByteArrayElements(J._ptr, code._ptr, nil)
+	do
 		local fp = path(newClassName..'.class')
 --DEBUG:print('writing to', fp)
 		fp:getdir():mkdir(true)
-		assert(fp:write(ffi.string(codeptr, #code)))
-		J._ptr[0].ReleaseByteArrayElements(J._ptr, code._ptr, codeptr, 0)
+		assert(fp:write(code))
 	end
 	local urls = J:_newArray(J.java.net.URL, 1, J.java.net.URL(J:_str('file://'..path:cwd())))
 	local loader = J.java.net.URLClassLoader(urls)

@@ -129,7 +129,7 @@ do
 	run:visitMaxs(0, 0)
 	run:visitEnd()
 
-	local classObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray(), classname)
+	local classObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray():_toStr(), classname)
 	ThisApplication = J:_getClassForJClass(classObj._ptr)
 end
 

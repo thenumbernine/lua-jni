@@ -15,7 +15,10 @@ return function(J)
 
 	-- check if it's already loaded
 	local cl = J:_findClass(newClassName)
-	if cl then return cl end
+	if cl then
+rawset(cl, '_runMethodName', runMethodName)
+		return cl
+	end
 
 	local runMethodName = 'run'
 
@@ -55,7 +58,7 @@ return function(J)
 				name = '<clinit>',
 				sig = '()V',
 				code = {
-					{'ldc', (path:cwd()/'libio_github_thenumbernine_NativeCallback.so').path},
+					{'ldc', 'string', (path:cwd()/'libio_github_thenumbernine_NativeCallback.so').path},
 					{'invokestatic', 'java/lang/System', 'load','(Ljava/lang/String;)V'},
 					{'return'},
 				},

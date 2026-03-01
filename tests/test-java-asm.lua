@@ -66,9 +66,8 @@ mv:visitEnd()
 --}
 cw:visitEnd()
 
-local code = cw:toByteArray()
 local helloWorldClass = require 'java.tests.bytecodetoclass'
-	.URIClassLoader(J, code, newClassName)
+	.URIClassLoader(J, cw:toByteArray():_toStr(), newClassName)
 helloWorldClass
 	:getMethod('main', J.String.class:arrayType())
 	:invoke(nil, J:_newArray(J.String, 0))

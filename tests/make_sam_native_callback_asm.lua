@@ -1,7 +1,6 @@
 --[[
 as the name says:
 this makes a subclass of a SAM interface (or abstract class)
-using Java-ASM
 and redirects the contents of the SAM function to io.github.thenumbernine.NativeCallback
 --]]
 local JavaClass = require 'java.class'
@@ -17,6 +16,13 @@ local infoForPrims = require 'java.util'.infoForPrims
 return function(J, samClass)
 	assert(JavaClass:isa(samClass), "expected samClass to be a JavaClass")
 
+	--[[ using java-asm
+	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+	--]]
+	-- [[ using java.classdata
+	local NativeCallback = require 'java.tests.nativecallback_classdata'(J)
+	--]]
+
 	local samMethod = samClass._samMethod
 	local samClassSlashSep = samClass._classpath:gsub('%.', '/')
 
@@ -27,8 +33,6 @@ return function(J, samClass)
 	local interfaces = samClass._isInterface
 		and J:_newArray(J.String, 1, J:_str(samClassSlashSep))
 		or nil
-
-	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(JavaClass:isa(ClassWriter), "JRE isn't finding ASM")
@@ -149,10 +153,8 @@ return function(J, samClass)
 	--}
 	cw:visitEnd()
 
-	local code = cw:toByteArray()
-
 	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray():_toStr(), newClassName)
 
 	local cl = J:_getClassForJClass(classAsObj._ptr)
 	-- 'cl' is a JavaClass instance

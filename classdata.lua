@@ -28,7 +28,7 @@ local classAccessFlags = require 'java.util'.classAccessFlags
 local nestedClassAccessFlags = require 'java.util'.nestedClassAccessFlags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
-local setFlagsToObj = require 'java.util'.setFlagsToObj 
+local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 
 local function deepCopy(t)
@@ -130,7 +130,7 @@ local function instPushConst(inst, insBlob, cldata, constIndex)
 			inst:insert(const.tag)
 			inst:insert(const.value)
 		else
-			error'here'
+			error('instPushConst with unsupported tag '..const.tag)
 		end
 	end
 end
@@ -165,7 +165,7 @@ local function instPopConst(inst, index, cldata)
 			value = inst[index],
 		}, index+1
 	else
-		error'here'
+		error('instPopConst with unsupported tag '..tag)
 	end
 end
 
@@ -183,7 +183,7 @@ local function instPushConst2(inst, insBlob, cldata, constIndex)
 			inst:insert(const.tag)
 			inst:insert(const.value)	-- forcing serialization to use a dot would be nice ...
 		else
-			error'here'
+			error('instPushConst2 with unsupported tag '..const.tag)
 		end
 	end
 end
@@ -197,7 +197,7 @@ local function instPopConst2(inst, index, cldata)
 			value = assert.type(inst[index], 'number'),
 		}, index+1
 	else
-		error'here'
+		error('instPopConst2 with unsupported tag '..tag)
 	end
 end
 
@@ -469,7 +469,7 @@ local instDescForOp = {
 		end,
 		write = function(inst, insBlob, cldata)
 			local fieldIndex = instPopField(inst, 2, cldata)
---DEBUG:print('write putfield '..fieldIndex)			
+--DEBUG:print('write putfield '..fieldIndex)
 			insBlob:writeu2(fieldIndex)
 		end,
 	},
@@ -682,7 +682,7 @@ function ReadBlob:read(ctype)
 		result = tmp[0]
 	end
 	self.ofs = self.ofs + size
---DEBUG(@5):print('read', self.ofs, ctype, result)	
+--DEBUG(@5):print('read', self.ofs, ctype, result)
 	return result
 end
 function ReadBlob:readString(size)
@@ -691,7 +691,7 @@ function ReadBlob:readString(size)
 	end
 	local result = ffi.string(self.ptr + self.ofs, size)
 	self.ofs = self.ofs + size
---DEBUG(@5):print('readstring', self.ofs, result)	
+--DEBUG(@5):print('readstring', self.ofs, result)
 	return result
 end
 function ReadBlob:readBlob(size)
@@ -712,12 +712,12 @@ function JavaClassData:readData(data)
 		return deepCopy(assert.index(self.constants, index))
 	end
 
-	--[[ 
+	--[[
 	this uses deepCopyIndex on name
 	but does so only after self.constants is deep-copied
 	also assets the name is a string.
 	this reads the length but then leaves it up to the callback to read the proper data
-	--]]	
+	--]]
 	local function readAttrs(b, callback)
 		local attrCount = b:readu2()
 		if attrCount == 0 then return end
@@ -826,7 +826,7 @@ function JavaClassData:readData(data)
 						..' at offset 0x'..bit.tohex(ofs)
 					)
 				end
---DEBUG:print('reading const', i, require 'ext.tolua'(const))				
+--DEBUG:print('reading const', i, require 'ext.tolua'(const))
 				self.constants:insert(const)
 			else
 				self.constants:insert(false)
@@ -918,13 +918,13 @@ end
 
 			assert(not readFieldAttr_ConstantValue, "got two field attrs")
 			readFieldAttr_ConstantValue = true
-		
+
 			field.attrName = fieldAttrName
 			assert.eq(fieldAttrLen, 2)
 			field.constantValue = deepCopyIndex(blob:readu2())
 		end)
 		self.fields:insert(field)
---DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))	
+--DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))
 	end
 
 	local methodCount = blob:readu2()
@@ -939,7 +939,7 @@ end
 		method.sig = deepCopyIndex(blob:readu2())
 
 		-- method attribute #1 = code attribute
-		local readMethodAttr_Code 
+		local readMethodAttr_Code
 		readAttrs(blob, function(methodAttrName, methodAttrLen)
 			if methodAttrName ~= 'Code' then
 				error("method attr not supported yet: "..methodAttrName)
@@ -959,7 +959,7 @@ end
 
 				local insnDataLength = blob:readu4()
 				local insnStartOfs = blob.ofs
-				local insnEndOfs = insnStartOfs + insnDataLength 
+				local insnEndOfs = insnStartOfs + insnDataLength
 				local insBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
 --DEBUG:print('reading method '..methodIndex..' insn blob '..#insBlobData)
 --DEBUG:print(require 'ext.string'.hexdump(insBlobData))
@@ -978,7 +978,7 @@ end
 						elseif type(argDesc) == 'function' then
 							argDesc(inst, blob, self)
 						else
-							error'here'
+							error('got unknown inst.args '..type(argDesc))
 						end
 					end
 					code:insert(inst)
@@ -1017,7 +1017,7 @@ io.stderr:write'TODO handle StackMapTable\n'
 						local numEntries = smAttrBlob:readu2()
 method.stackMapTableNumEntries = numEntries
 						stackmap.frames = table()
-						
+
 						-- next comes an implicit frame ...
 						local frame = {}
 						-- it has # locals 'maxLocals' and # stacks 'maxStacks' previously read ...
@@ -1032,7 +1032,7 @@ method.stackMapTableNumEntries = numEntries
 							local function readVerificationTypeInfo()
 								local typeinfo = {}
 								typeinfo.tag = smAttrBlob:readu1()
---DEBUG:print('reading verification tag type', typeinfo.tag)							
+--DEBUG:print('reading verification tag type', typeinfo.tag)
 								if tag == 0 then -- top
 								elseif tag == 1 then -- integer
 								elseif tag == 2 then -- float
@@ -1040,10 +1040,10 @@ method.stackMapTableNumEntries = numEntries
 								elseif tag == 6 then -- uninitialized 'this'
 								elseif tag == 7 then	-- object
 									typeinfo.value = deepCopyIndex(smAttrBlob:readu2())
---DEBUG:print('reading verification tag value', typeinfo.value)							
+--DEBUG:print('reading verification tag value', typeinfo.value)
 								elseif tag == 8 then	-- uninitialized
 									typeinfo.offset = smAttrBlob:readu2()
---DEBUG:print('reading verification tag offset', typeinfo.offset)							
+--DEBUG:print('reading verification tag offset', typeinfo.offset)
 
 								elseif tag == 4	-- long
 								or tag == 5		-- double
@@ -1145,7 +1145,7 @@ method.stackMapTableNumEntries = numEntries
 			end))
 		end)
 		self.methods:insert(method)
---DEBUG:print('reading method', methodIndex, require 'ext.tolua'(method))	
+--DEBUG:print('reading method', methodIndex, require 'ext.tolua'(method))
 	end
 
 	self.attrs = table()
@@ -1180,7 +1180,7 @@ function WriteBlob:init()
 end
 function WriteBlob:write(ctype, value)
 	assert.type(value, 'number')	-- or cdata for long?
---DEBUG(@5):print('write', #self.data, ctype, value)	
+--DEBUG(@5):print('write', #self.data, ctype, value)
 	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
 	local result
@@ -1228,9 +1228,9 @@ self.constants = constants
 			for i,const in ipairs(constants) do
 				-- TODO .tag==1 here?
 				-- too many layers to the same structure...
-				if type(const) == 'string' 
-				and const == x then 
-					return i 
+				if type(const) == 'string'
+				and const == x then
+					return i
 				end
 			end
 		elseif type(x) == 'table' then
@@ -1259,9 +1259,9 @@ self.constants = constants
 		else
 			error("idk how to check for uniqueness "..type(x))
 		end
-		
+
 		constants:insert(x)
-		local index = #constants	
+		local index = #constants
 
 		-- add padding for 64bit constants
 		if type(x) == 'table'
@@ -1429,7 +1429,7 @@ self.constants = constants
 
 	if self.fields then
 		for i,field in ipairs(self.fields) do
---DEBUG:print('writing field', i, require 'ext.tolua'(field))	
+--DEBUG:print('writing field', i, require 'ext.tolua'(field))
 			field.nameIndex = addConstUnique(field.name)
 			field.name = nil	-- necessary or nah?
 			field.sigIndex = addConstUnique(field.sig)
@@ -1456,20 +1456,20 @@ self.constants = constants
 
 	if self.methods then
 		for i,method in ipairs(self.methods) do
---DEBUG:print('writing method', i, require 'ext.tolua'(method))	
+--DEBUG:print('writing method', i, require 'ext.tolua'(method))
 			method.nameIndex = addConstUnique(method.name)
 			method.name = nil	-- necessary or nah?
 			method.sigIndex = addConstUnique(method.sig)
 			method.sig = nil
-			
+
 			method.attrs = table()
-		
+
 			if method.code then
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack)
 				cblob:writeu2(method.maxLocals)
 --DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
-				
+
 				local insBlob = WriteBlob()
 				for _,inst in ipairs(method.code) do
 					local op = assert.index(opForInstName, inst[1])
@@ -1484,7 +1484,7 @@ self.constants = constants
 						elseif type(argDesc) == 'function' then
 							assert.index(instDesc, 'write')(inst, insBlob, self)
 						else
-							error'here'
+							error('got unknown inst.args '..type(argDesc))
 						end
 					end
 				end
@@ -1506,9 +1506,9 @@ self.constants = constants
 						cblob:writeu2(addConstUnique(ex.catchType))
 					end
 				end
-				
+
 				local codeAttrs = table()
-			
+
 				-- TODO handle StackMapTable here
 				-- codeAttrs:insert(smAttr)
 
@@ -1529,7 +1529,7 @@ self.constants = constants
 				writeAttrs(codeAttrs, cblob)
 
 				-- TODO now add method.stackmap as attrs at the end of cblob
-				
+
 				local codeAttrData = cblob:compile()
 --DEBUG:print('writing method '..i..' codeAttrData '..#codeAttrData)
 --DEBUG:print(require'ext.string'.hexdump(codeAttrData))
@@ -1578,7 +1578,7 @@ self.constants = constants
 	-- write out constants
 	blob:writeu2(#constants+1)
 	for i,const in ipairs(constants) do
---DEBUG:print('writing const', i, require 'ext.tolua'(const))				
+--DEBUG:print('writing const', i, require 'ext.tolua'(const))
 		if const == false then
 			-- skip long/double padding
 		elseif type(const) == 'string' then
@@ -1630,7 +1630,7 @@ self.constants = constants
 				invokeStatic = 6,
 				invokeSpecial = 7,
 				newInvokeSpecial = 8,
-				invokeInterface = 9,			
+				invokeInterface = 9,
 			}, const.refKind)
 			blob:writeu2(refKindIndex)
 			blob:writeu2(const.referenceIndex)
@@ -1687,7 +1687,7 @@ self.constants = constants
 	else
 		blob:writeu2(#self.methods)
 		for i,method in ipairs(self.methods) do
---DEBUG:print('writing method refd', i, require 'ext.tolua'(method))	
+--DEBUG:print('writing method refd', i, require 'ext.tolua'(method))
 			blob:writeu2(getFlagsFromObj(method, methodAccessFlags))
 			blob:writeu2(method.nameIndex)
 			blob:writeu2(method.sigIndex)

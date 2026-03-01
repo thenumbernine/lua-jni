@@ -154,6 +154,14 @@ function JavaArray:_unmap(arptr)
 	envptr[0][releaseArrayElements](envptr, self._ptr, arptr, 0)
 end
 
+-- only works with primitives for now
+function JavaArray:_toStr()
+	local ptr = self:_map()
+	local s = ffi.string(ptr, #self * ffi.sizeof(self._elemFFIType))
+	self:_unmap(ptr)
+	return s
+end
+
 local function unpackLocal(ar, i, n)
 	if i >= n then return end
 	return ar[i], unpackLocal(ar, i+1, n)
