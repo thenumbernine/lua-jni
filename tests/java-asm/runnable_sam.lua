@@ -10,7 +10,7 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
-local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
+local MakeSAMNativeCallback = require 'java.tests.java-asm.make_sam_native_callback_asm'
 local NativeRunnable = MakeSAMNativeCallback(J, J.Runnable)
 NativeRunnable(function()
 	print('hello from within Lua!')

@@ -111,6 +111,15 @@ function M:run(args)
 
 	local interfaces = table()
 	for i,name in ipairs(args.interfaces or {}) do
+		if type(name) == 'string' then
+		elseif type(name) == 'table' then
+			if not require 'java.class':isa(name) then
+				error(".interfaces["..i.."] expects a string or a JavaClass")
+			end
+			name = name._classpath
+		else
+			error(".interfaces["..i.."] expects a string or a JavaClass")
+		end
 		interfaces[i] = name:gsub('%.', '/')
 	end
 

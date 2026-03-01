@@ -14,7 +14,7 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
-local LuaJavaClass = require 'java.tests.lua_java_class'
+local LuaJavaClass = require 'java.tests.java-asm.lua_java_class'
 local TestClass = LuaJavaClass{
 	env = J,
 	-- when using io.github.thenumbernine.LookupFactory to loading, this gives:

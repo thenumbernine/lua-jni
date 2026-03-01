@@ -9,7 +9,7 @@ local J = require 'java.vm'{
 }.jniEnv
 
 --[[ longwinded
-local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
+local LuaJavaClassFromSAM = require 'java.tests.java-asm.lua_java_class_from_sam'
 local NativeRunnable = LuaJavaClassFromSAM{
 	env = J,
 	class = J.Runnable,
@@ -20,7 +20,7 @@ local NativeRunnable = LuaJavaClassFromSAM{
 NativeRunnable():run()
 --]]
 -- [[ concise
-local LuaJavaClass = require 'java.tests.lua_java_class'	-- modify JavaClass _new/_cb
+local LuaJavaClass = require 'java.tests.java-asm.lua_java_class'	-- modify JavaClass _new/_cb
 J.Runnable(function(...)
 	print('hello from within Lua!', ...)
 end):run()

@@ -318,6 +318,8 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/println.lua` is a simple `System.out.println` demo.
 
+`java/tests/*` tests centered around interfacing with the `Test.java` / `Test.class` (that it compiles with `javac`). 
+
 `java/tests/runnable.lua` shows how to create and run a thin wrapper class in `java/tests/io/github/thenumbernine/NativeRunnable.java` to native code in `java/tests/io_github_thenumbernine_NativeRunnable.c` to run your C (or LuaJIT-cloure) callback.
 
 `java/tests/runnable_mt.lua` shows how to use this to run LuaJIT code on a new Java thread, in conjunction with my [`lua lite thread class`](https://github.com/thenumbernine/lua-thread/blob/master/lite.lua).
@@ -343,3 +345,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
+- Unify the fields.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ... 

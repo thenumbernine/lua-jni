@@ -82,7 +82,7 @@ print('parent thread, pthread_self', parentThread)
 -- TODO make the 'MakeSAM...' work for any method passed to it ...
 local ThisApplication
 do
-	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+	local NativeCallback = require 'java.tests.java-asm.nativecallback_asm'(J)
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	assert(require 'java.class':isa(ClassWriter), "JRE isn't finding ASM")
