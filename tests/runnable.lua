@@ -17,7 +17,8 @@ local J = require 'java.vm'{
 }.jniEnv
 
 --local NativeRunnable = require 'java.tests.nativerunnable'(J)		-- use javac and gcc
-local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
+--local NativeRunnable = require 'java.tests.nativerunnable_asm'(J)	-- use java-ASM (still needs gcc)
+local NativeRunnable = require 'java.tests.nativerunnable_classdata'(J)	-- "WE'LL DO IT LIVE!!!!"
 
 local ffi = require 'ffi'
 callback = function(arg)

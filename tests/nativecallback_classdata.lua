@@ -22,7 +22,7 @@ return function(J)
 	local cw = JavaClassData{
 		version = 0x41,
 		isPublic = true,
-		isSuper = true,	-- "Treat superclass methods specially when invoked by the invokespecial instruction."
+		isSuper = true,
 		thisClass = newClassNameSlashSep,
 		superClass = 'java/lang/Object',
 		methods = {
@@ -31,9 +31,9 @@ return function(J)
 				name = '<init>',
 				sig = '()V',
 				code = {
-					{"aload_0"},
-					{"invokespecial", "java/lang/Object", "<init>", "()V"},
-					{"return"}
+					{'aload_0'},
+					{'invokespecial', 'java/lang/Object', '<init>', '()V'},
+					{'return'}
 				},
 				maxLocals = 1,
 				maxStack = 1,

@@ -1663,7 +1663,7 @@ self.constants = constants
 	else
 		blob:writeu2(#self.interfaces)
 		for _,interfaceClassIndex in ipairs(self.interfaces) do
-			self:writeu2(interfaceClassIndex)
+			blob:writeu2(interfaceClassIndex)
 		end
 	end
 

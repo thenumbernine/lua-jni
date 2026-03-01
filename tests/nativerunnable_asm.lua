@@ -5,10 +5,10 @@ But it still requires a separate .so
 --]]
 return function(J)
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
-	--[[ java-asm based
+	-- [[ java-asm based
 	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
 	--]]
-	-- [[ luajit java.classdata
+	--[[ luajit java.classdata
 	local NativeCallback = require 'java.tests.nativecallback_classdata'(J)
 	--]]
 
