@@ -1,37 +1,64 @@
 --[[
-io.github.thenumbernine.NativeCallback class but implemented with JavaClassData
-
-This still requires the libio_github_thenumbernine_NativeCallback.so file to be present
+Here's the fake-class used for the solve purpose of its one native function that a lot of other functions are using for Java calling into LuaJIT.
+I guess with JavaClassData and JavaLuaClass, the need for this is getting slimmer and slimmer...
 --]]
-local path = require 'ext.path'
+local ffi = require 'ffi'
 local JavaClassData = require 'java.classdata'
 
 local M = {}
 
--- find where we are, assume libio_github_thenumbernine_NativeCallback.so is also there
--- change it later if you can't build in this dir
-M.srcDir = path(package.searchpath('java.nativecallback', package.path)):getdir()
+--[[
+JNIEXPORT jobject JNICALL
+Java_io_github_thenumbernine_NativeCallback_run(
+	JNIEnv * env,
+	jclass this_,
+	jlong jfuncptr,
+	jobject jarg
+) {
+	void* vfptr = (void*)jfuncptr;
+	void* results = NULL;
+	if (!vfptr) {
+		fprintf(stderr, "!!! DANGER !!! NativeCallback called with null function pointer !!!\n");
+	} else {
+		void *(*fptr)(void*) = (void*(*)(void*))vfptr;
+		results = fptr(jarg);
+	}
+	return results;
+}
+--]]
+M.nativeCallbackRunFunc = function(env, this, jfuncptr, jarg)
+	local vfptr = ffi.cast('void*', jfuncptr)
+	local results
+	if vfptr == nil then
+		io.stderr:write("!!! DANGER !!! NativeCallback called with null function pointer !!!\n")
+	else
+		-- in LuaJIT if I cast cdata to a function-pointer, does it create another closure object that I have to manually free?  I think no ...
+		local fptr = ffi.cast('void*(*)(void*)', vfptr)
+		results = fptr(jarg)
+	end
+	return results
+end
+M.nativeCallbackRunClosure = ffi.cast('jobject(*)(JNIEnv * env, jclass this_, jlong jfuncptr, jobject jarg)', M.nativeCallbackRunFunc)
 
-function M:run(J)
+M.runMethodName = 'run'
+M.runMethodSig = '(JLjava/lang/Object;)Ljava/lang/Object;'
+
+-- if Lua gc's this will Java complain?  Does Java copy it over upon function call?  I don't trust JNI's programmers....
+M.nativeMethods = ffi.new'JNINativeMethod[1]'
+M.nativeMethods[0].name = M.runMethodName
+M.nativeMethods[0].signature = M.runMethodSig
+M.nativeMethods[0].fnPtr = M.nativeCallbackRunClosure
+
+function M:run(env)
 	local newClassName = 'io.github.thenumbernine.NativeCallback'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')
 
-	local runMethodName = 'run'
-
 	-- check if it's already loaded
-	local cl = J:_findClass(newClassName)
+	local cl = env:_findClass(newClassName)
 	if cl then
-		rawset(cl, '_runMethodName', runMethodName)
+		rawset(cl, '_runMethodName', M.runMethodName)
 		return cl
 	end
-
-	-- still need to build the jni .c side
-	local srcFp = self.srcDir/'io_github_thenumbernine_NativeCallback.c'
-	local soFp = self.srcDir/'libio_github_thenumbernine_NativeCallback.so'
-	require 'java.build'.C{
-		src = srcFp.path,
-		dst = soFp.path,
-	}
 
 	local classData = JavaClassData{
 		version = 0x41,
@@ -51,42 +78,25 @@ function M:run(J)
 				},
 				maxLocals = 1,
 				maxStack = 1,
-				--[[ necessary?
-				lineNos={
-					{lineNo=3, startPC=0}
-				},
-				--]]
 			},
 			{
 				isNative = true,
 				isPublic = true,
 				isStatic = true,
-				name = runMethodName,
-				sig = '(JLjava/lang/Object;)Ljava/lang/Object;',
-			},
-			{
-				isStatic = true,
-				name = '<clinit>',
-				sig = '()V',
-				code = {
-					{'ldc', 'string', soFp.path},
-					{'invokestatic', 'java/lang/System', 'load','(Ljava/lang/String;)V'},
-					{'return'},
-				},
-				maxLocals = 0,
-				maxStack = 1,
-				--[[ necessary?
-				lineNos={
-					{lineNo=5, startPC=0},
-					{lineNo=6, startPC=5}
-				},
-				--]]
+				name = M.runMethodName,
+				sig = M.runMethodSig,
 			},
 		},
 	}
 
-	local cl = J:_defineClass(classData)
-	rawset(cl, '_runMethodName', runMethodName)
+	local cl = env:_defineClass(classData)
+
+	-- now it looks like JNIEnv->RegisterNatives can allow you to manually set native methods instead of depending on symbol table.
+	-- but I'm also reading that JNIEnv->RegisterNatives itself needs to be called from ... a specifically-named function in the symbol table ... smh.
+	-- let's see if I can call it manually here ...
+	env._ptr[0].RegisterNatives(env._ptr, cl._ptr, M.nativeMethods, 1)
+
+	rawset(cl, '_runMethodName', M.runMethodName)
 	return cl
 end
 

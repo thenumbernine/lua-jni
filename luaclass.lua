@@ -1,7 +1,6 @@
 --[[
 auto-gen java bytecode at runtime to make a glue-class whose methods point to Lua functions
-
-Still depends on io_github_thenumbernine_NativeCallback.c ...
+uses java/nativecallback.lua to do its LuaJIT->Java->LuaJIT, but honestly we're getting to the point where I can just inline that myself...
 --]]
 
 local ffi = require 'ffi'

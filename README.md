@@ -288,11 +288,11 @@ Lets you write java assembler in text and generate bytecode and run it live, no 
 
 - `cl = javaClassData:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
 
-### NativeRunnable
-`NativeRunnable = require 'java.nativerunnable`
+### NativeCallback
+`NativeCallback = require 'java.nativecallback`
 
 This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
-Maybe someday I'll figure out how to modify the symbol table at runtime, and then I'll get rid of this.
+Maybe I'll slowly merge its functionality more and more with JavaClassData and JavaLuaClass...
 
 ### JavaLuaClass
 `JavaLuaClass = require 'java.luaclass'`

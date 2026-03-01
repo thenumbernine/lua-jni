@@ -13,7 +13,6 @@ files = {
 	"distinfo",
 	"ffi/jni.lua",
 	"field.lua",
-	"io_github_thenumbernine_NativeCallback.c",
 	"java.lua",
 	"jnienv.lua",
 	"luaclass.lua",
