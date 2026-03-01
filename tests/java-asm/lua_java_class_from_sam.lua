@@ -5,7 +5,7 @@ unlike 'make_sam_native_callback_asm', this makes one class per function
 local assert = require 'ext.assert'
 local JavaClass = require 'java.class'
 
-local LuaJavaClass = require 'java.tests.lua_java_class'
+local LuaJavaClass = require 'java.tests.java-asm.lua_java_class'
 
 --[[
 args:

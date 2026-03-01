@@ -1,6 +1,4 @@
---[[
-nativecallback but using JavaClassData instead of Java-ASM
---]]
+-- nativecallback but using JavaClassData
 local path = require 'ext.path'
 local JavaClassData = require 'java.classdata'
 return function(J)
@@ -13,14 +11,14 @@ return function(J)
 	local newClassName = 'io.github.thenumbernine.NativeCallback'
 	local newClassNameSlashSep = newClassName:gsub('%.', '/')
 
+	local runMethodName = 'run'
+
 	-- check if it's already loaded
 	local cl = J:_findClass(newClassName)
 	if cl then
-rawset(cl, '_runMethodName', runMethodName)
+		rawset(cl, '_runMethodName', runMethodName)
 		return cl
 	end
-
-	local runMethodName = 'run'
 
 	local cw = JavaClassData{
 		version = 0x41,
@@ -40,7 +38,7 @@ rawset(cl, '_runMethodName', runMethodName)
 				},
 				maxLocals = 1,
 				maxStack = 1,
-				-- [[ necessary?
+				--[[ necessary?
 				lineNos={
 					{lineNo=3, startPC=0}
 				},
@@ -64,7 +62,7 @@ rawset(cl, '_runMethodName', runMethodName)
 				},
 				maxLocals = 0,
 				maxStack = 1,
-				-- [[ necessary?
+				--[[ necessary?
 				lineNos={
 					{lineNo=5, startPC=0},
 					{lineNo=6, startPC=5}

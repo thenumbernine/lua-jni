@@ -16,12 +16,7 @@ local infoForPrims = require 'java.util'.infoForPrims
 return function(J, samClass)
 	assert(JavaClass:isa(samClass), "expected samClass to be a JavaClass")
 
-	--[[ using java-asm
-	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
-	--]]
-	-- [[ using java.classdata
-	local NativeCallback = require 'java.tests.nativecallback_classdata'(J)
-	--]]
+	local NativeCallback = require 'java.tests.java-asm.nativecallback_asm'(J)
 
 	local samMethod = samClass._samMethod
 	local samClassSlashSep = samClass._classpath:gsub('%.', '/')

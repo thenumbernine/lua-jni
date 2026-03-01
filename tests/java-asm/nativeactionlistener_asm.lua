@@ -7,7 +7,7 @@ return function(J, jsuperclass)
 	jsuperclass = jsuperclass or 'java/lang/Object'
 
 	-- how about separate the NativeCallback static native method & System.load into its own class ...
-	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+	local NativeCallback = require 'java.tests.java-asm.nativecallback_asm'(J)
 
 	-- TODO name overrideable or generated based on jsuperclass
 	local newClassName = 'io/github/thenumbernine/NativeActionListener'

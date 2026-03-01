@@ -20,7 +20,10 @@ return function(J)
 
 	-- check if it's already loaded
 	local cl = J:_findClass(newClassName)
-	if cl then return cl end
+	if cl then 
+		rawset(cl, '_runMethodName', 'run')
+		return cl 
+	end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
 	local JavaClass = require 'java.class'

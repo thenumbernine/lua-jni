@@ -1466,8 +1466,8 @@ self.constants = constants
 
 			if method.code then
 				local cblob = WriteBlob()
-				cblob:writeu2(method.maxStack)
-				cblob:writeu2(method.maxLocals)
+				cblob:writeu2(method.maxStack or 0)
+				cblob:writeu2(method.maxLocals or 0)
 --DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
 
 				local insBlob = WriteBlob()

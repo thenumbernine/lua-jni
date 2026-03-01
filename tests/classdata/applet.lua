@@ -1,12 +1,11 @@
 #!/usr/bin/env luajit
 
+-- load our classes using java.classdata
+
 local thread = require 'thread.lite'{
 	code = [=[
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
-
-	local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
-	local NativeActionListener = MakeSAMNativeCallback(J, J.java.awt.event.ActionListener)
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -42,39 +41,43 @@ local thread = require 'thread.lite'{
 		local JButton = J.javax.swing.JButton
 
 		local ffi = require 'ffi'
+		local NativeActionListener = require 'java.tests.classdata.nativeactionlistener_classdata'(J)
 
 		local btn1 = JButton'Btn1'
 		btn1:addActionListener(NativeActionListener(
-			function(...)
-				print('button1 click', ...)
-			end
+			ffi.cast('void *(*)(void*)', function(arg)
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button1 click', arg)
+			end)
 		))
 		buttons:add(btn1, gbc)
 
 		local btn2 = JButton'Btn2'
 		btn2:addActionListener(NativeActionListener(
-			function(...)
-				print('button2 click', ...)
-			end
+			ffi.cast('void *(*)(void*)', function(arg)
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button2 click', arg)
+			end)
 		))
 		buttons:add(btn2, gbc)
 
 		local btn3 = JButton'Btn3'
 		btn3:addActionListener(NativeActionListener(
-			function(...)
-				print('button3 click', ...)
-			end
+			ffi.cast('void *(*)(void*)', function(arg)
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button3 click', arg)
+			end)
 		))
 		buttons:add(btn3, gbc)
 
 		local btn4 = JButton'Btn4'
 		btn4:addActionListener(NativeActionListener(
-			function(...)
-				print('button4 click', ...)
-			end
+			ffi.cast('void *(*)(void*)', function(arg)
+				arg = J:_javaToLuaArg(arg, 'java.awt.event.ActionListener')
+				print('button4 click', arg)
+			end)
 		))
 		buttons:add(btn4, gbc)
-
 
 		gbc.weighty = 1
 		panel:add(buttons, gbc)
@@ -92,20 +95,15 @@ local thread = require 'thread.lite'{
 
 local J = require 'java.vm'{
 	props = {
-		['java.class.path'] = table.concat({
-			'.',
-			'asm-9.9.1.jar',		-- needed for ASM
-		}, ':'),
+		['java.class.path'] = '.',
 		['java.library.path'] = '.',
 	},
 }.jniEnv
 
+local NativeRunnable = require 'java.tests.classdata.nativerunnable_classdata'(J)
 
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
-
-local MakeSAMNativeCallback = require 'java.tests.make_sam_native_callback_asm'
-local NativeRunnable = MakeSAMNativeCallback(J, J.Runnable)
 
 J.javax.swing.SwingUtilities:invokeAndWait(
 	NativeRunnable(thread.funcptr)

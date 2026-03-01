@@ -98,7 +98,7 @@ args:
 function M:run(args)
 	local J = assert.index(args, 'env')
 
-	local NativeCallback = require 'java.tests.nativecallback_asm'(J)
+	local NativeCallback = require 'java.tests.java-asm.nativecallback_asm'(J)
 	local NativeCallbackSlashSep = NativeCallback._classpath:gsub('%.', '/')
 
 	local classname = args.name
@@ -356,10 +356,8 @@ function M:run(args)
 
 	cw:visitEnd()
 
-	local code = cw:toByteArray()
-
 	-- create the java .class to go along with it
-	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, classnameSlashSep)
+	local classAsObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray():_toStr(), classnameSlashSep)
 	local cl = J:_getClassForJClass(classAsObj._ptr)
 	return cl
 end
@@ -368,7 +366,7 @@ end
 -- TODO while we're here, make this default behavior
 -- change JavaClass ctor to accept functions, auto-subclass, and return their instances
 function JavaClass:_cb(func)
-	local LuaJavaClassFromSAM = require 'java.tests.lua_java_class_from_sam'
+	local LuaJavaClassFromSAM = require 'java.tests.java-asm.lua_java_class_from_sam'
 	local newsubclass = LuaJavaClassFromSAM{
 		env = self._env,
 		class = self,
