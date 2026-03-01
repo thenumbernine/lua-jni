@@ -71,11 +71,11 @@ function M:run(env)
 				isPublic = true,
 				name = '<init>',
 				sig = '()V',
-				code = {
-					{'aload_0'},
-					{'invokespecial', 'java/lang/Object', '<init>', '()V'},
-					{'return'}
-				},
+				code = [[
+aload_0
+invokespecial java/lang/Object <init> ()V
+return
+]],
 				maxLocals = 1,
 				maxStack = 1,
 			},

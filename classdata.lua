@@ -674,6 +674,27 @@ function JavaClassData:init(args)
 		for k,v in pairs(args) do
 			self[k] = v
 		end
+
+		-- while we're here, prepare / validate args:
+		for _,method in ipairs(self.methods) do
+			-- parse method.code if it is instructions
+			if type(method.code) == 'string' then
+
+				-- argument validation:
+				-- do this here or upon ctor?
+				method.code = string.split(string.trim(method.code), '\n')
+					:mapi(function(line)
+						return string.trim(line)
+					end)
+					:filteri(function(line)
+						return line:sub(1, #self.lineComment) ~= self.lineComment
+					end)
+					:mapi(function(line)
+						return string.split(line, '%s+')
+					end)
+
+			end
+		end
 	else
 		error("idk how to init this")
 	end
@@ -1499,30 +1520,13 @@ self.constants = constants
 			method.attrs = table()
 
 			if method.code then
-				local srcCode = method.code	-- haha, "source-code", get it? ...
-
-				if type(srcCode) == 'string' then
-					-- argument validation:
-					-- do this here or upon ctor?
-					srcCode = string.split(string.trim(srcCode), '\n')
-						:mapi(function(line)
-							return string.trim(line)
-						end)
-						:filteri(function(line)
-							return line:sub(1, #self.lineComment) ~= self.lineComment
-						end)
-						:mapi(function(line)
-							return string.split(line, '%s+')
-						end)
-				end
-
 				local cblob = WriteBlob()
 				cblob:writeu2(method.maxStack or 0)
 				cblob:writeu2(method.maxLocals or 0)
 --DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
 
 				local insBlob = WriteBlob()
-				for _,inst in ipairs(srcCode) do
+				for _,inst in ipairs(method.code) do
 					local op = assert.index(opForInstName, inst[1])
 					insBlob:writeu1(op)
 					local instDesc = assert.index(instDescForOp, op)
