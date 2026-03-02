@@ -77,13 +77,13 @@ function JavaField:_get(thisOrClass)
 
 	env:_checkExceptions()
 
-	local getName, returnObject
+	local getName, getObject
 	if self._isStatic then
-		returnObject = getStaticNameForType.object
-		getName = getStaticNameForType[self._sig] or returnObject
+		getObject = getStaticNameForType.object
+		getName = getStaticNameForType[self._sig] or getObject
 	else
-		returnObject = getNameForType.object
-		getName = getNameForType[self._sig] or returnObject
+		getObject = getNameForType.object
+		getName = getNameForType[self._sig] or getObject
 	end
 
 	local result = env._ptr[0][getName](
@@ -94,7 +94,11 @@ function JavaField:_get(thisOrClass)
 
 	env:_checkExceptions()
 
-	if getName ~= returnObject then return result end
+	-- if it's a primitive then return it
+	if getName ~= getObject then return result end
+
+	-- if it's nil or NULL then return nil
+	if result == nil then return nil end
 
 	return JavaObject._createObjectForClassPath{
 		env = env,
@@ -108,16 +112,14 @@ function JavaField:_set(thisOrClass, value)
 
 	env:_checkExceptions()
 
-	local setName, returnObject
+	local setName
 	if self._isStatic then
-		returnObject = setStaticNameForType.object
-		setName = setStaticNameForType[self._sig] or returnObject
+		setName = setStaticNameForType[self._sig] or setStaticNameForType.object
 	else
-		returnObject = setNameForType.object
-		setName = setNameForType[self._sig] or returnObject
+		setName = setNameForType[self._sig] or setNameForType.object
 	end
 
-	local result = env._ptr[0][setName](
+	env._ptr[0][setName](
 		env._ptr,
 		assert(env:_luaToJavaArg(thisOrClass)),
 		self._ptr,

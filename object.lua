@@ -27,7 +27,13 @@ function JavaObject:init(args)
 	local envptr = env._ptr
 
 	local ptr = assert.index(args, 'ptr')
-	self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
+
+	if ptr ~= nil then
+		self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
+	else
+		error("no nil JavaObjects, just use nil itself")
+		--self._ptr = nil
+	end
 
 	-- TODO detect if not provided?
 	self._classpath = assert.index(args, 'classpath')
