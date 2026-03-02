@@ -5,8 +5,8 @@ I'm sure this has been done before, but here's my version.
 This library includes...
 - LuaJIT binding file for `jni.h`
 - Some Lua-wrapping classes for JavaVM, JNIEnv, etc.
-- `JavaObject`s and `JavaClass`es, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
-- A `JavaASMClass`-assembler in LuaJIT.  Create new classes at runtime -- no more `javac` required!
+- JavaObject's and JavaClass's, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
+- A JavaASMClass class for assembling Java in LuaJIT.  Create new classes at runtime -- no more `javac` required!
 - Java-native callback and Lua binding layer.  Create new Java classes from Lua functions!
 
 # Start:
@@ -355,6 +355,12 @@ Be sure to always use Lua's `:` notation for calling, i.e. `obj:func(...)` when 
 I made this to go with my [SDL-LuaJIT](https://github.com/thenumbernine/SDLLuaJIT-android) launcher.
 
 The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/include-lua) run on `jni.h`.
+
+# Dependencies
+
+- [`lua-ext`](http://github.com/thenumbernine/lua-ext) - For some basic utility functions.
+- [`lua-thread`](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread`.
+- [`lua-make`](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the java/build.lua file to invoke javac or gcc.
 
 # Examples
 
