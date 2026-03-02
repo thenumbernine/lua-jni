@@ -144,6 +144,10 @@ function M:run(args)
 		for key,field in pairs(args.fields) do
 			local field = field	-- still needed? will the iterator mess up if i reassign field?
 			if type(key) == 'string' then
+				
+				-- an extra inception layer here could be inferring value from field type,
+				-- but then string would be ambiguous (maybe I'd get rid of that?)
+
 				if type(field) == 'string' then
 					-- string = string <=> name = sig
 					field = {
@@ -168,17 +172,32 @@ function M:run(args)
 			end
 		
 			if field.isPublic == nil then field.isPublic = true end
+
 			field.name = assert.type(assert.index(field, 'name'), 'string')
+
 			field.sig = getJNISig((
 				assert.type(assert.index(field, 'sig'), 'string')
 			))
+
+			-- TODO here some conversion of constant value based on type or something
+			if field.value then
+			end
 
 			asmClassArgs.fields:insert(field)
 		end
 	end
 
 	local function buildLuaWrapperMethod(method)
-		local sig = method.sig or {}
+		local sig = method.sig
+		
+		if not sig then
+			if method.name == 'toString' then
+				sig = {'java.lang.String'}	-- default toString to String()
+			else
+				sig = {}	-- default to void()
+			end
+		end
+
 		sig[1] = sig[1] or 'void'
 		local returnType = sig[1]
 		local jniSig = getJNISig(sig)

@@ -975,7 +975,7 @@ end
 			readFieldAttr_ConstantValue = true
 
 			assert.eq(fieldAttrLen, 2)
-			field.constantValue = deepCopyIndex(blob:readu2())
+			field.value = deepCopyIndex(blob:readu2())
 		end)
 		self.fields:insert(field)
 --DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))
@@ -1488,12 +1488,12 @@ self.constants = constants
 			field.nameIndex = addConstUnique(field.name)
 			field.sigIndex = addConstUnique(field.sig)
 
-			-- convert field.constantValue into field.attrs[]
+			-- convert field.value into field.attrs[]
 			-- where each attr has {uint16_t name; string data;}
 			field.attrs = table()
-			if field.constantValue then
+			if field.value then
 				local attrBlob = WriteBlob()
-				attrBlob:writeu2(addConst(field.constantValue))
+				attrBlob:writeu2(addConst(field.value))
 
 				field.attrs:insert{
 					nameIndex = addConstUnique'ConstantValue',
@@ -1503,7 +1503,7 @@ self.constants = constants
 
 			--field.name = nil	-- necessary to clear or nah?
 			--field.sig = nil
-			--field.constantValue = nil
+			--field.value = nil
 		end
 	end
 

@@ -348,7 +348,7 @@ Maybe I'll slowly merge its functionality more and more with JavaASMClass and Ja
 Also for JNI, JavaClass, and JavaObject (and subclasses JavaString and JavaArray),
 the Lua `__index` and `__newindex` works for fields and methods.
 
-Be sure to always use `obj:func(...)` when calling, even if it's calling a static method, even from a Java class, because Lua needs the context of it, be it objects or classes.
+Be sure to always use Lua's `:` notation for calling, i.e. `obj:func(...)` when calling, even if it's calling a static method, even from a Java class, because Lua needs the context of the call, be it objects or classes.
 
 <hr>
 
