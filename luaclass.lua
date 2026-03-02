@@ -142,16 +142,38 @@ function M:run(args)
 	-- but I think pairs() does ipairs integer indexes in order at least?
 	if args.fields then
 		for key,field in pairs(args.fields) do
-			if type(key) == 'string'
-			and not field.name
-			then
-				field.name = key
+			local field = field	-- still needed? will the iterator mess up if i reassign field?
+			if type(key) == 'string' then
+				if type(field) == 'string' then
+					-- string = string <=> name = sig
+					field = {
+						name = key,
+						sig = field,
+					}
+				else
+					-- string = table <=> name = properties
+					assert.type(field, 'table')
+					if not field.name then
+						field.name = key
+					end
+				end
+			elseif type(field) == 'string' then
+				-- if the key is sequentially indexed, 
+				-- and value is string 
+				-- ... then value will be the name, and type will be implicit
+				field = {
+					name = field,
+					sig = 'java.lang.Object',
+				}
 			end
-			asmClassArgs.fields:insert{
-				isPublic = true,
-				name = assert.type(assert.index(field, 'name'), 'string'),
-				sig = getJNISig((assert.type(assert.index(field, 'sig'), 'string')))
-			}
+		
+			if field.isPublic == nil then field.isPublic = true end
+			field.name = assert.type(assert.index(field, 'name'), 'string')
+			field.sig = getJNISig((
+				assert.type(assert.index(field, 'sig'), 'string')
+			))
+
+			asmClassArgs.fields:insert(field)
 		end
 	end
 
@@ -159,14 +181,17 @@ function M:run(args)
 		local sig = method.sig or {}
 		sig[1] = sig[1] or 'void'
 		local returnType = sig[1]
+		local jniSig = getJNISig(sig)
+
+		-- fun fact, defining toString() with a return type other than the java.lang.String makes the VM segfault
+		-- adding extra args to toString() makes the VM give you a warning
+		if method.name == 'toString'
+		and jniSig ~= '()Ljava/lang/String;'
+		then
+			io.stderr:write'!!! WARNING !!! You are defining a class method toString() with an atypical signature.  In my experience the VM will segfault next, or just warn you if you are lucky.  Enjoy.\n'
+		end
 
 		local code = table()
-		local asmClassMethod = {
-			isPublic = true,
-			name = method.name,
-			sig = getJNISig(sig),
-			code = code,
-		}
 
 		-- special for ctors, call parent
 		if method.name == '<init>' then
@@ -298,6 +323,13 @@ function M:run(args)
 			code:insert{'areturn'}
 		end
 
+		local asmClassMethod = {
+			isPublic = true,
+			name = method.name,
+			sig = jniSig,
+			code = code,
+		}
+
 		asmClassMethod.maxStack = 10
 		asmClassMethod.maxLocals =
 			1 + (table.sub(sig, 2):mapi(function(sigi)
@@ -335,8 +367,15 @@ return
 		end
 	end
 
-	for _,method in ipairs(args.methods or {}) do
-		buildLuaWrapperMethod(method)
+	if args.methods then
+		for key,method in pairs(args.methods) do
+			if type(key) == 'string'
+			and not method.name
+			then
+				method.name = key
+			end
+			buildLuaWrapperMethod(method)
+		end
 	end
 
 	return J:_defineClass(JavaASMClass(asmClassArgs))

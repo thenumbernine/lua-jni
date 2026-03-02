@@ -290,7 +290,7 @@ This acts on top of `JavaASMClass` to build a translation layer for converting a
 - - name: (optional) classname, auto-generated otherwise.
 - - extends: (optional) dot-separated parent class name, defaults to `java.lang.Object`.
 - - implements: (optional) table of dot-separated interface class names.
-- - fields: (optional) either a list of tables of field properties passed to JavaASMClass, or optionally key/value fields will use the key for the name.
+- - fields: (optional) either a list of tables of field properties passed to JavaASMClass, or optionally key/value fields will use the key for the name, or if the key is the name and the value is a string then the value will be the type, or if the key is sequential and the value is a string then maybe the value will be the name.
 - - methods: (optional) either a list of tables of method properties passed to JavaASMClass, or optionally key/value methods will use the key for the name.
 - - ctors: (optional) list of properties to pass for constructors.  If none are provided then a default constructor is created.
 
