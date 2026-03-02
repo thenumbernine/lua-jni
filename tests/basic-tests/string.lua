@@ -77,6 +77,8 @@ arr[1] = J:_str'testing'
 print('arr[1]', arr[1])
 arr[2] = 'test'
 print('arr[2]', arr[2])
+arr[0] = nil
+print('arr[0]', arr[0])
 
 -- [[ needs this to work
 print('java.lang.String', J:_findClass'java.lang.String')

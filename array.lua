@@ -10,7 +10,7 @@ local infoForPrims = require 'java.util'.infoForPrims
 local super = JavaObject
 local JavaArray = class(super)
 JavaArray.__name = 'JavaArray'
-JavaArray.__index = JavaObject.__index	-- class() will override this, so reset it
+--JavaArray.__index = super.__index	-- class() overrides this, but then I override this later in the file anyways
 JavaArray.super = nil
 JavaArray.class = nil
 JavaArray.subclass = nil
@@ -85,9 +85,11 @@ function JavaArray:_get(i)
 		return result
 	else
 		local elemClassPath = self._elemClassPath
+		local elemPtr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i)
+		if elemPtr == nil then return nil end
 		return JavaObject._createObjectForClassPath{
 			env = env,
-			ptr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i),
+			ptr = elemPtr,
 			classpath = elemClassPath,
 		}
 	end
