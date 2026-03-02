@@ -603,7 +603,7 @@ function JavaClass:_cbClass(func)
 			{
 				name = samMethod._name,
 				sig = samMethod._sig,
-				func = func,
+				value = func,
 			},
 		},
 	}

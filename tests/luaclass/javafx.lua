@@ -68,7 +68,7 @@ local ThisApplication = require 'java.luaclass'{
 			isPublic = true,
 			name = 'start',
 			sig = {'void', 'javafx.stage.Stage'},
-			func = thread.funcptr,	-- thread will get called with 'stage'
+			value = thread.funcptr,	-- thread will get called with 'stage'
 		},
 	},
 }

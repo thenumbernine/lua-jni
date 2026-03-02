@@ -24,12 +24,9 @@ local Test = require 'java.luaclass'{
 		'loo',	-- key=seq int, value=string, use name for value
 	},
 	methods = {
-		toString = {
-			func = function(this)
-				--return 'from Test.toString()'
-				return J:_str'from Test.toString()'
-			end,
-		},
+		toString = function(this)
+			return 'from Test.toString()'
+		end,
 	},
 }
 print('Test', Test)

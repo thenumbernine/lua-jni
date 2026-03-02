@@ -56,6 +56,7 @@ args:
 		{
 			name =
 			sig = string of dot-separated java type (primitive, class, array, etc)
+			value = JavaASMClass constant descriptor table of initial value
 			isStatic =
 			isPublic =
 			isPrivate =
@@ -65,7 +66,7 @@ args:
 	}
 	ctors = (optional) {
 		{
-			func = Lua callback function
+			value = Lua callback function
 			sig =
 			isPrivate =
 			isPublic =
@@ -74,9 +75,9 @@ args:
 	}
 	methods = (optional) {
 		{
-			func = Lua callback function
 			name =
 			sig = table, 1st is return value, rest are arguments,
+			value = Lua callback function, or cdata pointer to C function
 			isVarArg
 			isStatic
 			isPublic
@@ -142,7 +143,6 @@ function M:run(args)
 	-- but I think pairs() does ipairs integer indexes in order at least?
 	if args.fields then
 		for key,field in pairs(args.fields) do
-			local field = field	-- still needed? will the iterator mess up if i reassign field?
 			if type(key) == 'string' then
 				
 				-- an extra inception layer here could be inferring value from field type,
@@ -218,7 +218,7 @@ function M:run(args)
 			code:insert{'invokespecial', parentClassSlashSep, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
 		end
 
-		local func = assert.index(method, 'func')
+		local func = assert.index(method, 'value')
 		-- if it's cdata then use it as-is
 		local funcptr
 		if type(func) == 'cdata' then
@@ -252,7 +252,7 @@ function M:run(args)
 			closures:insert(closure)
 			funcptr = closure
 		else
-			error("idk how to handle func of type "..type(func))
+			error("idk how to handle method value of type "..type(func))
 		end
 
 		-- now native callback will get ...
@@ -342,22 +342,19 @@ function M:run(args)
 			code:insert{'areturn'}
 		end
 
-		local asmClassMethod = {
-			isPublic = true,
-			name = method.name,
-			sig = jniSig,
-			code = code,
-		}
-
-		asmClassMethod.maxStack = 10
-		asmClassMethod.maxLocals =
+		if method.isPublic == nil then method.isPublic = true end
+		method.value = nil
+		method.sig = jniSig
+		method.code = code
+		method.maxStack = 10
+		method.maxLocals =
 			1 + (table.sub(sig, 2):mapi(function(sigi)
 				-- max locals ... wait, locals include args right?
 				-- so any sig that is double or long needs 2, otherwise 1?
 				return (sigi == 'long' or sigi == 'double') and 2 or 1
 			end):sum() or 0)
 
-		asmClassArgs.methods:insert(asmClassMethod)
+		asmClassArgs.methods:insert(method)
 	end
 
 	local srcCtors = args.ctors
@@ -388,10 +385,17 @@ return
 
 	if args.methods then
 		for key,method in pairs(args.methods) do
-			if type(key) == 'string'
-			and not method.name
-			then
-				method.name = key
+			if type(key) == 'string' then
+				if type(method) == 'function' then
+					method = {
+						name = key,
+						value = method
+					}
+				elseif type(method) == 'table'
+				and not method.name
+				then
+					method.name = key
+				end
 			end
 			buildLuaWrapperMethod(method)
 		end
