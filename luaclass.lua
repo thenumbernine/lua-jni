@@ -78,7 +78,7 @@ args:
 			name =
 			sig = table, 1st is return value, rest are arguments,
 			value = Lua callback function, or cdata pointer to C function
-			isVarArg
+			isVarArgs
 			isStatic
 			isPublic
 			isPrivate

@@ -81,7 +81,7 @@ args:
 			func = Lua callback function
 			name =
 			sig = table, 1st is return value, rest are arguments,
-			isVarArg
+			isVarArgs
 			isStatic
 			isPublic
 			isPrivate
