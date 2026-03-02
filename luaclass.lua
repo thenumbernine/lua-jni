@@ -170,7 +170,7 @@ function M:run(args)
 					sig = 'java.lang.Object',
 				}
 			end
-		
+			assert.type(field, 'table')
 			if field.isPublic == nil then field.isPublic = true end
 
 			field.name = assert.type(assert.index(field, 'name'), 'string')
@@ -197,7 +197,6 @@ function M:run(args)
 				sig = {}	-- default to void()
 			end
 		end
-
 		sig[1] = sig[1] or 'void'
 		local returnType = sig[1]
 		local jniSig = getJNISig(sig)
@@ -272,16 +271,17 @@ function M:run(args)
 		code:insert{'aload_0'}
 		code:insert{'aastore'}
 
+		local baseArg = method.isStatic and 0 or 1		-- to skip 'this' ... right?
 		if sigNumArgs > 0 then
-			local localVarIndex = 1
+			local localVarIndex = method.isStatic and 0 or 1	-- right?
 			for i=0,sigNumArgs-1 do		-- 0-based argument index
 				code:insert{'dup'}
 
-				-- write to args[i+1] to skip 'this'
-				if i+1 <= 5 then
-					code:insert{'iconst_'..(i+1)}
+				local argIndex = i + baseArg
+				if argIndex <= 5 then
+					code:insert{'iconst_'..argIndex}
 				else
-					code:insert{'bipush', i+1}
+					code:insert{'bipush', argIndex}
 				end
 
 				local argSig = sig[i+2]
@@ -348,7 +348,7 @@ function M:run(args)
 		method.code = code
 		method.maxStack = 10
 		method.maxLocals =
-			1 + (table.sub(sig, 2):mapi(function(sigi)
+			baseArg + (table.sub(sig, 2):mapi(function(sigi)
 				-- max locals ... wait, locals include args right?
 				-- so any sig that is double or long needs 2, otherwise 1?
 				return (sigi == 'long' or sigi == 'double') and 2 or 1
@@ -391,12 +391,14 @@ return
 						name = key,
 						value = method
 					}
-				elseif type(method) == 'table'
-				and not method.name
-				then
-					method.name = key
+				else
+					assert.type(method, 'table')
+					if not method.name then
+						method.name = key
+					end
 				end
 			end
+			assert.type(method, 'table')
 			buildLuaWrapperMethod(method)
 		end
 	end

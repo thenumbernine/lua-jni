@@ -24,9 +24,39 @@ local Test = require 'java.luaclass'{
 		'loo',	-- key=seq int, value=string, use name for value
 	},
 	methods = {
+		-- [[
 		toString = function(this)
 			return 'from Test.toString()'
 		end,
+		testFunc = {
+			sig = {'double', 'java.lang.String', 'java.lang.Object'},
+			value = function(this, ...)
+				print('this=', this)
+				print('here with', ...)
+				return 42
+			end,
+		},
+		--]]
+		--[[ same same but verbose
+		{
+			isPublic = true,
+			name = 'toString',
+			sig = {'java.lang.String'},
+			value = function(this)
+				return 'from Test.toString()'
+			end,
+		}
+		--]]
+		--[[ hmm adding a static method crashes
+		{
+			name = 'testStatic',
+			isStatic = true,
+			sig = {'void'},
+			value = function(...)
+				print('here with', ...)
+			end,
+		}
+		--]]
 	},
 }
 print('Test', Test)
@@ -63,3 +93,5 @@ assert.eq(test2.doo, test.doo)	-- make sure static field is shared between objec
 assert.eq(test.baz, 137LL)
 assert.eq(test2.baz, 137LL)
 print('test.baz', test.baz)
+
+--test:testStatic()

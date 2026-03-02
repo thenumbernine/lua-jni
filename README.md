@@ -387,7 +387,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 # TODO
 
 - generics
-- functions / lambdas
 - I'm not building proper reflection for arrays I think ... I'm using getFields()/getMethods(), but then I still have to explicitly grab the default ctor or the toString(), so maybe I should use getDeclaredFields()/getDeclaredMethods() and then manaully search inheritence myself? But then should I be caching the class tree refs to parent myself too?
 - call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
 - I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
@@ -396,3 +395,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - Add fields to JavaClass, JavaField, and JavaMethod.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ...
 - make a full `.javasm` parser for JavaASMClass.
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...
+- JavaObject `.this` and `.super` for nonvirtual qualified lookup wrapper.
