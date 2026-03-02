@@ -169,10 +169,6 @@ function JNIEnv:init(args)
 		name = 'getModifiers',
 		sig = {'int'},
 	})
-	self._java_lang_reflect_Method._java_lang_reflect_Method_isVarArgs = assert(self._java_lang_reflect_Method:_method{
-		name = 'isVarArgs',
-		sig = {'boolean'},
-	})
 
 	-- so if Method and Constructor both inherit from Executable, and it has getName, getParameterTypes, getModifiers, can I just get those methods from it and use on both?
 	-- or does the jmethodID not do vtable lookup?
@@ -185,10 +181,6 @@ function JNIEnv:init(args)
 	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers = assert(self._java_lang_reflect_Constructor:_method{
 		name = 'getModifiers',
 		sig = {'int'},
-	})
-	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_isVarArgs = assert(self._java_lang_reflect_Constructor:_method{
-		name = 'isVarArgs',
-		sig = {'boolean'},
 	})
 
 	-- now that reflection is setup, we can start JavaObject-wrapping excpetions

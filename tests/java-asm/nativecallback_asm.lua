@@ -7,22 +7,42 @@ This returns a function(J) that returns a JavaClass
  with signature Object(long, Object)
  that is used for callbacks of pthread signature function pointers.
 --]]
+local ffi = require 'ffi'
 local path = require 'ext.path'
 
-return function(J)
-	-- need to build the jni .c side
-	require 'java.build'.C{
-		src = 'io_github_thenumbernine_NativeCallback.c',
-		dst = 'libio_github_thenumbernine_NativeCallback.so',
-	}
+local M = {}
 
+M.nativeCallbackRunFunc = function(jniEnvPtr, this, jfuncptr, jarg)
+	local vfptr = ffi.cast('void*', jfuncptr)
+	local results
+	if vfptr == nil then
+		io.stderr:write("!!! DANGER !!! NativeCallback called with null function pointer !!!\n")
+	else
+		-- in LuaJIT if I cast cdata to a function-pointer, does it create another closure object that I have to manually free?  I think no ...
+		local fptr = ffi.cast('void*(*)(void*)', vfptr)
+		results = fptr(jarg)
+	end
+	return results
+end
+M.nativeCallbackRunClosure = ffi.cast('jobject(*)(JNIEnv * env, jclass this_, jlong jfuncptr, jobject jarg)', M.nativeCallbackRunFunc)
+
+M.runMethodName = 'run'
+M.runMethodSig = '(JLjava/lang/Object;)Ljava/lang/Object;'
+
+-- if Lua gc's this will Java complain?  Does Java copy it over upon function call?  I don't trust JNI's programmers....
+M.nativeMethods = ffi.new'JNINativeMethod[1]'
+M.nativeMethods[0].name = M.runMethodName
+M.nativeMethods[0].signature = M.runMethodSig
+M.nativeMethods[0].fnPtr = M.nativeCallbackRunClosure
+
+function M:run(J)
 	local newClassName = 'io/github/thenumbernine/NativeCallback'
 
 	-- check if it's already loaded
 	local cl = J:_findClass(newClassName)
-	if cl then 
+	if cl then
 		rawset(cl, '_runMethodName', 'run')
-		return cl 
+		return cl
 	end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter
@@ -39,20 +59,6 @@ return function(J)
 		nil,
 		'java/lang/Object',
 		nil)
-
-	--	static
-	local clinit = cw:visitMethod(Opcodes.ACC_STATIC, '<clinit>', '()V', nil, nil)
-	--	{
-	clinit:visitCode()
-	clinit:visitLdcInsn((path:cwd()/'libio_github_thenumbernine_NativeCallback.so').path)
-	--	call System.loadLibrary
-	clinit:visitMethodInsn(Opcodes.INVOKESTATIC, 'java/lang/System', 'load', '(Ljava/lang/String;)V', false)
-	--	return
-	clinit:visitInsn(Opcodes.RETURN)
-	--	max stacks, locals
-	clinit:visitMaxs(0, 0)
-	--	}
-	clinit:visitEnd()
 
 	-- public static native long run(long funcptr, long arg);
 	cw:visitMethod(
@@ -71,8 +77,14 @@ return function(J)
 
 	local cl = J:_fromJClass(classAsObj._ptr)
 
+	J._ptr[0].RegisterNatives(J._ptr, cl._ptr, M.nativeMethods, 1)
+
 	-- save for later:
 	rawset(cl, '_runMethodName', 'run')
 
 	return cl
 end
+
+return setmetatable(M, {
+	__call = M.run,
+})

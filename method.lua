@@ -48,8 +48,6 @@ function JavaMethod:init(args)
 	-- this is used in java wrt super.call ... is that the only time?
 	self._nonvirtual = not not args.nonvirtual
 
-	self._isVarArgs = not not args.isVarArgs
-
 	-- modifiers
 	self._isPublic = not not args.isPublic
 	self._isPrivate = not not args.isPrivate
@@ -57,12 +55,12 @@ function JavaMethod:init(args)
 	self._isStatic = not not args.isStatic
 	self._isFinal = not not args.isFinal
 	self._isSynchronized = not not args.isSynchronized
-	self._isVolatile = not not args.isVolatile
-	self._isTransient = not not args.isTransient
+	self._isBridge = not not args.isBridge
+	self._isVarArgs = not not args.isVarArgs
 	self._isNative = not not args.isNative
-	self._isInterface = not not args.isInterface
 	self._isAbstract = not not args.isAbstract
 	self._isStrict = not not args.isStrict
+	self._isSynthetic = not not args.isSynthetic
 end
 
 function JavaMethod:__call(thisOrClass, ...)

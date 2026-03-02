@@ -68,7 +68,7 @@ function JavaClass:init(args)
 	self._isProtected = 0 ~= bit.band(modifiers, 4)
 	self._isStatic = 0 ~= bit.band(modifiers, 8)
 	self._isFinal = 0 ~= bit.band(modifiers, 16)
-	self._isSynchronized = 0 ~= bit.band(modifiers, 32)
+	self._isSuper = 0 ~= bit.band(modifiers, 32)	-- same as 'isSynchronized'
 	self._isVolatile = 0 ~= bit.band(modifiers, 64)
 	self._isTransient = 0 ~= bit.band(modifiers, 128)
 	self._isNative = 0 ~= bit.band(modifiers, 256)
@@ -181,14 +181,11 @@ function JavaClass:_setupReflection()
 				isPrivate = 0 ~= bit.band(modifiers, 2),
 				isProtected = 0 ~= bit.band(modifiers, 4),
 				isStatic = 0 ~= bit.band(modifiers, 8),
-				isFinal = 0 ~= bit.band(modifiers, 16),
-				isSynchronized = 0 ~= bit.band(modifiers, 32),
-				isVolatile = 0 ~= bit.band(modifiers, 64),
-				isTransient = 0 ~= bit.band(modifiers, 128),
-				isNative = 0 ~= bit.band(modifiers, 256),
-				isInterface = 0 ~= bit.band(modifiers, 512),
-				isAbstract = 0 ~= bit.band(modifiers, 1024),
-				isStrict = 0 ~= bit.band(modifiers, 2048),
+				isFinal = 0 ~= bit.band(modifiers, 0x10),
+				isVolatile = 0 ~= bit.band(modifiers, 0x40),
+				isTransient = 0 ~= bit.band(modifiers, 0x80),
+				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
+				isEnum = 0 ~= bit.band(modifiers, 0x4000),
 			}
 
 			self._fields[name] = self._fields[name] or table()
@@ -223,8 +220,6 @@ function JavaClass:_setupReflection()
 				sig:insert(paramClassPath)
 			end
 
-			local isVarArgs = java_lang_reflect_Method._java_lang_reflect_Method_isVarArgs(method)
-
 			local modifiers = java_lang_reflect_Method._java_lang_reflect_Method_getModifiers(method)
 
 			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
@@ -237,20 +232,19 @@ function JavaClass:_setupReflection()
 				ptr = jmethodID,
 				name = name,
 				sig = sig,
-				isVarArgs = isVarArgs,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
 				isPrivate = 0 ~= bit.band(modifiers, 2),
 				isProtected = 0 ~= bit.band(modifiers, 4),
 				isStatic = 0 ~= bit.band(modifiers, 8),
-				isFinal = 0 ~= bit.band(modifiers, 16),
-				isSynchronized = 0 ~= bit.band(modifiers, 32),
-				isVolatile = 0 ~= bit.band(modifiers, 64),
-				isTransient = 0 ~= bit.band(modifiers, 128),
-				isNative = 0 ~= bit.band(modifiers, 256),
-				isInterface = 0 ~= bit.band(modifiers, 512),
-				isAbstract = 0 ~= bit.band(modifiers, 1024),
-				isStrict = 0 ~= bit.band(modifiers, 2048),
+				isFinal = 0 ~= bit.band(modifiers, 0x10),
+				isSynchronized = 0 ~= bit.band(modifiers, 0x20),
+				isBridge = 0 ~= bit.band(modifiers, 0x40),
+				isVarArgs = 0 ~= bit.band(modifiers, 0x80),
+				isNative = 0 ~= bit.band(modifiers, 0x100),
+				isAbstract = 0 ~= bit.band(modifiers, 0x400),
+				isStrict = 0 ~= bit.band(modifiers, 0x800),
+				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
 			}
 
 			self._methods[name] = self._methods[name] or table()
@@ -280,8 +274,6 @@ function JavaClass:_setupReflection()
 				sig:insert(paramClassPath)
 			end
 
-			local isVarArgs = java_lang_reflect_Constructor._java_lang_reflect_Constructor_isVarArgs(method)
-
 			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
 --DEBUG:print('modifiers', modifiers)
 
@@ -299,20 +291,19 @@ function JavaClass:_setupReflection()
 				ptr = jmethodID,
 				name = ctorname,
 				sig = sig,
-				isVarArgs = isVarArgs,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
 				isPrivate = 0 ~= bit.band(modifiers, 2),
 				isProtected = 0 ~= bit.band(modifiers, 4),
 				isStatic = 0 ~= bit.band(modifiers, 8),
-				isFinal = 0 ~= bit.band(modifiers, 16),
-				isSynchronized = 0 ~= bit.band(modifiers, 32),
-				isVolatile = 0 ~= bit.band(modifiers, 64),
-				isTransient = 0 ~= bit.band(modifiers, 128),
-				isNative = 0 ~= bit.band(modifiers, 256),
-				isInterface = 0 ~= bit.band(modifiers, 512),
-				isAbstract = 0 ~= bit.band(modifiers, 1024),
-				isStrict = 0 ~= bit.band(modifiers, 2048),
+				isFinal = 0 ~= bit.band(modifiers, 0x10),
+				isSynchronized = 0 ~= bit.band(modifiers, 0x20),
+				isBridge = 0 ~= bit.band(modifiers, 0x40),
+				isVarArgs = 0 ~= bit.band(modifiers, 0x80),
+				isNative = 0 ~= bit.band(modifiers, 0x100),
+				isAbstract = 0 ~= bit.band(modifiers, 0x400),
+				isStrict = 0 ~= bit.band(modifiers, 0x800),
+				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
 			}
 
 			self._ctors:insert(methodObj)

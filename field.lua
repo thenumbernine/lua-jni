@@ -51,13 +51,10 @@ function JavaField:init(args)
 	self._isProtected = not not args.isProtected
 	self._isStatic = not not args.isStatic
 	self._isFinal = not not args.isFinal
-	self._isSynchronized = not not args.isSynchronized
 	self._isVolatile = not not args.isVolatile
 	self._isTransient = not not args.isTransient
-	self._isNative = not not args.isNative
-	self._isInterface = not not args.isInterface
-	self._isAbstract = not not args.isAbstract
-	self._isStrict = not not args.isStrict
+	self._isSynthetic = not not args.isSynthetic
+	self._isEnum = not not args.isEnum
 end
 
 -- there is a case for maintaining these pointers ...

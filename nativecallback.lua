@@ -7,25 +7,6 @@ local JavaASMClass = require 'java.asmclass'
 
 local M = {}
 
---[[
-JNIEXPORT jobject JNICALL
-Java_io_github_thenumbernine_NativeCallback_run(
-	JNIEnv * env,
-	jclass this_,
-	jlong jfuncptr,
-	jobject jarg
-) {
-	void* vfptr = (void*)jfuncptr;
-	void* results = NULL;
-	if (!vfptr) {
-		fprintf(stderr, "!!! DANGER !!! NativeCallback called with null function pointer !!!\n");
-	} else {
-		void *(*fptr)(void*) = (void*(*)(void*))vfptr;
-		results = fptr(jarg);
-	}
-	return results;
-}
---]]
 M.nativeCallbackRunFunc = function(env, this, jfuncptr, jarg)
 	local vfptr = ffi.cast('void*', jfuncptr)
 	local results
