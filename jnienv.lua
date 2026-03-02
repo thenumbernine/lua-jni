@@ -325,6 +325,15 @@ function JNIEnv:_version()
 	return envptr[0].GetVersion(envptr)
 end
 
+function JNIEnv:_fromJObject(jobject)
+	local classpath = self:_getObjClassPath(jobject)
+	return JavaObject._createObjectForClassPath{
+		env = self,
+		ptr = jobject,
+		classpath = classpath,
+	}
+end
+
 function JNIEnv:_str(s, len)
 	assert(type(s) == 'string' or type(s) == 'cdata', 'expected string or cdata')
 	local jstring
@@ -367,7 +376,9 @@ for _,name in ipairs(prims) do
 	primNameForCTypes[tostring(assert(primInfo.ctype))] = name
 end
 
--- jtype is a primitive or a classpath
+-- jtype can be:
+-- - a string: is a primitive or a classpath
+-- - a JavaClass object
 function JNIEnv:_newArray(jtype, length, objInit)
 
 	-- if jtype is a ffi ctype then convert it back to its name
@@ -383,6 +394,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 			jclassObj = self:_findClass(jclassObj)
 		else
 			assert(JavaClass:isa(jclassObj), "JNIEnv:_newArray expects a classpath or a JavaClass object")
+			jtype = jclassObj._classpath
 		end
 		-- TODO objInit as JavaObject, but how to encode null?
 		-- am I going to need a java.null placeholder object?
@@ -444,16 +456,10 @@ function JNIEnv:_exceptionOccurred()
 
 	self:_exceptionClear()
 
-	local classpath = self:_getObjClassPath(e)
-
---DEBUG:print('exception classpath', classpath)
+--DEBUG:print('exception classpath', self:_getObjClassPath(e))
 --DEBUG:print(debug.traceback())
 
-	local result = JavaObject._createObjectForClassPath{
-		env = self,
-		ptr = e,
-		classpath = classpath,
-	}
+	local result = self:_fromJObject(e)
 
 	self._dontCheckExceptions = false
 

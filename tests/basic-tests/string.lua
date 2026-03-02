@@ -64,6 +64,7 @@ print('arr String[3]', arr)
 print('arr:_getClass():_name()', arr:_getClass():_name())	-- [Ljava/lang/String; ... i.e. String[]
 -- can I get its length?
 print('#(arr String[3])', #arr)
+print('arr[0]', arr[0])
 
 arr:_set(0, 'a')
 arr:_set(1, 'b')
@@ -73,8 +74,8 @@ print('arr[0]', arr:_get(0))
 print('arr[1]', arr:_get(1))
 print('arr[2]', arr:_get(2))
 arr[1] = J:_str'testing'
-print('arr[0]', arr[0])
 print('arr[1]', arr[1])
+arr[2] = 'test'
 print('arr[2]', arr[2])
 
 -- [[ needs this to work

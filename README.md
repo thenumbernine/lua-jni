@@ -84,15 +84,17 @@ J.System.out:println("hello java")
 - - `javaType` can be a primitive string, a classpath string, a ffi ctype of a primitive, or a `JavaClass` object.
 - - see `JavaArray`
 
-- `jclass = J:_getObjClass(objPtr)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
+- `cl = J:_fromJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
 
-- `classpath, jclass = J:_getObjClassPath(objPtr)` = returns a Lua string of the classpath and `jclass` for the object in `objPtr`.
+- `obj = J:_fromJObject(jobject)` = gets the JavaObject (or subclass) Lua object for a jobject JNI pointer.
+
+- `jclass = J:_getObjClass(jobject)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
+
+- `classpath, jclass = J:_getObjClassPath(jobject)` = returns a Lua string of the classpath and `jclass` for the jobject in `jobject`.
 
 - `classObj = J:_saveJClassForClassPath(args)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
 
 - `J:_findClass(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
-
-- `cl = J:_fromJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
 
 - `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getTypeName() to determine the classname of the JNI jclass pointer.
 
