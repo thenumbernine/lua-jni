@@ -11,11 +11,16 @@ local thread = require 'thread.lite'{
 	local pthread = require 'ffi.req' 'c.pthread'
 	local callbackThread = pthread.pthread_self()
 	print('callback thread, pthread_self', callbackThread)
-	
-	local stage = arg
+
+	-- typically JavaLuaClass does this, but since we handed off a thread, we have to ourselves
+	-- that's why I am tempted to do a TODO JavaThread wrapper to do this for us.
+	print('arg', arg)
+	local args = J:_javaToLuaArg(arg, 'java.lang.Object[]')
+	print('args', args)
+	print('#args', #args)
+	local stage = args[0]:_cast'io.github.thenumbernine.ThisApplication'
 	print('stage', stage)
-	stage = J:_javaToLuaArg(stage, 'javafx.stage.Stage')
-	print('stage', stage)
+	print('stage._classpath', stage._classpath)
 
 	stage:setTitle'Hello World!'
 
@@ -27,6 +32,8 @@ local thread = require 'thread.lite'{
 	stage:setScene(
 		J.javafx.scene.Scene(root, 300, 250)
 	)
+
+	-- TODO not showing...
 	stage:show()
 ]=],
 }
@@ -49,7 +56,7 @@ local parentThread = pthread.pthread_self()
 print('parent thread, pthread_self', parentThread)
 
 -- the java-asm one loads a static field funcptr and calls it with NativeCallback
--- this is going to use closures. 
+-- this is going to use closures.
 local ThisApplication = require 'java.luaclass'{
 	env = J,
 	isPublic = true,

@@ -28,8 +28,10 @@ local J = require 'java'
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
--- auto-cast from func ptr
+-- _cb() will auto-cast from func ptr
+-- notice that because we're passing a function-pointer and not a function, we can't use JavaClass's implicit-call / _new()
 local th = J.Thread(J.Runnable:_cb(thread.funcptr))
+
 print('thread', th)
 th:start()
 th:join()

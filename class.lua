@@ -598,7 +598,7 @@ function JavaClass:_cbClass(func)
 	local cl = JavaLuaClass{
 		env = env,
 		extends = parentClass,
-		interfaces = interfaces,
+		implements = interfaces,
 		methods = {
 			{
 				name = samMethod._name,

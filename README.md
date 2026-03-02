@@ -275,42 +275,6 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `ar._elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
 - `ar._elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
 
-### JavaASMClass
-`JavaASMClass = require 'java.asmclass'`
-
-This is a bytecode reader/writer.
-It is meant to be an equivalent / replacement for Java-ASM.
-Lets you write java assembler in text and generate bytecode and run it live, no `javac` needed.
-
-- `asmClass = JavaASMClass(bytecode)` = build a `JavaASMClass` object from a Java `.class` file contents.
-
-- `asmClass = JavaASMClass(args)` = build a `JavaASMClass` from a table of properties.
-- args:
-- - `isPublic` etc `classAccessFlags` found in `java/util.lua`
-- - `thisClass` = slash-separated name of this class.
-- - `superClass` = slash-separated name of parent class.
-- - `interfaces` = list of slash-separated names of interface classes.
-- - `fields = {...}`
-- - - `isPublic` etc `fieldAccessFlags` found in `java/util.lua`
-- - - `name` = field name
-- - - `sig` = field signature
-- - - `constantValue` = optional field constant initialization value.
-- - `methods = {...}`
-- - - `isPublic` etc `methodAccessFlags` found in `java/util.lua`
-- - - `name` = method name
-- - - `sig` = method signature
-- - - `maxLocals`
-- - - `maxStack`
-- - - `code` = optional, method code.
-		If a table then a list of instructions.  Each instruction itself is a list, where the first is the instruction name and the rest are arguments.
-		If a string then this is parsed by line and space-separator, with semicolon (;) as comments.
-- - - `lineNos` = optional
-- - - `attrs = {...}` = optional method attributes.
-- - `attrs = {...}` = optional class attributes.
-
-- `bytecode = asmClass:compile()` = compiles the properties of a `JavaASMClass` object into Java bytecode, suitable for a `.class` file.
-
-- `cl = asmClass:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
 
 ### JavaLuaClass
 `JavaLuaClass = require 'java.luaclass'`
@@ -321,12 +285,63 @@ This acts on top of `JavaASMClass` to build a translation layer for converting a
 - Maybe I will just make the `.class` versus `.dex` file instruction set interchangeable and then I'll have to rename `JavaASMClass` to something like `JavaAsm`.
 
 `NewClass = JavaLuaClass(args)` = build a new `JavaClass` object with methods and constructors from provided Lua functions.
+- args:
+- - env: JNIEnv Lua wrapper
+- - name: (optional) classname, auto-generated otherwise.
+- - extends: (optional) dot-separated parent class name, defaults to `java.lang.Object`.
+- - implements: (optional) table of dot-separated interface class names.
+- - fields: (optional) either a list of tables of field properties passed to JavaASMClass, or optionally key/value fields will use the key for the name.
+- - methods: (optional) either a list of tables of method properties passed to JavaASMClass, or optionally key/value methods will use the key for the name.
+- - ctors: (optional) list of properties to pass for constructors.  If none are provided then a default constructor is created.
+
+### JavaASMClass
+`JavaASMClass = require 'java.asmclass'`
+
+This is a bytecode reader/writer.
+It is meant to be an equivalent / replacement for Java-ASM.
+Lets you read and write java assembler in text and generate bytecode and run it live, no `javac` needed.
+
+Notice that, like Lua class bytecode, the names in this tend to all be slash-separated unlike the dot-separated names in classes above.
+
+- `asmClass = JavaASMClass(bytecode)` = build a `JavaASMClass` object from a Java `.class` file contents.
+- `asmClass = JavaASMClass:fromFile(filename)` = helper function.
+
+- `asmClass = JavaASMClass(args)` = build a `JavaASMClass` from a table of properties.
+- args:
+- - `isPublic`... etc `classAccessFlags` found in `java/util.lua`
+- - `thisClass` = slash-separated name of this class.
+- - `superClass` = slash-separated name of parent class.
+- - `interfaces` = list of slash-separated names of interface classes.
+- - `attrs = {...}` = optional class attributes.
+- - `fields = {...}`
+- - - `isPublic`... etc `fieldAccessFlags` found in `java/util.lua`
+- - - `name` = field name
+- - - `sig` = field signature
+- - - `constantValue` = optional field constant initialization value.
+- - - `attrs = {...}` = optional field attributes.
+- - `methods = {...}`
+- - - `isPublic`... etc `methodAccessFlags` found in `java/util.lua`
+- - - `name` = method name
+- - - `sig` = method signature
+- - - `maxLocals`
+- - - `maxStack`
+- - - `code` = optional, method code.
+		If a table then a list of instructions.  Each instruction itself is a list, where the first is the instruction name and the rest are arguments.
+		If a string then this is parsed by line and space-separator, with semicolon (;) as comments.
+- - - `lineNos` = optional
+- - - `attrs = {...}` = optional method attributes.
+
+- `bytecode = asmClass:compile()` = compiles the properties of a `JavaASMClass` object into Java bytecode, suitable for a `.class` file.
+
+- `cl = asmClass:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
+
 
 ### NativeCallback
 `NativeCallback = require 'java.nativecallback`
 
 This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
 Maybe I'll slowly merge its functionality more and more with JavaASMClass and JavaLuaClass...
+
 
 <hr>
 

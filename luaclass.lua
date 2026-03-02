@@ -51,7 +51,7 @@ args:
 	env = JavaEnv
 	name = (optional) dot-separated class name
 	extends = (optional) parent-class, or java.lang.Object by default
-	interfaces = (optional) list-of-interfaces to use
+	implements = (optional) list-of-interfaces to use
 	fields = (optional) {
 		{
 			name =
@@ -109,7 +109,7 @@ function M:run(args)
 	local parentClassSlashSep = parentClass:gsub('%.', '/')
 
 	local interfaces = table()
-	for i,name in ipairs(args.interfaces or {}) do
+	for i,name in ipairs(args.implements or {}) do
 		if type(name) == 'string' then
 		elseif type(name) == 'table' then
 			if not require 'java.class':isa(name) then
@@ -125,6 +125,7 @@ function M:run(args)
 	local closures = table()	-- to-free
 	M.savedClosures[classname] =  closures
 
+
 	local asmClassArgs = {
 		version = 0x41,
 		isPublic = true,
@@ -132,21 +133,33 @@ function M:run(args)
 		thisClass = classnameSlashSep,
 		superClass = parentClassSlashSep,
 		interfaces = interfaces,
-		fields = table(args.fields):mapi(function(field)
-			return {
+		fields = table(),
+		methods = table(),
+	}
+
+
+	-- pairs() order is non-deterministic
+	-- but I think pairs() does ipairs integer indexes in order at least?
+	if args.fields then
+		for key,field in pairs(args.fields) do
+			if type(key) == 'string'
+			and not field.name
+			then
+				field.name = key
+			end
+			asmClassArgs.fields:insert{
 				isPublic = true,
 				name = assert.type(assert.index(field, 'name'), 'string'),
 				sig = getJNISig((assert.type(assert.index(field, 'sig'), 'string')))
 			}
-		end),
-		methods = table(),
-	}
+		end
+	end
 
 	local function buildLuaWrapperMethod(method)
 		local sig = method.sig or {}
 		sig[1] = sig[1] or 'void'
 		local returnType = sig[1]
-	
+
 		local code = table()
 		local asmClassMethod = {
 			isPublic = true,
@@ -292,7 +305,7 @@ function M:run(args)
 				-- so any sig that is double or long needs 2, otherwise 1?
 				return (sigi == 'long' or sigi == 'double') and 2 or 1
 			end):sum() or 0)
-	
+
 		asmClassArgs.methods:insert(asmClassMethod)
 	end
 
