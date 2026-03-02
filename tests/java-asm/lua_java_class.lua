@@ -358,7 +358,7 @@ function M:run(args)
 
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray():_toStr(), classnameSlashSep)
-	local cl = J:_getClassForJClass(classAsObj._ptr)
+	local cl = J:_fromJClass(classAsObj._ptr)
 	return cl
 end
 

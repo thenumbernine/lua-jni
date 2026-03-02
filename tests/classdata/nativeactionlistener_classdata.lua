@@ -64,6 +64,6 @@ return
 
 	local code = cw:compile()
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code, newClassName)
-	local cl = J:_getClassForJClass(classAsObj._ptr)
+	local cl = J:_fromJClass(classAsObj._ptr)
 	return cl
 end

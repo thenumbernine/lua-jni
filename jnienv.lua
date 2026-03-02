@@ -261,7 +261,7 @@ end
 -- looks up if its loaded in Lua yet
 -- ... loads it in Lua if not
 -- returns the JavaClass
-function JNIEnv:_getClassForJClass(jclass)
+function JNIEnv:_fromJClass(jclass)
 	if jclass == nil then return nil end
 	local classpath = self:_getJClassClasspath(jclass)
 
@@ -278,7 +278,7 @@ end
 
 -- makes a JavaClass object for a jclass pointer
 -- saves it in _classesLoaded
--- used by _findClass and _getClassForJClass
+-- used by _findClass and _fromJClass
 function JNIEnv:_saveJClassForClassPath(args)
 	local classpath = args.classpath
 	args.env = self
@@ -966,7 +966,7 @@ function JNIEnv:_defineClass(arg, newClassName)
 	if jclass == nil then
 		error("JNI DefineClass failed to load "..tostring(newClassName))
 	end
-	return self:_getClassForJClass(jclass)
+	return self:_fromJClass(jclass)
 end
 
 return JNIEnv

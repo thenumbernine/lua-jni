@@ -23,7 +23,7 @@ M.JNIDefineClass = function(J, code, newClassName)
 	if jclass == nil then
 		error("JNI DefineClass failed to load "..tostring(newClassName))
 	end
-	return J:_getClassForJClass(jclass)
+	return J:_fromJClass(jclass)
 end
 
 M.MethodHandlesLookup = function(J, code)	-- Notice this fails from JNI from C, but I bet it'd work in Android Java app.

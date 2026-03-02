@@ -494,7 +494,7 @@ end
 function JavaClass:_super()
 	local env = self._env
 	local jsuper = env._ptr[0].GetSuperclass(env._ptr, self._ptr)
-	return env:_getClassForJClass(jsuper)
+	return env:_fromJClass(jsuper)
 end
 
 -- idk that theres an equivalent operator in java?
@@ -508,7 +508,7 @@ function JavaClass:_isAssignableFrom(classTo)
 			error("tried to cast to an unknown class "..classpath)
 		end
 	elseif type(classTo) == 'cdata' then
-		classTo = env:_getClassForJClass(classTo)
+		classTo = env:_fromJClass(classTo)
 	elseif type(classTo) == 'table' then
 		-- TODO assert it's a JavaClass?
 		-- TODO if it's a JavaObject then get its :_getClass() ?

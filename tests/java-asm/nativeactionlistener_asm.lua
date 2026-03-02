@@ -105,5 +105,5 @@ print('CheckClassAdapter', CheckClassAdapter)
 	-- create the java .class to go along with it
 	local classAsObj = require 'java.tests.bytecodetoclass'(J, code:_toStr(), newClassName)
 
-	return (J:_getClassForJClass(classAsObj._ptr))
+	return (J:_fromJClass(classAsObj._ptr))
 end

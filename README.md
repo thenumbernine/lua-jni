@@ -92,7 +92,7 @@ J.System.out:println("hello java")
 
 - `J:_findClass(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
 
-- `cl = J:_getClassForJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
+- `cl = J:_fromJClass(jclass)` = gets the JavaClass Lua object for a jclass JNI pointer.  Either uses cache or creates a new JavaClass.
 
 - `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getTypeName() to determine the classname of the JNI jclass pointer.
 

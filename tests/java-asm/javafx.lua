@@ -130,7 +130,7 @@ do
 	run:visitEnd()
 
 	local classObj = require 'java.tests.bytecodetoclass'(J, cw:toByteArray():_toStr(), classname)
-	ThisApplication = J:_getClassForJClass(classObj._ptr)
+	ThisApplication = J:_fromJClass(classObj._ptr)
 end
 
 print('ThisApplication._fields.funcptr', ThisApplication._fields.funcptr)

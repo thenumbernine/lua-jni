@@ -94,7 +94,7 @@ end
 function JavaObject:_getClass()
 	local env = self._env
 	local jclass = env:_getObjClass(self._ptr)
-	return env:_getClassForJClass(jclass)
+	return env:_fromJClass(jclass)
 end
 
 -- shorthand for self:_getClass():_method(args)
