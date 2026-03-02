@@ -1,13 +1,9 @@
 #!/usr/bin/env luajit
--- needs to be run in java/tests/classdata/
+-- needs to be run in java/tests/asmclass/
 
-local J = require 'java.vm'{
-	props = {
-		['java.library.path'] = '.', 	-- needed for .so native loading
-	},
-}.jniEnv
+local J = require 'java'
 
-local NativeRunnable = require 'java.tests.classdata.nativerunnable_classdata'(J)	-- "WE'LL DO IT LIVE!!!!"
+local NativeRunnable = require 'java.tests.asmclass.nativerunnable_asmclass'(J)	-- "WE'LL DO IT LIVE!!!!"
 
 local ffi = require 'ffi'
 callback = function(arg)

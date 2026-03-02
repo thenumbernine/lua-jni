@@ -7,7 +7,7 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
 local JavaClass = require 'java.class'
-local JavaClassData = require 'java.classdata'
+local JavaASMClass = require 'java.asmclass'
 local getJNISig = require 'java.util'.getJNISig
 local infoForPrims = require 'java.util'.infoForPrims
 
@@ -125,7 +125,7 @@ function M:run(args)
 	local closures = table()	-- to-free
 	M.savedClosures[classname] =  closures
 
-	local classDataArgs = {
+	local asmClassArgs = {
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,
@@ -148,7 +148,7 @@ function M:run(args)
 		local returnType = sig[1]
 	
 		local code = table()
-		local classDataMethod = {
+		local asmClassMethod = {
 			isPublic = true,
 			name = method.name,
 			sig = getJNISig(sig),
@@ -285,20 +285,20 @@ function M:run(args)
 			code:insert{'areturn'}
 		end
 
-		classDataMethod.maxStack = 10
-		classDataMethod.maxLocals =
+		asmClassMethod.maxStack = 10
+		asmClassMethod.maxLocals =
 			1 + (table.sub(sig, 2):mapi(function(sigi)
 				-- max locals ... wait, locals include args right?
 				-- so any sig that is double or long needs 2, otherwise 1?
 				return (sigi == 'long' or sigi == 'double') and 2 or 1
 			end):sum() or 0)
 	
-		classDataArgs.methods:insert(classDataMethod)
+		asmClassArgs.methods:insert(asmClassMethod)
 	end
 
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
-		classDataArgs.methods:insert{
+		asmClassArgs.methods:insert{
 			isPublic = true,
 			name = '<init>',
 			sig = '()V',
@@ -326,7 +326,7 @@ return
 		buildLuaWrapperMethod(method)
 	end
 
-	return J:_defineClass(JavaClassData(classDataArgs))
+	return J:_defineClass(JavaASMClass(asmClassArgs))
 end
 
 return setmetatable(M, {

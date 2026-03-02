@@ -8,8 +8,8 @@ return function(J)
 	-- [[ java-asm based
 	local NativeCallback = require 'java.tests.java-asm.nativecallback_asm'(J)
 	--]]
-	--[[ luajit java.classdata
-	local NativeCallback = require 'java.tests.classdata.nativecallback_classdata'(J)
+	--[[ luajit java.asmclass
+	local NativeCallback = require 'java.tests.asmclass.nativecallback_asmclass'(J)
 	--]]
 
 	-- can I make this use the same namespace as my previously built .so? yes.

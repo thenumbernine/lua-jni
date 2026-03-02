@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
 
--- load our classes using java.classdata
+-- load our classes using java.asmclass
 
 local thread = require 'thread.lite'{
 	code = [=[
@@ -41,7 +41,7 @@ local thread = require 'thread.lite'{
 		local JButton = J.javax.swing.JButton
 
 		local ffi = require 'ffi'
-		local NativeActionListener = require 'java.tests.classdata.nativeactionlistener_classdata'(J)
+		local NativeActionListener = require 'java.tests.asmclass.nativeactionlistener_asmclass'(J)
 
 		local btn1 = JButton'Btn1'
 		btn1:addActionListener(NativeActionListener(
@@ -100,7 +100,7 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
-local NativeRunnable = require 'java.tests.classdata.nativerunnable_classdata'(J)
+local NativeRunnable = require 'java.tests.asmclass.nativerunnable_asmclass'(J)
 
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))

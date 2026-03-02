@@ -70,33 +70,33 @@ local function deepCopy(t)
 end
 
 -- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
-local function readClassName(cldata, index)
-	local const = assert.index(cldata.constants, index, 'classData.constants')
+local function readClassName(asmClass, index)
+	local const = assert.index(asmClass.constants, index, 'asmClass.constants')
 	assert.type(const, 'table', 'const class type')
 	assert.eq(const.tag, 'class', 'const class tag')
 	return assert.type(const.name, 'string')
 end
 
-local function instPushClass(inst, insBlob, cldata)
-	inst:insert((readClassName(cldata, insBlob:readu2())))
+local function instPushClass(inst, insBlob, asmClass)
+	inst:insert((readClassName(asmClass, insBlob:readu2())))
 end
-local function insPopClass(inst, index, cldata)
-	return cldata.addConst{
+local function insPopClass(inst, index, asmClass)
+	return asmClass.addConst{
 		tag = 'class',
 		name = inst[index],
 	}, index+1
 end
 
-local function instPushMethod(inst, insBlob, cldata)
+local function instPushMethod(inst, insBlob, asmClass)
 	local methodIndex = insBlob:readu2()
-	local method = assert.index(cldata.constants, methodIndex)
+	local method = assert.index(asmClass.constants, methodIndex)
 	assert.eq(method.tag, 'methodRef')
 	inst:insert(method.class.name)
 	inst:insert(method.nameAndType.name)
 	inst:insert(method.nameAndType.sig)
 end
-local function instPopMethod(inst, index, cldata)
-	local methodIndex = cldata.addConst{
+local function instPopMethod(inst, index, asmClass)
+	local methodIndex = asmClass.addConst{
 		tag = 'methodRef',
 		class = inst[index],
 		nameAndType = {
@@ -105,20 +105,20 @@ local function instPopMethod(inst, index, cldata)
 			sig = inst[index+2],
 		},
 	}
-assert.eq('methodRef', assert.index(assert.index(cldata.constants, methodIndex), 'tag'))
+assert.eq('methodRef', assert.index(assert.index(asmClass.constants, methodIndex), 'tag'))
 	return methodIndex, index+3
 end
 
-local function instPushField(inst, insBlob, cldata)
+local function instPushField(inst, insBlob, asmClass)
 	local fieldIndex = insBlob:readu2()
-	local field = assert.index(cldata.constants, fieldIndex)
+	local field = assert.index(asmClass.constants, fieldIndex)
 	assert.eq(field.tag, 'fieldRef')
 	inst:insert(field.class.name)
 	inst:insert(field.nameAndType.name)
 	inst:insert(field.nameAndType.sig)
 end
-local function instPopField(inst, index, cldata)
-	local fieldIndex = cldata.addConst{
+local function instPopField(inst, index, asmClass)
+	local fieldIndex = asmClass.addConst{
 		tag = 'fieldRef',
 		class = inst[index],
 		nameAndType = {
@@ -127,12 +127,12 @@ local function instPopField(inst, index, cldata)
 			sig = inst[index+2],
 		},
 	}
-assert.eq('fieldRef', assert.index(assert.index(cldata.constants, fieldIndex), 'tag'))
+assert.eq('fieldRef', assert.index(assert.index(asmClass.constants, fieldIndex), 'tag'))
 	return fieldIndex, index+3
 end
 
-local function instPushConst(inst, insBlob, cldata, constIndex)
-	local const = cldata.constants[constIndex]
+local function instPushConst(inst, insBlob, asmClass, constIndex)
+	local const = asmClass.constants[constIndex]
 	if not const then
 		-- how do we notice 'dynamic index' ?
 		inst:insert(constIndex)
@@ -163,33 +163,33 @@ local function instPushConst(inst, insBlob, cldata, constIndex)
 		end
 	end
 end
-local function instPopConst(inst, index, cldata)
+local function instPopConst(inst, index, asmClass)
 	local tag = inst[index] index=index+1
 	if type(tag) == 'number' then
 		return tag, index
 	elseif tag == 'class' then
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			name = inst[index],
 		}, index+1
 	elseif tag == 'methodHandle' then
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			refKind = inst[index],
 			reference = inst[index+1],
 		}, index+2
 	elseif tag == 'methodType' then
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			sig = inst[index],
 		}, index+1
 	elseif tag == 'float' or tag == 'int' then
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			value = inst[index],
 		}, index+1
 	elseif tag == 'string' then
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			value = inst[index],
 		}, index+1
@@ -198,8 +198,8 @@ local function instPopConst(inst, index, cldata)
 	end
 end
 
-local function instPushConst2(inst, insBlob, cldata, constIndex)
-	local const = cldata.constants[constIndex]
+local function instPushConst2(inst, insBlob, asmClass, constIndex)
+	local const = asmClass.constants[constIndex]
 	if not const then
 		-- how do we notice 'dynamic index' ?
 		inst:insert(constIndex)
@@ -216,14 +216,14 @@ local function instPushConst2(inst, insBlob, cldata, constIndex)
 		end
 	end
 end
-local function instPopConst2(inst, index, cldata)
+local function instPopConst2(inst, index, asmClass)
 	local tag = inst[index] index=index+1
 	if type(tag) == 'number' then
 		return tag, index
 	elseif tag == 'long' or tag == 'double' then
 		local value = assert.index(inst, index)
 		value = castToNumberOrJPrim(value)
-		return cldata.addConst{
+		return asmClass.addConst{
 			tag = tag,
 			value = value,
 		}, index+1
@@ -257,11 +257,11 @@ local instDescForOp = {
 	[0x12] = {
 		name='ldc',
 		--args={'uint8_t'},	-- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
-		args = function(inst, insBlob, cldata)
-			instPushConst(inst, insBlob, cldata, insBlob:readu1())
+		args = function(inst, insBlob, asmClass)
+			instPushConst(inst, insBlob, asmClass, insBlob:readu1())
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu1(instPopConst(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu1(instPopConst(inst, 2, asmClass))
 		end,
 	},
 
@@ -269,11 +269,11 @@ local instDescForOp = {
 	[0x13] = {
 		name='ldc_w',
 		args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
-			instPushConst(inst, insBlob, cldata, insBlob:readu2())
+		args = function(inst, insBlob, asmClass)
+			instPushConst(inst, insBlob, asmClass, insBlob:readu2())
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopConst(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopConst(inst, 2, asmClass))
 		end,
 	},
 
@@ -281,11 +281,11 @@ local instDescForOp = {
 	[0x14] = {
 		name='ldc2_w',
 		--args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
-			instPushConst2(inst, insBlob, cldata, insBlob:readu2())
+		args = function(inst, insBlob, asmClass)
+			instPushConst2(inst, insBlob, asmClass, insBlob:readu2())
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopConst2(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopConst2(inst, 2, asmClass))
 		end,
 	},
 
@@ -455,11 +455,11 @@ local instDescForOp = {
 	[0xb2] = {
 		name='getstatic',
 		--args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
-			instPushField(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushField(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopField(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopField(inst, 2, asmClass))
 		end,
 	},
 
@@ -467,11 +467,11 @@ local instDescForOp = {
 	[0xb3] = {
 		name='putstatic',
 		--args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
-			instPushField(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushField(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopField(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopField(inst, 2, asmClass))
 		end,
 	},
 
@@ -479,11 +479,11 @@ local instDescForOp = {
 	[0xb4] = {
 		name='getfield',
 		--args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
-			instPushField(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushField(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopField(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopField(inst, 2, asmClass))
 		end,
 	},
 
@@ -491,15 +491,15 @@ local instDescForOp = {
 	[0xb5] = {
 		name='putfield',
 		--args={'uint16_t'},
-		args = function(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
 			assert(xpcall(function()
-				instPushField(inst, insBlob, cldata)
+				instPushField(inst, insBlob, asmClass)
 			end, function(err)
 				return 'at putfield at ofs='..insBlob.ofs..'\n'..err
 			end))
 		end,
-		write = function(inst, insBlob, cldata)
-			local fieldIndex = instPopField(inst, 2, cldata)
+		write = function(inst, insBlob, asmClass)
+			local fieldIndex = instPopField(inst, 2, asmClass)
 --DEBUG:print('write putfield '..fieldIndex)
 			insBlob:writeu2(fieldIndex)
 		end,
@@ -508,46 +508,46 @@ local instDescForOp = {
 	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb6] = {
 		name='invokevirtual',
-		args = function(inst, insBlob, cldata)
-			instPushMethod(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushMethod(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopMethod(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopMethod(inst, 2, asmClass))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb7] = {
 		name='invokespecial',
-		args = function(inst, insBlob, cldata)
-			instPushMethod(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushMethod(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopMethod(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopMethod(inst, 2, asmClass))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2	[arg1, arg2, ...] → result	invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb8] = {
 		name='invokestatic',
-		args = function(inst, insBlob, cldata)
-			instPushMethod(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushMethod(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopMethod(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopMethod(inst, 2, asmClass))
 		end,
 	},
 
 	-- 4: indexbyte1, indexbyte2, count, 0	objectref, [arg1, arg2, ...] → result	invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb9] = {
 		name='invokeinterface',
-		args = function(inst, insBlob, cldata)
-			instPushMethod(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushMethod(inst, insBlob, asmClass)
 			inst:insert(insBlob:readu1())	-- count ... what's count for?
 			assert.eq(insBlob:readu1(), 0)	-- 0
 		end,
-		write = function(inst, insBlob, cldata)
-			local methodIndex, index = instPopMethod(inst, 2, cldata)
+		write = function(inst, insBlob, asmClass)
+			local methodIndex, index = instPopMethod(inst, 2, asmClass)
 			insBlob:writeu2(methodIndex)
 			insBlob:writeu1(inst[index])
 			insBlob:writeu1(0)
@@ -558,12 +558,12 @@ local instDescForOp = {
 	[0xba] = {
 		name='invokedynamic',
 		args={'uint16_t', 'uint8_t', 'uint8_t'},
-		args = function(inst, insBlob, cldata)
-			instPushMethod(inst, insBlob, cldata)
+		args = function(inst, insBlob, asmClass)
+			instPushMethod(inst, insBlob, asmClass)
 			assert.eq(insBlob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(instPopMethod(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(instPopMethod(inst, 2, asmClass))
 			insBlob:writeu2(0)
 		end,
 	},
@@ -572,11 +572,11 @@ local instDescForOp = {
 	[0xbb] = {
 		name='new',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, cldata)
-			instPushClass(inst, insBlob, cldata)
+		args = function(inst, isnBlob, asmClass)
+			instPushClass(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(insPopClass(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(insPopClass(inst, 2, asmClass))
 		end,
 	},
 
@@ -591,11 +591,11 @@ local instDescForOp = {
 	[0xbd] = {
 		name='anewarray',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, cldata)
-			instPushClass(inst, insBlob, cldata)
+		args = function(inst, isnBlob, asmClass)
+			instPushClass(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(insPopClass(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(insPopClass(inst, 2, asmClass))
 		end,
 	},
 
@@ -606,11 +606,11 @@ local instDescForOp = {
 	[0xc0] = {
 		name='checkcast',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, cldata)
-			instPushClass(inst, insBlob, cldata)
+		args = function(inst, isnBlob, asmClass)
+			instPushClass(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(insPopClass(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(insPopClass(inst, 2, asmClass))
 		end,
 	},
 
@@ -618,11 +618,11 @@ local instDescForOp = {
 	[0xc1] = {
 		name='instanceof',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, cldata)
-			instPushClass(inst, insBlob, cldata)
+		args = function(inst, isnBlob, asmClass)
+			instPushClass(inst, insBlob, asmClass)
 		end,
-		write = function(inst, insBlob, cldata)
-			insBlob:writeu2(insPopClass(inst, 2, cldata))
+		write = function(inst, insBlob, asmClass)
+			insBlob:writeu2(insPopClass(inst, 2, asmClass))
 		end,
 	},
 
@@ -634,12 +634,12 @@ local instDescForOp = {
 	[0xc5] = {
 		name='multianewarray',
 		--args={'uint16_t', 'uint8_t'}
-		args = function(inst, isnBlob, cldata)
-			instPushClass(inst, insBlob, cldata)
+		args = function(inst, isnBlob, asmClass)
+			instPushClass(inst, insBlob, asmClass)
 			inst:insert(insBlob:readu1())
 		end,
-		write = function(inst, insBlob, cldata)
-			local classIndex, index = insPopClass(inst, 2, cldata)
+		write = function(inst, insBlob, asmClass)
+			local classIndex, index = insPopClass(inst, 2, asmClass)
 			insBlob:writeu2(classIndex)
 			insBlob:writeu1(inst[index])
 		end,
@@ -660,13 +660,13 @@ local opForInstName = table.map(instDescForOp, function(inst,op)
 end)
 
 
-local JavaClassData = class()
-JavaClassData.__name = 'JavaClassData'
+local JavaASMClass = class()
+JavaASMClass.__name = 'JavaASMClass'
 
 -- ; is a popular asm comment syntax, right?
-JavaClassData.lineComment = ';'
+JavaASMClass.lineComment = ';'
 
-function JavaClassData:init(args)
+function JavaASMClass:init(args)
 	if type(args) == 'string' then
 		self:readData(args)	-- assume its raw data
 	elseif type(args) == 'nil' then
@@ -705,8 +705,8 @@ end
 
 
 -- static ctor
-function JavaClassData:fromFile(filename)
-	local o = JavaClassData()
+function JavaASMClass:fromFile(filename)
+	local o = JavaASMClass()
 	o:readData((assert(path(filename):read())))
 	return o
 end
@@ -762,7 +762,7 @@ function ReadBlob:assertDone()
 	end
 end
 
-function JavaClassData:readData(data)
+function JavaASMClass:readData(data)
 	local function deepCopyIndex(index)
 		return deepCopy(assert.index(self.constants, index))
 	end
@@ -1263,7 +1263,7 @@ function WriteBlob:compile()
 end
 
 -- hmm maybe 'toByteCode()' ?
-function JavaClassData:compile()
+function JavaASMClass:compile()
 	--[[
 	build constants fresh?  why not?
 	cycle through all fields and all methods and their instructions
@@ -1757,8 +1757,8 @@ self.constants = constants
 end
 
 -- shorthand for env:_defineClass(self, ...)
-function JavaClassData:_defineClass(env, ...)
+function JavaASMClass:_defineClass(env, ...)
 	return env:_defineClass(self, ...)
 end
 
-return JavaClassData
+return JavaASMClass

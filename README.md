@@ -6,7 +6,7 @@ This library includes...
 - LuaJIT binding file for `jni.h`
 - Some Lua-wrapping classes for JavaVM, JNIEnv, etc.
 - `JavaObject`s and `JavaClass`es, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
-- A `JavaClassData`-assembler in LuaJIT.  Create new classes at runtime -- no more `javac` required!
+- A `JavaASMClass`-assembler in LuaJIT.  Create new classes at runtime -- no more `javac` required!
 - Java-native callback and Lua binding layer.  Create new Java classes from Lua functions!
 
 # Start:
@@ -116,7 +116,7 @@ J.System.out:println("hello java")
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
 - - ex: `J.java.lang.String` retrieves the JavaClass `java.lang.String`
 
-- `cl = J:_defineClass(javaClassData)` = generate a new class at runtime from a JavaClassData object.
+- `cl = J:_defineClass(asmClass)` = generate a new class at runtime from a JavaASMClass object.
 - `cl = J:_defineClass(bytecode, newClassName)` = same but with bytecode as a Lua string, and new class name.
 
 I put primitives in the root namespace to map to LuaJIT FFI cdata types.
@@ -275,16 +275,16 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `ar._elemFFIType_1` = for primitives, LuaJIT FFI ctype of a 1-length array of the JNI primitive type.
 - `ar._elemFFIType_ptr` = for primitives, LuaJIT FFI ctype of a pointer of the JNI primitive type.
 
-### JavaClassData
-`JavaClassData = require 'java.classdata'`
+### JavaASMClass
+`JavaASMClass = require 'java.asmclass'`
 
 This is a bytecode reader/writer.
 It is meant to be an equivalent / replacement for Java-ASM.
 Lets you write java assembler in text and generate bytecode and run it live, no `javac` needed.
 
-- `classData = JavaClassData(bytecode)` = build a `JavaClassData` object from a Java `.class` file contents.
+- `asmClass = JavaASMClass(bytecode)` = build a `JavaASMClass` object from a Java `.class` file contents.
 
-- `classData = JavaClassData(args)` = build a `JavaClassData` from a table of properties.
+- `asmClass = JavaASMClass(args)` = build a `JavaASMClass` from a table of properties.
 - args:
 - - `isPublic` etc `classAccessFlags` found in `java/util.lua`
 - - `thisClass` = slash-separated name of this class.
@@ -308,17 +308,17 @@ Lets you write java assembler in text and generate bytecode and run it live, no 
 - - - `attrs = {...}` = optional method attributes.
 - - `attrs = {...}` = optional class attributes.
 
-- `bytecode = classData:compile()` = compiles the properties of a `JavaClassData` object into Java bytecode, suitable for a `.class` file.
+- `bytecode = asmClass:compile()` = compiles the properties of a `JavaASMClass` object into Java bytecode, suitable for a `.class` file.
 
-- `cl = javaClassData:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
+- `cl = asmClass:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
 
 ### JavaLuaClass
 `JavaLuaClass = require 'java.luaclass'`
 
-This acts on top of `JavaClassData` to build a translation layer for converting arguments between Lua and Java and closure-capture.
-- Maybe I will slowly merge its features into JavaClassData.
-- Maybe I will introduce JavaDalvikData and make it and JavaClassData interechangeable underneath JavaLuaClass.
-- Maybe I will just make the `.class` versus `.dex` file instruction set interchangeable and then I'll have to rename `JavaClassData` to something like `JavaAsm`.
+This acts on top of `JavaASMClass` to build a translation layer for converting arguments between Lua and Java and closure-capture.
+- Maybe I will slowly merge its features into JavaASMClass.
+- Maybe I will introduce JavaDalvikData and make it and JavaASMClass interechangeable underneath JavaLuaClass.
+- Maybe I will just make the `.class` versus `.dex` file instruction set interchangeable and then I'll have to rename `JavaASMClass` to something like `JavaAsm`.
 
 `NewClass = JavaLuaClass(args)` = build a new `JavaClass` object with methods and constructors from provided Lua functions.
 
@@ -326,7 +326,7 @@ This acts on top of `JavaClassData` to build a translation layer for converting 
 `NativeCallback = require 'java.nativecallback`
 
 This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
-Maybe I'll slowly merge its functionality more and more with JavaClassData and JavaLuaClass...
+Maybe I'll slowly merge its functionality more and more with JavaASMClass and JavaLuaClass...
 
 <hr>
 
@@ -353,13 +353,13 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 `java/tests/inheritence/inheritence.lua` tests inheritence properties.  It requires `javac`.
 
-`java/tests/classdata/runnable.lua` = demonstrates `java.lang.Runnable` using this library's JavaClassData (realtime bytecode assembler).
+`java/tests/asmclass/runnable.lua` = demonstrates `java.lang.Runnable` using this library's JavaASMClass (realtime bytecode assembler).
 
-`java/tests/classdata/runnable_mt.lua` = demonstrates `java.lang.Runnable` and `java.lang.Thread` using this library's JavaClassData and lua-thread's LiteThread.
+`java/tests/asmclass/runnable_mt.lua` = demonstrates `java.lang.Runnable` and `java.lang.Thread` using this library's JavaASMClass and lua-thread's LiteThread.
 
-`java/tests/classdata/applet.lua` = demonstrates Java Swing application example using JavaClassData.
+`java/tests/asmclass/applet.lua` = demonstrates Java Swing application example using JavaASMClass.
 
-`java/tests/classdata/javafx.lua` = WIP demo of JavaFX with JavaClassData.
+`java/tests/asmclass/javafx.lua` = WIP demo of JavaFX with JavaASMClass.
 
 `java/tests/java-asm/*.lua` = a lot of demos that use Java-ASM for accessing NativeCallback and creating subclasses at runtime and breaking out of the Java reservation.
 
@@ -379,5 +379,5 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
 - Add fields to JavaClass, JavaField, and JavaMethod.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ...
-- make a full `.javasm` parser for JavaClassData.
-- make JavaClassData fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...
+- make a full `.javasm` parser for JavaASMClass.
+- make JavaASMClass fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...

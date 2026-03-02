@@ -1,11 +1,11 @@
 #!/usr/bin/env luajit
 
--- test reading classdata
+-- test reading and writing and reading and writing asmclass
 local os = require 'ext.os'
 local path = require 'ext.path'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
-local JavaClassData = require 'java.classdata'
+local JavaASMClass = require 'java.asmclass'
 
 
 --[[
@@ -58,14 +58,14 @@ end
 
 validate()
 
-local classFileData = assert(srcClassPath:read())
+local classByteCode = assert(srcClassPath:read())
 
 print('original:')
-print(string.hexdump(classFileData, 16))
+print(string.hexdump(classByteCode, 16))
 print()
 
 -- read
-local cldata = JavaClassData(classFileData)
+local cldata = JavaASMClass(classByteCode)
 print('in Lua:')
 print(require'ext.tolua'(cldata))
 print()
@@ -78,7 +78,7 @@ print(string.hexdump(bytes, 16))
 print()
 
 print('2nd try, in Lua:')
-local try2 = JavaClassData(bytes)
+local try2 = JavaASMClass(bytes)
 print(require'ext.tolua'(try2))
 print()
 

@@ -1,9 +1,9 @@
 --[[
 Here's the fake-class used for the solve purpose of its one native function that a lot of other functions are using for Java calling into LuaJIT.
-I guess with JavaClassData and JavaLuaClass, the need for this is getting slimmer and slimmer...
+I guess with JavaASMClass and JavaLuaClass, the need for this is getting slimmer and slimmer...
 --]]
 local ffi = require 'ffi'
-local JavaClassData = require 'java.classdata'
+local JavaASMClass = require 'java.asmclass'
 
 local M = {}
 
@@ -60,7 +60,7 @@ function M:run(env)
 		return cl
 	end
 
-	local classData = JavaClassData{
+	local asmClass = JavaASMClass{
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,
@@ -89,7 +89,7 @@ return
 		},
 	}
 
-	local cl = env:_defineClass(classData)
+	local cl = env:_defineClass(asmClass)
 
 	-- now it looks like JNIEnv->RegisterNatives can allow you to manually set native methods instead of depending on symbol table.
 	-- but I'm also reading that JNIEnv->RegisterNatives itself needs to be called from ... a specifically-named function in the symbol table ... smh.

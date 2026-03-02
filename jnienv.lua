@@ -939,21 +939,21 @@ assert.eq(true, env._ignoringExceptions)
 	return Name{env=env, name=classpath}
 end
 
--- _defineClass points to JavaClassData = require 'java.classdata'
+-- _defineClass points to JavaASMClass = require 'java.asmclass'
 --[[
-'arg' can be a JavaClassData, or a Lua string of bytecode (returned with :compile() above)
-'newClassName' = classname, not necessary if using a JavaClassData to call this.
+'asmClass' can be a JavaASMClass, or a Lua string of bytecode (returned with :compile() above)
+'newClassName' = classname, not necessary if using a JavaASMClass to call this.
 --]]
-function JNIEnv:_defineClass(arg, newClassName)
-	local JavaClassData = require 'java.classdata'
+function JNIEnv:_defineClass(asmClass, newClassName)
+	local JavaASMClass = require 'java.asmclass'
 	local code
-	if type(arg) == 'string' then
-		code = arg
-	elseif JavaClassData:isa(arg) then
-		code = arg:compile()
-		newClassName = newClassName or arg.thisClass
+	if type(asmClass) == 'string' then
+		code = asmClass
+	elseif JavaASMClass:isa(asmClass) then
+		code = asmClass:compile()
+		newClassName = newClassName or asmClass.thisClass
 	else
-		error('JavaClassData.defineClass accepts its own objects or Lua strings')
+		error('JavaASMClass.defineClass accepts its own objects or Lua strings')
 	end
 
 	newClassName = newClassName:gsub('%.', '/')

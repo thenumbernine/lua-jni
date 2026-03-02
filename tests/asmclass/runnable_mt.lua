@@ -1,5 +1,5 @@
 #!/usr/bin/env luajit
--- run from java/tests/classdata/
+-- run from java/tests/asmclass/
 
 -- child thread:
 local thread = require 'thread.lite'{
@@ -33,7 +33,7 @@ local J = require 'java.vm'{
 	},
 }.jniEnv
 
-local NativeRunnable = require 'java.tests.classdata.nativerunnable_classdata'(J)	-- "WE'LL DO IT LIVE!!!!"
+local NativeRunnable = require 'java.tests.asmclass.nativerunnable_asmclass'(J)	-- "WE'LL DO IT LIVE!!!!"
 
 -- before I was passing J._vm._ptr as the arg
 -- now I can't because JNI expects it to be jobject and will poke inside the memory

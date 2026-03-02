@@ -1,13 +1,13 @@
 #!/usr/bin/env luajit
--- this loads a `.class` and spits out its JavaClassData contents.
+-- this loads a `.class` and spits out its JavaASMClass contents.
 -- Useful for viewing Java disassembly.
--- The equivalent contents can be taken and used as a JavaClassData ctor args to build a similar class. 
---  (Should be the identical class bytecode if disassembled and built twice in a row from JavaClassData)
--- (TODO this is the same as java/tests/javac/test_classdata.lua except that runs java-asm and maybe the javap stuff too)
+-- The equivalent contents can be taken and used as a JavaASMClass ctor args to build a similar class. 
+--  (Should be the identical class bytecode if disassembled and built twice in a row from JavaASMClass)
+-- (TODO this is the same as java/tests/javac/test_asmclass.lua except that runs java-asm and maybe the javap stuff too)
 local path = require 'ext.path'
 local string = require 'ext.string'
 local assert = require 'ext.assert'
-local JavaClassData = require 'java.classdata'
+local JavaASMClass = require 'java.asmclass'
 
 local classfile = path((assert(..., 'expected <classfile>')))
 assert(classfile:exists(), "couldn't find class file "..classfile)
@@ -20,8 +20,8 @@ print('original bytecode:')
 print(string.hexdump(classFileData, 48))
 print()
 
-local cldata = JavaClassData(classFileData)
-print('JavaClassData:')
+local cldata = JavaASMClass(classFileData)
+print('JavaASMClass:')
 print(require'ext.tolua'(cldata))
 print()
 
@@ -30,8 +30,8 @@ print'recompiled bytecode:'
 print(string.hexdump(bytes, 48))
 print()
 
-print('2nd read into JavaClassData:')
-local try2 = JavaClassData(bytes)
+print('2nd read into JavaASMClass:')
+local try2 = JavaASMClass(bytes)
 print(require'ext.tolua'(try2))
 print()
 
