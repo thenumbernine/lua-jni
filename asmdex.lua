@@ -54,4 +54,57 @@ end
 
 
 function JavaASMDex:readData(data)
+	local blob = ReadBlob(data)
+	blob.littleEndian = true	-- by default
+	assert.eq(blob:readString(8), 'dex\n035\0')
+	local checksum = blob:readu4()
+	local sha1sig = blob:readString(20)
+	local size = blob:readu4()
+	local endian = blob:readu4()
+	if endian == 0x78563412 then
+		-- then do I flip size and checksum as well?
+		blob.littleEndian = false
+	end
+	assert.eq(size, #data, "size didn't match")	-- when does size not equal #data?
+	local linkSize = blob:readu4()
+	local linkOfs = blob:readu4()
+	local mapOfs = blob:readu4()
+
+	-- string offset points to a list of uint32_t's which point to the string data
+	-- ... which start with a uleb128 prefix
+	local stringIdsSize = blob:readu4()
+	local stringIdsOfs = blob:readu4()
+
+	-- list of uint32 idss into string table?
+	local typeIdsSize = blob:readu4()
+	local typeIdsOfs = blob:readu4()
+
+	--[[
+	proto points to:
+		uint32_t string index of short-form signature
+		uint32_t type-ID index of return type
+		uint32_t offset into "type list" (where?)
+	--]]
+	local protoIdsSize = blob:readu4()
+	local protoIdsOfs = blob:readu4()
+
+	--[[
+
+	--]]
+	local fieldIdsSize = blob:readu4()
+	local fieldIdsOfs = blob:readu4()
+
+	--[[
+		uint16 index into type IDs of class
+		uint16 index into protoIDs for method signature
+		uint32 index into stringIDs for method name
+	--]]
+	local methodIdsSize = blob:readu4()
+	local methodIdsOfs = blob:readu4()
+
+	local classDefSize = blob:readu4()
+	local classDefOfs = blob:readu4()
+
+	local dataSize = blob:readu4()
+	local dataOfs = blob:readu4()
 end
