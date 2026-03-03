@@ -109,18 +109,21 @@ function M:run(args)
 	local parentClass = args.extends or 'java.lang.Object'
 	local parentClassSlashSep = parentClass:gsub('%.', '/')
 
-	local interfaces = table()
-	for i,name in ipairs(args.implements or {}) do
-		if type(name) == 'string' then
-		elseif type(name) == 'table' then
-			if not require 'java.class':isa(name) then
+	local interfaces
+	if args.implements then
+		interfaces = table()
+		for i,name in ipairs(args.implements) do
+			if type(name) == 'string' then
+			elseif type(name) == 'table' then
+				if not require 'java.class':isa(name) then
+					error(".interfaces["..i.."] expects a string or a JavaClass")
+				end
+				name = name._classpath
+			else
 				error(".interfaces["..i.."] expects a string or a JavaClass")
 			end
-			name = name._classpath
-		else
-			error(".interfaces["..i.."] expects a string or a JavaClass")
+			interfaces[i] = name:gsub('%.', '/')
 		end
-		interfaces[i] = name:gsub('%.', '/')
 	end
 
 	local closures = table()	-- to-free
@@ -210,6 +213,13 @@ function M:run(args)
 		end
 
 		local code = table()
+		local function pushConstInt(value)
+			if value >= 0 and value <= 5 then
+				code:insert{'iconst_'..value}
+			else
+				const:insert{'bipush', value}
+			end
+		end
 
 		-- special for ctors, call parent
 		if method.name == '<init>' then
@@ -261,34 +271,42 @@ function M:run(args)
 		-- 2) an Object[] of {this, ... rest of args of the method}
 		local sigNumArgs = #sig-1
 --DEBUG:print('sigNumArgs', sigNumArgs)
-		code:insert{'bipush', sigNumArgs+1}		-- +1 for 'this' (TODO static)
+		local argArraySize = sigNumArgs
+			-- +1 for 'this' unless it's static
+			+ (method.isStatic and 0 or 1)
+		pushConstInt(argArraySize)
 		code:insert{'anewarray', 'java/lang/Object'}
 
 		-- set args[0] = this
-		-- TODO if it's static, what to do?  pass nothing?  pass the JavaObject of the java.lang.Class?
-		code:insert{'dup'}
-		code:insert{'iconst_0'}
-		code:insert{'aload_0'}
-		code:insert{'aastore'}
+		-- if it's static, what to do?
+		-- TODO pass the JavaObject of the java.lang.Class?
+		local localVarIndex = 0
+		local argArrayIndex = 0
+		-- to skip 'this' ... right?
+		if not method.isStatic then
+			code:insert{'dup'}
+			pushConstInt(0)		-- array index ...?
+			code:insert{'aload_'..argArrayIndex}	-- local index (0 for 'this')
+			code:insert{'aastore'}
+			localVarIndex = localVarIndex + 1	-- start us at 1
+			argArrayIndex = argArrayIndex + 1
+		end
 
-		local baseArg = method.isStatic and 0 or 1		-- to skip 'this' ... right?
 		if sigNumArgs > 0 then
-			local localVarIndex = method.isStatic and 0 or 1	-- right?
 			for i=0,sigNumArgs-1 do		-- 0-based argument index
 				code:insert{'dup'}
 
-				local argIndex = i + baseArg
-				if argIndex <= 5 then
-					code:insert{'iconst_'..argIndex}
-				else
-					code:insert{'bipush', argIndex}
-				end
-
+				pushConstInt(argArrayIndex)
 				local argSig = sig[i+2]
 				local primInfo = infoForPrims[argSig]
 
 				local argOpcode = primInfo and 'iload' or 'aload'
-				code:insert{argOpcode, localVarIndex}
+				if localVarIndex < 4 then
+					-- aload, iload, etc have 0123 as separate commands:
+					code:insert{argOpcode..'_'..localVarIndex}
+				else
+					code:insert{argOpcode, localVarIndex}
+				end
 				if primInfo then
 					local boxedTypeSlashSep = primInfo.boxedType:gsub('%.', '/')
 					code:insert{
@@ -306,6 +324,7 @@ function M:run(args)
 				else
 					localVarIndex = localVarIndex + 1
 				end
+				argArrayIndex = argArrayIndex + 1
 			end
 		end
 
@@ -347,16 +366,12 @@ function M:run(args)
 		method.sig = jniSig
 		method.code = code
 
-		method.maxStack = 10	-- honestly I don't have a clue
+		-- honestly I don't have a clue
+		-- TODO I should be tracking stack push/pop per instruction ...
+		method.maxStack = 10
 
-		method.maxLocals =
-			baseArg 	-- +1 for 'this' for non-static ... ?
-			+ 1			-- +1 for the new Object[] ... ?
-			+ (table.sub(sig, 2):mapi(function(sigi)
-				-- max locals ... wait, locals include args right?
-				-- so any sig that is double or long needs 2, otherwise 1?
-				return (sigi == 'long' or sigi == 'double') and 2 or 1
-			end):sum() or 0)
+		-- ???
+		method.maxLocals = localVarIndex
 
 		asmClassArgs.methods:insert(method)
 	end
@@ -372,7 +387,7 @@ function M:run(args)
 
 			-- provide a default ctor, no need for closure or callback
 			code = [[
-aload 0
+aload_0
 invokespecial ]]..parentClassSlashSep..[[ <init> ()V
 return
 ]],

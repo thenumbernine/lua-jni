@@ -50,7 +50,7 @@ local Test = require 'java.luaclass'{
 			end,
 		}
 		--]]
-		-- [[ hmm adding a static method crashes
+		-- [[
 		{
 			name = 'testStatic',
 			isStatic = true,
@@ -97,4 +97,4 @@ assert.eq(test.baz, 137LL)
 assert.eq(test2.baz, 137LL)
 print('test.baz', test.baz)
 
---test:testStatic()
+test:testStatic()
