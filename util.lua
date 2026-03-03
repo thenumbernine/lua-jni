@@ -3,6 +3,15 @@ local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'
 
+local function deepCopy(t)
+	if type(t) ~= 'table' then return t end
+	local t2 = table(t)
+	for k,v in pairs(t) do
+		t2[k] = deepCopy(v)
+	end
+	return t2
+end
+
 -- seems this goes somewhere with the sig stuff in java.class
 local prims = table{
 	'boolean',
@@ -261,6 +270,7 @@ local function getFlagsFromObj(t, flagsTable)
 end
 
 return {
+	deepCopy = deepCopy,
 	prims = prims,
 	infoForPrims = infoForPrims,
 	getJNISig = getJNISig,

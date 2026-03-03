@@ -46,6 +46,9 @@ end
 function ReadBlob:read(ctype)
 	ctype = ffi.typeof(ctype)
 	local size = ffi.sizeof(ctype)
+	if self.ofs < 0 then
+		error("read before beginning")
+	end
 	if size + self.ofs > self.len then
 		error("read past the end")
 	end
@@ -66,6 +69,9 @@ function ReadBlob:read(ctype)
 	return result
 end
 function ReadBlob:readString(size)
+	if self.ofs < 0 then
+		error("read before beginning")
+	end
 	if size + self.ofs > self.len then
 		error("read past the end")
 	end
@@ -80,6 +86,34 @@ end
 function ReadBlob:readu1() return self:read'uint8_t' end
 function ReadBlob:readu2() return self:read'uint16_t' end
 function ReadBlob:readu4() return self:read'uint32_t' end
+
+function ReadBlob:readUleb128()
+	local result = 0
+	local shift = 0
+	for count=1,5 do
+		local byte = self:readu1()
+		result = bit.bor(result, bit.lshift(bit.band(byte, 0x7f), shift))
+		shift = shift + 7
+		if 0 == bit.band(byte, 0x80) then break end
+	end
+	return result
+end
+function ReadBlob:readSleb128()
+	local result = 0
+	local shift = 0
+	local byte
+	for count=1,5 do
+		byte = self:read'int8_t'
+		if byte == -1 then error("unexpected EOF") end
+		result = bit.bor(result, bit.lshift(bit.band(byte, 0x7f), shift))
+		shift = shift + 7
+		if 0 == bit.band(byte, 0x80) then break end
+	end
+	if bit.band(byte, 0x40) ~= 0 then
+		result = bit.bor(result, bit.lshift(bit.bnot(0), shift))
+	end
+	return result
+end
 function ReadBlob:done() return self.ofs == self.len end
 function ReadBlob:assertDone()
 	if self.ofs < self.len then

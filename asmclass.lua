@@ -35,15 +35,7 @@ local methodAccessFlags = require 'java.util'.methodAccessFlags
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 local sigStrToObj = require 'java.util'.sigStrToObj
-
-local function deepCopy(t)
-	if type(t) ~= 'table' then return t end
-	local t2 = table(t)
-	for k,v in pairs(t) do
-		t2[k] = deepCopy(v)
-	end
-	return t2
-end
+local deepCopy = require 'java.util'.deepCopy
 
 -- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
 local function readClassName(asmClass, index)
