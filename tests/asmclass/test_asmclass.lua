@@ -8,14 +8,14 @@ local string = require 'ext.string'
 local JavaASMClass = require 'java.asmclass'
 
 
---[[
-local srcClassPath = path'Test.class'
+-- [[
+local srcClassPath = path'../test/Test.class'
 srcClassPath:remove()
 --]]
 --[[
 local srcClassPath = path'io/github/thenumbernine/NativeCallback.class'
 --]]
--- [[
+--[[
 local srcClassPath = path'io/github/thenumbernine/NativeRunnable.class'
 --]]
 
@@ -31,7 +31,7 @@ local J = require 'java.vm'{
 	props = {
 		['java.class.path'] = table.concat({
 			'.',
-			'asm-9.9.1.jar',		-- needed for ASM, for ClassReader, for validating integrity of class
+			'../java-asm/asm-9.9.1.jar',		-- needed for ASM, for ClassReader, for validating integrity of class
 		}, ':'),
 		['java.library.path'] = '.',
 	},
@@ -49,6 +49,16 @@ local function validate()
 	ffi.copy(ptr, bytes, #bytes)
 	jbytes:_unmap(ptr)
 	local cr = ClassReader(jbytes)
+
+	-- need this subclass
+	require 'make.targets'():add{
+		dsts = {'TestClassVisitor.class'},
+		srcs = {'TestClassVisitor.java'},
+		rule = function(r)
+			assert(os.exec('javac -cp ../java-asm/asm-9.9.1.jar TestClassVisitor.java'))
+		end,
+	}:runAll()
+
 	local vis = J.TestClassVisitor()
 	cr:accept(vis, 0)
 	print'END VALIDATION'
@@ -92,9 +102,9 @@ assert.eq(bytes, bytes2)
 -- I'd keep it separate but meh, it's java, it wants the classname to match the filename
 srcClassPath:write(bytes)
 validate()
---]=] 
+--]=]
 
--- stdout / stderr flush issues, when piping even >&1 it is out of order 
+-- stdout / stderr flush issues, when piping even >&1 it is out of order
 --os.exec('javap '..srcClassPath)
 
 

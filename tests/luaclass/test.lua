@@ -5,6 +5,7 @@ local J = require 'java'
 
 local Test = require 'java.luaclass'{
 	env = J,
+	name = 'TestStatic',
 	fields = {
 		{		-- key=seq int, value=table, use as properties for JavaASMClass
 			name = 'moo',

@@ -547,7 +547,7 @@ local instDescForOp = {
 	[0xbb] = {
 		name='new',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, asmClass)
+		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 		end,
 		write = function(inst, insBlob, asmClass)
@@ -566,7 +566,7 @@ local instDescForOp = {
 	[0xbd] = {
 		name='anewarray',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, asmClass)
+		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 		end,
 		write = function(inst, insBlob, asmClass)
@@ -581,7 +581,7 @@ local instDescForOp = {
 	[0xc0] = {
 		name='checkcast',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, asmClass)
+		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 		end,
 		write = function(inst, insBlob, asmClass)
@@ -593,7 +593,7 @@ local instDescForOp = {
 	[0xc1] = {
 		name='instanceof',
 		--args={'uint16_t'},
-		args = function(inst, isnBlob, asmClass)
+		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 		end,
 		write = function(inst, insBlob, asmClass)
@@ -609,7 +609,7 @@ local instDescForOp = {
 	[0xc5] = {
 		name='multianewarray',
 		--args={'uint16_t', 'uint8_t'}
-		args = function(inst, isnBlob, asmClass)
+		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 			inst:insert(insBlob:readu1())
 		end,
@@ -889,18 +889,22 @@ end
 		field.name = deepCopyIndex(blob:readu2())
 		field.sig = deepCopyIndex(blob:readu2())
 
-		local readFieldAttr_ConstantValue
+		field.attrs = table()
 		readAttrs(blob, function(fieldAttrName, fieldAttrLen)
-			if fieldAttrName ~= 'ConstantValue' then
-				error("field attr not supported yet: "..fieldAttrName)
+			if fieldAttrName == 'ConstantValue' then
+				assert.eq(fieldAttrLen, 2, 'field attr "ConstantValue" must be 2 bytes')
+				assert(not field.value, 'field cannot have two "ConstantValue" attributes')
+				field.value = deepCopyIndex(blob:readu2())
+			else
+io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
+				field.attrs:insert{
+					name = fieldAttrName,
+					data = blob:readString(fieldAttrLen),
+				}
 			end
-
-			assert(not readFieldAttr_ConstantValue, "got two field attrs")
-			readFieldAttr_ConstantValue = true
-
-			assert.eq(fieldAttrLen, 2)
-			field.value = deepCopyIndex(blob:readu2())
 		end)
+		if #field.attrs == 0 then field.attrs = nil end
+
 		self.fields:insert(field)
 --DEBUG:print('reading field', fieldIndex, require 'ext.tolua'(field))
 	end
@@ -917,20 +921,21 @@ end
 		method.sig = deepCopyIndex(blob:readu2())
 
 		-- method attribute #1 = code attribute
-		local readMethodAttr_Code
+		method.attrs = table()
 		readAttrs(blob, function(methodAttrName, methodAttrLen)
-			if methodAttrName ~= 'Code' then
-				error("method attr not supported yet: "..methodAttrName)
-			end
-			assert(not readMethodAttr_Code, "got two code attrs")
-			readMethodAttr_Code = true
-
 --DEBUG:local methodAttrData = blob.data:sub(blob.ofs+1, blob.ofs+methodAttrLen)
 --DEBUG:print('reading method '..methodIndex..' methodAttrData '..#methodAttrData)
 --DEBUG:print(require 'ext.string'.hexdump(methodAttrData))
 
-			local code = table()
-			assert(xpcall(function()
+			-- I could have method.attrs = {{name='Code, etc}, ...}
+			-- but because these attributes are 1) unique and 2) required (method's "Code" and field's "ConstantValue"),
+			--  instead I'll just write them as extra arguments to the method.
+			if methodAttrName == 'Code' then
+				assert(not method.code, 'method cannot have two "Code" attributes')
+
+				local code = table()
+				method.code = code
+
 				method.maxStack = blob:readu2()
 				method.maxLocals = blob:readu2()
 --DEBUG:print('reading method stack locals', method.maxStack, method.maxLocals)
@@ -977,23 +982,31 @@ end
 					end
 				end
 
+				-- Because Code is a unique attribute of method,
+				-- and since Code's attr "StackMapTable" is also unique,
+				-- I'll put method' attr "Code"s attr "StackMapTable" as properties of method as well.
+				-- But I can't have method.code.attrs since code is a list of instructions.
+				-- so I'll put method's attr Code's attrs into a method.codeAttr table.
+				method.codeAttrs = table()
+
 				-- code attribute #1 = stack map attribute
-				local readCodeAttr_StackMapTable
 				readAttrs(blob, function(codeAttrName, codeAttrLen)
 					if codeAttrName == 'StackMapTable' then
+						assert(not method.stackmap, 'method "Code" attribute cannot have two "StackMapTable" attributes')
+
+						local stackmap = {}
+						method.stackmap = stackmap
+
 						local smAttrData = blob:readString(codeAttrLen)
 
-						assert(not readCodeAttr_StackMapTable, "expected one stack map attr")
-						readCodeAttr_StackMapTable = true
 io.stderr:write'TODO handle StackMapTable\n'
 --[===[ TODO
 						local smAttrBlob = ReadBlob(smAttrData)
-						local stackmap = {}
 --DEBUG:print('smAttrData')
 --DEBUG:print(require'ext.string'.hexdump(smAttrData))
 
 						local numEntries = smAttrBlob:readu2()
-method.stackMapTableNumEntries = numEntries
+--DEBUG:method.stackMapTableNumEntries = numEntries
 						stackmap.frames = table()
 
 						-- next comes an implicit frame ...
@@ -1100,12 +1113,15 @@ method.stackMapTableNumEntries = numEntries
 							stackmap.frames[entryIndex] = smFrame
 						end
 						smAttrBlob:assertDone()
-						method.stackmap = stackmap
 --]===]
 					elseif codeAttrName == 'LineNumberTable' then
-						-- TODO
+						-- is LineNumberTable unique?
+						--  if yes then error upon method.lineNos here
+						--  if no then we will append to lineNos as we go
+						--  (and that means we will spit out just one attribute even if we read in multiple)
+						method.lineNos = method.lineNos or table()
+
 						local numLineNos = blob:readu2()
-						method.lineNos = table()
 						for i=1,numLineNos do
 							local lineNo = {}
 							lineNo.startPC = blob:readu2()
@@ -1113,15 +1129,25 @@ method.stackMapTableNumEntries = numEntries
 							method.lineNos:insert(lineNo)
 						end
 					else
-						error("code attr not supported yet: "..codeAttrName)
+io.stderr:write('TODO not yet supported method "Code" attr: '..codeAttrName)
+						method.codeAttrs:insert{
+							name = codeAttrName,
+							data = blob:readString(codeAttrLen),
+						}
 					end
 				end)
+				if #method.codeAttrs == 0 then method.codeAttrs = nil end
 
-				method.code = code
-			end, function(err)
-				return 'in method '..methodIndex..':\n'..err
-			end))
+			else	-- methodAttr other than Code...
+io.stderr:write('TODO not yet supported method attr: '..methodAttrName)
+				method.attrs:insert{
+					name = methodAttrName,
+					data = blob:readString(methodAttrLen),
+				}
+			end
 		end)
+		if #method.attrs == 0 then method.attrs = nil end
+
 		self.methods:insert(method)
 --DEBUG:print('reading method', methodIndex, require 'ext.tolua'(method))
 	end
@@ -1448,7 +1474,7 @@ self.constants = constants
 					end
 				end
 
-				local codeAttrs = table()
+				local codeAttrs = method.codeAttrs or table()
 
 				-- TODO handle StackMapTable here
 				-- codeAttrs:insert(smAttr)
