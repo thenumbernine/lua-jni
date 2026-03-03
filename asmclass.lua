@@ -243,7 +243,7 @@ local instDescForOp = {
 	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
 	[0x13] = {
 		name='ldc_w',
-		args={'uint16_t'},
+		--args={'uint16_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushConst(inst, insBlob, asmClass, insBlob:readu2())
 		end,
@@ -532,7 +532,7 @@ local instDescForOp = {
 	-- 4: indexbyte1, indexbyte2, 0, 0	[arg1, arg2, ...] → result	invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xba] = {
 		name='invokedynamic',
-		args={'uint16_t', 'uint8_t', 'uint8_t'},
+		--args={'uint16_t', 'uint8_t', 'uint8_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
 			assert.eq(insBlob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
