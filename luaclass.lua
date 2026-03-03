@@ -144,7 +144,7 @@ function M:run(args)
 	if args.fields then
 		for key,field in pairs(args.fields) do
 			if type(key) == 'string' then
-				
+
 				-- an extra inception layer here could be inferring value from field type,
 				-- but then string would be ambiguous (maybe I'd get rid of that?)
 
@@ -162,8 +162,8 @@ function M:run(args)
 					end
 				end
 			elseif type(field) == 'string' then
-				-- if the key is sequentially indexed, 
-				-- and value is string 
+				-- if the key is sequentially indexed,
+				-- and value is string
 				-- ... then value will be the name, and type will be implicit
 				field = {
 					name = field,
@@ -189,7 +189,7 @@ function M:run(args)
 
 	local function buildLuaWrapperMethod(method)
 		local sig = method.sig
-		
+
 		if not sig then
 			if method.name == 'toString' then
 				sig = {'java.lang.String'}	-- default toString to String()
@@ -346,9 +346,13 @@ function M:run(args)
 		method.value = nil
 		method.sig = jniSig
 		method.code = code
-		method.maxStack = 10
+
+		method.maxStack = 10	-- honestly I don't have a clue
+
 		method.maxLocals =
-			baseArg + (table.sub(sig, 2):mapi(function(sigi)
+			baseArg 	-- +1 for 'this' for non-static ... ?
+			+ 1			-- +1 for the new Object[] ... ?
+			+ (table.sub(sig, 2):mapi(function(sigi)
 				-- max locals ... wait, locals include args right?
 				-- so any sig that is double or long needs 2, otherwise 1?
 				return (sigi == 'long' or sigi == 'double') and 2 or 1
@@ -363,7 +367,7 @@ function M:run(args)
 			isPublic = true,
 			name = '<init>',
 			sig = '()V',
-			maxStack = 3,
+			maxStack = 1,
 			maxLocals = 1,
 
 			-- provide a default ctor, no need for closure or callback

@@ -15,6 +15,8 @@ local Test = require 'java.luaclass'{
 		bar = 'java.lang.String',
 		baz = {
 			isStatic = true,
+			-- NOTICE I am initializing values as field's ConstantValue attribute
+			-- but it looks like javac initializes values as <clinit> assignment
 			value = {tag='long', value='137'},	-- structure used by JavaASMClass
 			sig = 'long',
 		},
@@ -48,7 +50,7 @@ local Test = require 'java.luaclass'{
 			end,
 		}
 		--]]
-		--[[ hmm adding a static method crashes
+		-- [[ hmm adding a static method crashes
 		{
 			name = 'testStatic',
 			isStatic = true,

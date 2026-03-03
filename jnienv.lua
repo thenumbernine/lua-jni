@@ -942,7 +942,11 @@ function JNIEnv:_defineClass(asmClass, newClassName)
 	if type(asmClass) == 'string' then
 		code = asmClass
 	elseif JavaASMClass:isa(asmClass) then
+--DEBUG:print('asm class:')
+--DEBUG:print(require 'ext.tolua'(asmClass))
 		code = asmClass:compile()
+--DEBUG:print('asm class code')
+--DEBUG:print(require 'ext.string'.hexdump(code))
 		newClassName = newClassName or asmClass.thisClass
 	else
 		error('JavaASMClass.defineClass accepts its own objects or Lua strings')

@@ -900,8 +900,8 @@ end
 		field.attrs = table()
 		readAttrs(blob, function(fieldAttrName, fieldAttrLen)
 			if fieldAttrName == 'ConstantValue' then
-				assert.eq(fieldAttrLen, 2, 'field attr "ConstantValue" must be 2 bytes')
 				assert(not field.value, 'field cannot have two "ConstantValue" attributes')
+				assert.eq(fieldAttrLen, 2, 'field attr "ConstantValue" must be 2 bytes')
 				field.value = deepCopyIndex(blob:readu2())
 			else
 io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
@@ -1181,6 +1181,9 @@ io.stderr:write('TODO not yet supported method attr: '..methodAttrName)
 	end
 
 	blob:assertDone()
+
+	-- now that all consants have been deep-copied into where they are going, we dont really need the constants table anymore...
+	self.constants = nil
 end
 
 
@@ -1567,6 +1570,9 @@ assert.type(const.name, 'string')
 	end
 
 	writeAttrs(self.attrs, blob)
+
+	-- no longer need constants
+	self.constants = nil
 
 	return blob.data:concat()
 end
