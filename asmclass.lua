@@ -73,14 +73,18 @@ end
 local function instPopMethod(inst, index, asmClass)
 	local methodIndex = asmClass.addConst{
 		tag = 'methodRef',
-		class = inst[index],
+		class = {
+			tag = 'class',
+			name = inst[index],
+		},
 		nameAndType = {
 			tag = 'nameAndType',
 			name = inst[index+1],
 			sig = inst[index+2],
 		},
 	}
-assert.eq('methodRef', assert.index(assert.index(asmClass.constants, methodIndex), 'tag'))
+-- this now encodes it as a blob, so equality testing will be faster
+--assert.eq('methodRef', assert.index(assert.index(asmClass.constants, methodIndex), 'tag'))
 	return methodIndex, index+3
 end
 
@@ -95,14 +99,18 @@ end
 local function instPopField(inst, index, asmClass)
 	local fieldIndex = asmClass.addConst{
 		tag = 'fieldRef',
-		class = inst[index],
+		class = {
+			tag = 'class',
+			name = inst[index],
+		},
 		nameAndType = {
 			tag = 'nameAndType',
 			name = inst[index+1],
 			sig = inst[index+2],
 		},
 	}
-assert.eq('fieldRef', assert.index(assert.index(asmClass.constants, fieldIndex), 'tag'))
+-- this now encodes it as a blob, so equality testing will be faster
+--assert.eq('fieldRef', assert.index(assert.index(asmClass.constants, fieldIndex), 'tag'))
 	return fieldIndex, index+3
 end
 
@@ -1184,183 +1192,142 @@ function JavaASMClass:compile()
 	build constants fresh?  why not?
 	cycle through all fields and all methods and their instructions
 	accumulate unique constants
+	store them as string binary blobs here per constant
+	then do string compare to test uniqueness
 	--]]
 	local constants = table()
 
 -- overwrite mind you ...
 -- but here I rebuild them anyways so
+-- TODO in the read phase, 'constants' is read as raw blobs
+-- but then decoded to tables of indexed-references
+-- and last is replaced by deep copy of tables
+-- Here, 'constants' will be the just the raw blobs
+-- so maybe I need dif names for each pass? 'constantBlobs', 'constantRefs', 'constants' ? maybe change that later.
 self.constants = constants
 
 	-- these methods are for compressing unique constants
 	-- and for replacing deep-copies with *Index constant-table-reference fields
 
-	local function addConstUnique(x)
-		if type(x) == 'string' then
-			for i,const in ipairs(constants) do
-				-- TODO .tag==1 here?
-				-- too many layers to the same structure...
-				if type(const) == 'string'
-				and const == x then
-					return i
-				end
-			end
-		elseif type(x) == 'table' then
-			assert.index(x, 'tag')
-			-- TODO TODO per-tag compare
-			-- maybe I should make subclasses
-			-- mmeh I'm lazy
-			local xkeys = table.keys(x):sort()
-			for i,const in ipairs(constants) do
-				if type(const) == 'table' then
-					local okeys = table.keys(const):sort()
-					if #xkeys == #okeys then
-						local same = true
-						for j=1,#xkeys do
-							if x[xkeys[j]] ~= const[okeys[j]] then
-								same = false
-								break
-							end
-						end
-						if same then
-							return i
-						end
-					end
-				end
-			end
+	-- 1) converts from deep copy trees to constant index refs
+	-- 2) serializes into a blob
+	-- 3) checks for uniqueness, returns previous index if not unique, adds if it is.
+	local function addConst(const)
+		local constBlob = WriteBlob()
+
+		local tagname
+
+		if type(const) == 'string' then	-- lua string == utf8string constant
+			tagname = 'utf8string'
+			constBlob:writeu1(1)	-- utf8string
+			constBlob:writeu2(#const)
+			constBlob:writeString(const)
 		else
-			error("idk how to check for uniqueness "..type(x))
+			assert.type(const, 'table')
+			tagname = const.tag
+			if const.tag == 'class' then
+				constBlob:writeu1(7)
+assert.type(const.name, 'string')
+				constBlob:writeu2(addConst(const.name))	-- utf8string
+			elseif const.tag == 'fieldRef' then
+				constBlob:writeu1(9)
+assert.eq(const.class.tag, 'class')
+				constBlob:writeu2(addConst(const.class))
+assert.eq(const.nameAndType.tag, 'nameAndType')
+				constBlob:writeu2(addConst(const.nameAndType))
+			elseif const.tag == 'methodRef' then
+				constBlob:writeu1(10)
+assert.eq(const.class.tag, 'class')
+				constBlob:writeu2(addConst(const.class))
+assert.eq(const.nameAndType.tag, 'nameAndType')
+				constBlob:writeu2(addConst(const.nameAndType))
+			elseif const.tag == 'interfaceMethodRef' then
+				constBlob:writeu1(11)
+assert.eq(const.class.tag, 'class')
+				constBlob:writeu2(addConst(const.class))
+assert.eq(const.nameAndType.tag, 'nameAndType')
+				constBlob:writeu2(addConst(const.nameAndType))
+			elseif const.tag == 'string' then
+				constBlob:writeu1(8)
+assert.type(const.value, 'string')
+				constBlob:writeu2(addConst(const.value))	-- utf8string
+			elseif const.tag == 'int' then
+				constBlob:writeu1(3)
+				constBlob:write('jint', const.value)
+			elseif const.tag == 'float' then
+				constBlob:writeu1(4)
+				constBlob:write('jfloat', const.value)
+			elseif const.tag == 'long' then
+				constBlob:writeu1(5)
+				constBlob:write('jlong', const.value)
+			elseif const.tag == 'double' then
+				constBlob:writeu1(6)
+				constBlob:write('jdouble', const.value)
+			elseif const.tag == 'nameAndType' then
+				constBlob:writeu1(12)
+assert.type(const.name, 'string')
+				constBlob:writeu2(addConst(const.name))	-- utf8string
+assert.type(const.sig, 'string')
+				constBlob:writeu2(addConst(const.sig))	-- utf8string
+			elseif const.tag == 'methodHandle' then
+				constBlob:writeu1(15)
+				local refKindIndex = assert.index({
+					getField = 1,
+					getStatic = 2,
+					putField = 3,
+					putStatic = 4,
+					invokeVirtual = 5,
+					invokeStatic = 6,
+					invokeSpecial = 7,
+					newInvokeSpecial = 8,
+					invokeInterface = 9,
+				}, assert.type(assert.index(const,' refKind'), 'string'))
+				constBlob:writeu2(refKindIndex)
+assert.type(const.reference, 'string')
+				constBlob:writeu2(const.reference)	-- utf8string
+			elseif const.tag == 'methodType' then
+				constBlob:writeu1(16)
+assert.type(const.sig, 'string')
+				constBlob:writeu2(const.sig)	-- utf8string
+			elseif const.tag == 'invokeDynamic' then
+				constBlob:writeu1(18)
+assert.type(const.bootstrapMethodAttr, 'string')		-- utf8string ... ???
+				constBlob:writeu2(addConst(const.bootstrapMethodAttr))
+assert.eq(const.nameAndType.tag, 'nameAndType')
+				constBlob:writeu2(addConst(const.nameAndType))
+			elseif const.tag == 'module' then
+				constBlob:writeu1(19)
+assert.type(const.name, 'string')
+				constBlob:writeu2(addConst(const.name))	-- utf8string?
+			elseif const.tag == 'package' then
+				constBlob:writeu1(20)
+assert.type(const.name, 'string')
+				constBlob:writeu2(addConst(const.name))	-- utf8string?
+			else
+				error("idk how to encode const of tag "..tostring(const.tag))
+			end
 		end
 
-		constants:insert(x)
+		local constStr = constBlob:compile()
+		for i,oconstStr in ipairs(constants) do
+			if constStr == oconstStr then
+				return i	-- already found
+			end
+		end
+
+		constants:insert(constStr)
 		local index = #constants
 
 		-- add padding for 64bit constants
-		if type(x) == 'table'
-		and (x.tag == 'double' or x.tag == 'long')
-		then
+		if tagname == 'double' or tagname == 'long' then
 			constants:insert(false)
 		end
 
 		return index
 	end
-
-	local function addConstNameAndType(const)
-		return addConstUnique{
-			tag = 'nameAndType',
-			nameIndex = addConstUnique(const.name),	-- utf8string
-			sigIndex = addConstUnique(const.sig),	-- utf8string
-		}
-	end
-
-	local addConstClass
-
-	-- for converting from deep copy trees to constant index refs
-	local function addConst(const)
-		if type(const) == 'string' then
-			return addConstUnique(const)
-		end
-		assert.type(const, 'table')
-		if const.tag == 'class' then
-			return addConstUnique{
-				tag = const.tag,
-				nameIndex = addConstUnique(const.name),
-			}
-		end
-		if const.tag == 'fieldRef' then
-			return addConstUnique{
-				tag = const.tag,
-				classIndex = addConstClass(const.class),
-				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
-			}
-		end
-		if const.tag == 'methodRef' then
-			return addConstUnique{
-				tag = const.tag,
-				classIndex = addConstClass(const.class),
-				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
-			}
-		end
-		if const.tag == 'interfaceMethodRef' then
-			return addConstUnique{
-				tag = const.tag,
-				classIndex = addConstClass(const.class),
-				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
-			}
-		end
-		if const.tag == 'string' then
-			return addConstUnique{
-				tag = const.tag,
-				valueIndex = addConstUnique(const.value),	-- utf8string
-			}
-		end
-		if const.tag == 'int' then
-			return addConstUnique{
-				tag = const.tag,
-				value = const.value,
-			}
-		end
-		if const.tag == 'float' then
-			return addConstUnique{
-				tag = const.tag,
-				value = const.value,
-			}
-		end
-		if const.tag == 'long' then
-			return addConstUnique{
-				tag = const.tag,
-				value = const.value,
-			}
-		end
-		if const.tag == 'double' then
-			return addConstUnique{
-				tag = const.tag,
-				value = const.value,
-			}
-		end
-		if const.tag == 'nameAndType' then
-			return addConstUnique{
-				tag = const.tag,
-				nameIndex = addConstUnique(const.name),	-- utf8string?
-				sigIndex = addConstUnique(const.sig),	-- utf8string?
-			}
-		end
-		if const.tag == 'methodHandle' then
-			return addConstUnique{
-				tag = const.tag,
-				refKind = assert.type(assert.index(const, 'refKind'), 'string'),
-				referenceIndex = addConstUnique(const.reference),	-- utf8string?
-			}
-		end
-		if const.tag == 'methodType' then
-			return addConstUnique{
-				tag = const.tag,
-				sigIndex = addConstUnique(const.sig),	-- utf8string
-			}
-		end
-		if const.tag == 'invokeDynamic' then
-			return addConstUnique{
-				tag = const.tag,
-				bootstrapMethodAttrIndex = addConst(const.bootstrapMethodAttr),
-				nameAndTypeIndex = addConstNameAndType(const.nameAndType),
-			}
-		end
-		if const.tag == 'module' then
-			return addConstUnique{
-				tag = const.tag,
-				nameIndex = addConstUnique(const.name),	-- utf8string?
-			}
-		end
-		if const.tag == 'package' then
-			return addConstUnique{
-				tag = const.tag,
-				nameIndex = addConstUnique(const.name),	-- utf8string?
-			}
-		end
-		error("idk how to encode const of tag "..tostring(const.tag))
-	end
 	self.addConst = addConst
 
-	function addConstClass(name)
+	local function addConstClass(name)
 		return addConst{
 			tag = 'class',
 			name = assert.type(name, 'string'),
@@ -1401,8 +1368,8 @@ self.constants = constants
 	if self.fields then
 		for i,field in ipairs(self.fields) do
 --DEBUG:print('writing field', i, require 'ext.tolua'(field))
-			field.nameIndex = addConstUnique(field.name)
-			field.sigIndex = addConstUnique(field.sig)
+			field.nameIndex = addConst(field.name)
+			field.sigIndex = addConst(field.sig)
 
 			-- convert field.value into field.attrs[]
 			-- where each attr has {uint16_t name; string data;}
@@ -1412,7 +1379,7 @@ self.constants = constants
 				attrBlob:writeu2(addConst(field.value))
 
 				field.attrs:insert{
-					nameIndex = addConstUnique'ConstantValue',
+					nameIndex = addConst'ConstantValue',
 					data = attrBlob:compile(),
 				}
 			end
@@ -1426,8 +1393,8 @@ self.constants = constants
 	if self.methods then
 		for i,method in ipairs(self.methods) do
 --DEBUG:print('writing method', i, require 'ext.tolua'(method))
-			method.nameIndex = addConstUnique(method.name)
-			method.sigIndex = addConstUnique(method.sig)
+			method.nameIndex = addConst(method.name)
+			method.sigIndex = addConst(method.sig)
 
 			method.attrs = table()
 
@@ -1470,7 +1437,7 @@ self.constants = constants
 						cblob:writeu2(ex.startPC)
 						cblob:writeu2(ex.endPC)
 						cblob:writeu2(ex.handlerPC)
-						cblob:writeu2(addConstUnique(ex.catchType))
+						cblob:writeu2(addConst(ex.catchType))
 					end
 				end
 
@@ -1487,7 +1454,7 @@ self.constants = constants
 						attrBlob:writeu2(lineNo.lineNo)
 					end
 					codeAttrs:insert{
-						nameIndex = addConstUnique'LineNumberTable',
+						nameIndex = addConst'LineNumberTable',
 						data = attrBlob:compile(),
 					}
 				end
@@ -1500,7 +1467,7 @@ self.constants = constants
 --DEBUG:print('writing method '..i..' codeAttrData '..#codeAttrData)
 --DEBUG:print(require'ext.string'.hexdump(codeAttrData))
 				method.attrs:insert{
-					nameIndex = addConstUnique'Code',
+					nameIndex = addConst'Code',
 					data = codeAttrData,
 				}
 			end
@@ -1525,7 +1492,7 @@ self.constants = constants
 		for _,attr in ipairs(self.attrs) do
 			if attr.name == 'SourceFile' then
 				local attrBlob = WriteBlob()
-				attrBlob:writeu2(addConstUnique(
+				attrBlob:writeu2(addConst(
 					(assert.type(attr.source, 'string'))
 				))
 				attr.data = attrBlob:compile()
@@ -1534,7 +1501,7 @@ self.constants = constants
 			end
 
 			-- TODO index fields
-			attr.nameIndex = addConstUnique(attr.name)
+			attr.nameIndex = addConst(attr.name)
 			assert.index(attr, 'data')
 
 			--attr.name = nil
@@ -1550,80 +1517,12 @@ self.constants = constants
 	-- write out constants
 	blob:writeu2(#constants+1)
 	for i,const in ipairs(constants) do
---DEBUG:print('writing const', i, require 'ext.tolua'(const))
-		if const == false then
-			-- skip long/double padding
-		elseif type(const) == 'string' then
-			blob:writeu1(1)	-- utf8string
-			blob:writeu2(#const)
+		if type(const) == 'string' then
 			blob:writeString(const)
-		elseif const.tag == 'class' then
-			blob:writeu1(7)
-			blob:writeu2(const.nameIndex)
-		elseif const.tag == 'fieldRef' then
-			blob:writeu1(9)
-			blob:writeu2(const.classIndex)
-			blob:writeu2(const.nameAndTypeIndex)
-		elseif const.tag == 'methodRef' then
-			blob:writeu1(10)
-			blob:writeu2(const.classIndex)
-			blob:writeu2(const.nameAndTypeIndex)
-		elseif const.tag == 'interfaceMethodRef' then
-			blob:writeu1(11)
-			blob:writeu2(const.classIndex)
-			blob:writeu2(const.nameAndTypeIndex)
-		elseif const.tag == 'string' then
-			blob:writeu1(8)
-			blob:writeu2(const.valueIndex)
-		elseif const.tag == 'int' then
-			blob:writeu1(3)
-			blob:write('jint', const.value)
-		elseif const.tag == 'float' then
-			blob:writeu1(4)
-			blob:write('jfloat', const.value)
-		elseif const.tag == 'long' then
-			blob:writeu1(5)
-			blob:write('jlong', const.value)
-		elseif const.tag == 'double' then
-			blob:writeu1(6)
-			blob:write('jdouble', const.value)
-		elseif const.tag == 'nameAndType' then
-			blob:writeu1(12)
-			blob:writeu2(const.nameIndex)
-			blob:writeu2(const.sigIndex)
-		elseif const.tag == 'methodHandle' then
-			blob:writeu1(15)
-			local refKindIndex = assert.index({
-				getField = 1,
-				getStatic = 2,
-				putField = 3,
-				putStatic = 4,
-				invokeVirtual = 5,
-				invokeStatic = 6,
-				invokeSpecial = 7,
-				newInvokeSpecial = 8,
-				invokeInterface = 9,
-			}, const.refKind)
-			blob:writeu2(refKindIndex)
-			blob:writeu2(const.referenceIndex)
-		elseif const.tag == 'methodType' then
-			blob:writeu1(16)
-			blob:writeu2(const.sigIndex)
-		elseif const.tag == 'invokeDynamic' then
-			blob:writeu1(18)
-			blob:writeu2(const.bootstrapMethodAttrIndex)
-			blob:writeu2(const.nameAndTypeIndex)
-		elseif const.tag == 'module' then
-			blob:writeu1(19)
-			blob:writeu2(const.nameIndex)
-		elseif const.tag == 'package' then
-			blob:writeu1(19)
-			blob:writeu2(const.nameIndex)
-		else
-			error'TODO'
+		elseif const ~= false then
+			error("unknown value in the constants table "..require 'ext.tolua'(const))
 		end
 	end
-
 
 	blob:writeu2(getFlagsFromObj(self, classAccessFlags))
 
