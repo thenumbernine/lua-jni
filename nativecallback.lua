@@ -57,8 +57,8 @@ aload_0
 invokespecial java/lang/Object <init> ()V
 return
 ]],
-				maxLocals = 1,
 				maxStack = 1,
+				maxLocals = 1,
 			},
 			{
 				isNative = true,

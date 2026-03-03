@@ -214,7 +214,9 @@ function M:run(args)
 
 		local code = table()
 		local function pushConstInt(value)
-			if value >= 0 and value <= 5 then
+			if value == -1 then
+				code:insert{'iconst_m1'}
+			elseif value >= 0 and value <= 5 then
 				code:insert{'iconst_'..value}
 			else
 				const:insert{'bipush', value}
@@ -366,11 +368,7 @@ function M:run(args)
 		method.sig = jniSig
 		method.code = code
 
-		-- honestly I don't have a clue
-		-- TODO I should be tracking stack push/pop per instruction ...
-		method.maxStack = 10
-
-		-- ???
+		--method.maxStack = 6	-- always? or will it be sig dependent? esp for long/double?
 		method.maxLocals = localVarIndex
 
 		asmClassArgs.methods:insert(method)

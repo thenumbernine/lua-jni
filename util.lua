@@ -62,8 +62,8 @@ TODO this won't handle an array-of-methods
 --]]
 local getJNISigMethod
 local function getJNISig(s)
-	if type(s) == 'table' then 
-		return getJNISigMethod(s) 
+	if type(s) == 'table' then
+		return getJNISigMethod(s)
 	end
 	local arrayCount = 0
 	while true do
@@ -86,38 +86,84 @@ function getJNISigMethod(sig)
 	..')'..getJNISig(sig[1] or 'void')
 end
 
--- opposite of getJNISig
-local function sigStrToObj(s)
-	s = tostring(s)
---DEBUG:print('sigStrToObj', s)	
-	assert(not s:match'^%(', "TODO sigStrToobject for methods")
+-- accepts a signature string and an index to start reading
+-- returns the most recent read type and the next index
+-- or nil upon error
+local function sigStrToObjSingle(str, index)
+--DEBUG:print('sigStrToObj', str)
 	local arraySuffix = ''
 	while true do
-		local rest = s:match'^%[(.*)$'
-		if not rest then break end
+		if str:sub(index, index) ~= '[' then break end
 		arraySuffix = arraySuffix .. '[]'
-		s = rest
+		index = index + 1
 	end
---DEBUG:print('arrays', arraySuffix, 'base', s)
+--DEBUG:print('arrays', arraySuffix, 'base', str)
 
-	local prim = primNameForSigStr[s]
-	if prim then 
---DEBUG:print'is prim'		
+	local prim = primNameForSigStr[str:sub(index, index)]
+	if prim then
+--DEBUG:print'is prim'
 		-- TOOD match and return the rest
-		return prim..arraySuffix 
+		return prim..arraySuffix, index + 1
 	end
---DEBUG:print('should be class', s)	
+--DEBUG:print('should be class', str)
+	if str:sub(index, index) ~= 'L' then
+		return nil	--error("sigStrToObj "..tostring(str))
+	end
+
 	-- what's left? objects?
-	local classpath, rest = s:match'^L([^;]*);(.*)$'
---DEBUG:print('classpath', classpath)	
-	if classpath then
-		-- convert from /-separator when it is to .-separator
-		classpath = classpath:gsub('/', '%.')
-		assert.eq(rest, '')
---DEBUG:print('returning', 	classpath..arraySuffix)
-		return classpath..arraySuffix 
+	local classpath = str:sub(index):match'^([^;]*);'
+--DEBUG:print('classpath', classpath)
+	if not classpath then
+		return nil	--error("sigStrToObj "..tostring(str))
 	end
-	return nil --error("sigStrToObj "..tostring(s))
+	index = index + #classpath + 1	-- +1 for ;
+	-- convert from /-separator when it is to .-separator
+	classpath = classpath:gsub('/', '%.')
+--DEBUG:print('returning', 	classpath..arraySuffix)
+	return classpath..arraySuffix, index
+end
+
+-- opposite of getJNISig
+local function sigStrToObj(str)
+	str = tostring(str)
+	if str:sub(1,1) == '(' then
+		local sig = table()
+		local index = 2
+		while str:sub(index,index) ~= ')' do
+			local result, resultIndex = sigStrToObjSingle(str, index)
+			if not result then
+				if not result then
+					error("sigStrToObj on function string "..str.." starting at index "..index.." failed to parse arg")
+					return
+				end
+			end
+			sig:insert(result)
+			index = resultIndex
+		end
+		index = index + 1	-- skip ')'
+		-- read return type last
+		if str:sub(index,index) == 'V' then	-- the only place 'void' can be ...
+			sig:insert(1, 'void')
+			index = index + 1	-- not that it matters
+		else
+			local result, resultIndex = sigStrToObjSingle(str, index)
+			if not result then
+				error("sigStrToObj on function string "..str.." starting at index "..index.." failed to parse return type")
+			end
+			if resultIndex ~= #str+1 then
+				error("DANGER sigStrToObj on a function string "..str.." starting at index "..index.." and you got back an index not at the end "..resultIndex)
+			end
+			sig:insert(1, result)
+		end
+		return sig
+	end
+
+	local result, resultIndex = sigStrToObjSingle(str, 1)
+	if not result then return end
+	if resultIndex ~= #str+1 then
+		error("DANGER sigStrToObj on a single string "..str.." and you got back an index not at the end "..resultIndex)
+	end
+	return result
 end
 
 -- general access flags
@@ -211,7 +257,7 @@ local function getFlagsFromObj(t, flagsTable)
 			flagsValue = bit.bor(flagsValue, value)
 		end
 	end
-	return flagsValue 
+	return flagsValue
 end
 
 return {

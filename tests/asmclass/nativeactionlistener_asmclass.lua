@@ -31,8 +31,8 @@ return function(J)
 				isPublic=true,
 				name='<init>',
 				sig='(J)V',
-				maxLocals=3,
 				maxStack=3,
+				maxLocals=3,
 				code = [[
 aload_0
 invokespecial java/lang/Object <init> ()V
@@ -46,8 +46,8 @@ return
 				isPublic=true,
 				name='actionPerformed',
 				sig='(Ljava/awt/event/ActionEvent;)V',
-				maxLocals=2,
 				maxStack=3,
+				maxLocals=2,
 				code = [[
 aload_0
 getfield ]]..newClassNameSlashSep..[[ funcptr J

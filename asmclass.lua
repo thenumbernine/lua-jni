@@ -34,6 +34,7 @@ local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
+local sigStrToObj = require 'java.util'.sigStrToObj
 
 local function deepCopy(t)
 	if type(t) ~= 'table' then return t end
@@ -217,29 +218,30 @@ end
 
 
 local instDescForOp = {
-	[0x00] = {name='nop'},	-- [No change]	perform no operation
-	[0x01] = {name='aconst_null'},	-- → null	push a null reference onto the stack
-	[0x02] = {name='iconst_m1'},	-- → -1	load the int value −1 onto the stack
-	[0x03] = {name='iconst_0'},	-- → 0	load the int value 0 onto the stack
-	[0x04] = {name='iconst_1'},	-- → 1	load the int value 1 onto the stack
-	[0x05] = {name='iconst_2'},	-- → 2	load the int value 2 onto the stack
-	[0x06] = {name='iconst_3'},	-- → 3	load the int value 3 onto the stack
-	[0x07] = {name='iconst_4'},	-- → 4	load the int value 4 onto the stack
-	[0x08] = {name='iconst_5'},	-- → 5	load the int value 5 onto the stack
-	[0x09] = {name='lconst_0'},	-- → 0L	push 0L (the number zero with type long) onto the stack
-	[0x0a] = {name='lconst_1'},	-- → 1L	push 1L (the number one with type long) onto the stack
-	[0x0b] = {name='fconst_0'},	-- → 0.0f	push 0.0f on the stack
-	[0x0c] = {name='fconst_1'},	-- → 1.0f	push 1.0f on the stack
-	[0x0d] = {name='fconst_2'},	-- → 2.0f	push 2.0f on the stack
-	[0x0e] = {name='dconst_0'},	-- → 0.0	push the constant 0.0 (a double) onto the stack
-	[0x0f] = {name='dconst_1'},	-- → 1.0	push the constant 1.0 (a double) onto the stack
-	[0x10] = {name='bipush', args={'uint8_t'}},	-- 1: byte	→ value	push a byte onto the stack as an integer value
-	[0x11] = {name='sipush', args={'uint16_t'}},	-- 2: byte1, byte2	→ value	push a short onto the stack as an integer value
+	[0x00] = {name='nop'},	-- [No change] .... perform no operation
+	[0x01] = {name='aconst_null', stackadd=1},	-- → null .... push a null reference onto the stack
+	[0x02] = {name='iconst_m1', stackadd=1},	-- → -1 .... load the int value −1 onto the stack
+	[0x03] = {name='iconst_0', stackadd=1},	-- → 0 .... load the int value 0 onto the stack
+	[0x04] = {name='iconst_1', stackadd=1},	-- → 1 .... load the int value 1 onto the stack
+	[0x05] = {name='iconst_2', stackadd=1},	-- → 2 .... load the int value 2 onto the stack
+	[0x06] = {name='iconst_3', stackadd=1},	-- → 3 .... load the int value 3 onto the stack
+	[0x07] = {name='iconst_4', stackadd=1},	-- → 4 .... load the int value 4 onto the stack
+	[0x08] = {name='iconst_5', stackadd=1},	-- → 5 .... load the int value 5 onto the stack
+	[0x09] = {name='lconst_0', stackadd=2},	-- → 0L .... push 0L (the number zero with type long) onto the stack
+	[0x0a] = {name='lconst_1', stackadd=2},	-- → 1L .... push 1L (the number one with type long) onto the stack
+	[0x0b] = {name='fconst_0', stackadd=1},	-- → 0.0f .... push 0.0f on the stack
+	[0x0c] = {name='fconst_1', stackadd=1},	-- → 1.0f .... push 1.0f on the stack
+	[0x0d] = {name='fconst_2', stackadd=1},	-- → 2.0f .... push 2.0f on the stack
+	[0x0e] = {name='dconst_0', stackadd=2},	-- → 0.0 .... push the constant 0.0 (a double) onto the stack
+	[0x0f] = {name='dconst_1', stackadd=2},	-- → 1.0 .... push the constant 1.0 (a double) onto the stack
+	[0x10] = {name='bipush', args={'uint8_t'}, stackadd=1},	-- 1: byte .... → value .... push a byte onto the stack as an integer value
+	[0x11] = {name='sipush', args={'uint16_t'}, stackadd=1},	-- 2: byte1, byte2 .... → value .... push a short onto the stack as an integer value
 
-	-- 1: index	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack
+	-- 1: index .... → value .... push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack
 	[0x12] = {
 		name='ldc',
-		--args={'uint8_t'},	-- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
+		--args={'uint8_t'}, .... -- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
+		stackadd=1,
 		args = function(inst, insBlob, asmClass)
 			instPushConst(inst, insBlob, asmClass, insBlob:readu1())
 		end,
@@ -248,10 +250,11 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... → value .... push a constant #index from a constant pool (String, int, float, Class, java.lang.invoke.MethodType, java.lang.invoke.MethodHandle, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
 	[0x13] = {
 		name='ldc_w',
 		--args={'uint16_t'},
+		stackadd=1,
 		args = function(inst, insBlob, asmClass)
 			instPushConst(inst, insBlob, asmClass, insBlob:readu2())
 		end,
@@ -260,10 +263,11 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	→ value	push a constant #index from a constant pool (double, long, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... → value .... push a constant #index from a constant pool (double, long, or a dynamically-computed constant) onto the stack (wide index is constructed as indexbyte1 << 8 | indexbyte2)
 	[0x14] = {
 		name='ldc2_w',
 		--args={'uint16_t'},
+		stackadd=2,
 		args = function(inst, insBlob, asmClass)
 			instPushConst2(inst, insBlob, asmClass, insBlob:readu2())
 		end,
@@ -272,172 +276,309 @@ local instDescForOp = {
 		end,
 	},
 
-	[0x15] = {name='iload', args={'uint8_t'}},	-- 1: index	→ value	load an int value from a local variable #index
-	[0x16] = {name='lload', args={'uint8_t'}},	-- 1: index	→ value	load a long value from a local variable #index
-	[0x17] = {name='fload', args={'uint8_t'}},	-- 1: index	→ value	load a float value from a local variable #index
-	[0x18] = {name='dload', args={'uint8_t'}},	-- 1: index	→ value	load a double value from a local variable #index
-	[0x19] = {name='aload', args={'uint8_t'}},	-- 1: index	→ objectref	load a reference onto the stack from a local variable #index
-	[0x1a] = {name='iload_0'},	-- → value	load an int value from local variable 0
-	[0x1b] = {name='iload_1'},	-- → value	load an int value from local variable 1
-	[0x1c] = {name='iload_2'},	-- → value	load an int value from local variable 2
-	[0x1d] = {name='iload_3'},	-- → value	load an int value from local variable 3
-	[0x1e] = {name='lload_0'},	-- → value	load a long value from a local variable 0
-	[0x1f] = {name='lload_1'},	-- → value	load a long value from a local variable 1
-	[0x20] = {name='lload_2'},	-- → value	load a long value from a local variable 2
-	[0x21] = {name='lload_3'},	-- → value	load a long value from a local variable 3
-	[0x22] = {name='fload_0'},	-- → value	load a float value from local variable 0
-	[0x23] = {name='fload_1'},	-- → value	load a float value from local variable 1
-	[0x24] = {name='fload_2'},	-- → value	load a float value from local variable 2
-	[0x25] = {name='fload_3'},	-- → value	load a float value from local variable 3
-	[0x26] = {name='dload_0'},	-- → value	load a double from local variable 0
-	[0x27] = {name='dload_1'},	-- → value	load a double from local variable 1
-	[0x28] = {name='dload_2'},	-- → value	load a double from local variable 2
-	[0x29] = {name='dload_3'},	-- → value	load a double from local variable 3
-	[0x2a] = {name='aload_0'},	-- → objectref	load a reference onto the stack from local variable 0
-	[0x2b] = {name='aload_1'},	-- → objectref	load a reference onto the stack from local variable 1
-	[0x2c] = {name='aload_2'},	-- → objectref	load a reference onto the stack from local variable 2
-	[0x2d] = {name='aload_3'},	-- → objectref	load a reference onto the stack from local variable 3
-	[0x2e] = {name='iaload'},	-- arrayref, index → value	load an int from an array
-	[0x2f] = {name='laload'},	-- arrayref, index → value	load a long from an array
-	[0x30] = {name='faload'},	-- arrayref, index → value	load a float from an array
-	[0x31] = {name='daload'},	-- arrayref, index → value	load a double from an array
-	[0x32] = {name='aaload'},	-- arrayref, index → value	load onto the stack a reference from an array
-	[0x33] = {name='baload'},	-- arrayref, index → value	load a byte or Boolean value from an array
-	[0x34] = {name='caload'},	-- arrayref, index → value	load a char from an array
-	[0x35] = {name='saload'},	-- arrayref, index → value	load short from array
-	[0x36] = {name='istore', args={'uint8_t'}},	-- 1: index	value →	store int value into variable #index
-	[0x37] = {name='lstore', args={'uint8_t'}},	-- 1: index	value →	store a long value in a local variable #index
-	[0x38] = {name='fstore', args={'uint8_t'}},	-- 1: index	value →	store a float value into a local variable #index
-	[0x39] = {name='dstore', args={'uint8_t'}},	-- 1: index	value →	store a double value into a local variable #index
-	[0x3a] = {name='astore', args={'uint8_t'}},	-- 1: index	objectref →	store a reference into a local variable #index
-	[0x3b] = {name='istore_0'},	-- value →	store int value into variable 0
-	[0x3c] = {name='istore_1'},	-- value →	store int value into variable 1
-	[0x3d] = {name='istore_2'},	-- value →	store int value into variable 2
-	[0x3e] = {name='istore_3'},	-- value →	store int value into variable 3
-	[0x3f] = {name='lstore_0'},	-- value →	store a long value in a local variable 0
-	[0x40] = {name='lstore_1'},	-- value →	store a long value in a local variable 1
-	[0x41] = {name='lstore_2'},	-- value →	store a long value in a local variable 2
-	[0x42] = {name='lstore_3'},	-- value →	store a long value in a local variable 3
-	[0x43] = {name='fstore_0'},	-- value →	store a float value into local variable 0
-	[0x44] = {name='fstore_1'},	-- value →	store a float value into local variable 1
-	[0x45] = {name='fstore_2'},	-- value →	store a float value into local variable 2
-	[0x46] = {name='fstore_3'},	-- value →	store a float value into local variable 3
-	[0x47] = {name='dstore_0'},	-- value →	store a double into local variable 0
-	[0x48] = {name='dstore_1'},	-- value →	store a double into local variable 1
-	[0x49] = {name='dstore_2'},	-- value →	store a double into local variable 2
-	[0x4a] = {name='dstore_3'},	-- value →	store a double into local variable 3
-	[0x4b] = {name='astore_0'},	-- objectref →	store a reference into local variable 0
-	[0x4c] = {name='astore_1'},	-- objectref →	store a reference into local variable 1
-	[0x4d] = {name='astore_2'},	-- objectref →	store a reference into local variable 2
-	[0x4e] = {name='astore_3'},	-- objectref →	store a reference into local variable 3
-	[0x4f] = {name='iastore'},	-- arrayref, index, value →	store an int into an array
-	[0x50] = {name='lastore'},	-- arrayref, index, value →	store a long to an array
-	[0x51] = {name='fastore'},	-- arrayref, index, value →	store a float in an array
-	[0x52] = {name='dastore'},	-- arrayref, index, value →	store a double into an array
-	[0x53] = {name='aastore'},	-- arrayref, index, value →	store a reference in an array
-	[0x54] = {name='bastore'},	-- arrayref, index, value →	store a byte or Boolean value into an array
-	[0x55] = {name='castore'},	-- arrayref, index, value →	store a char into an array
-	[0x56] = {name='sastore'},	-- arrayref, index, value →	store short to array
-	[0x57] = {name='pop'},	-- value →	discard the top value on the stack
-	[0x58] = {name='pop2'},	-- {value2, value1} →	discard the top two values on the stack (or one value, if it is a double or long)
-	[0x59] = {name='dup'},	-- value → value, value	duplicate the value on top of the stack
-	[0x5a] = {name='dup_x1'},	-- value2, value1 → value1, value2, value1	insert a copy of the top value into the stack two values from the top. value1 and value2 must not be of the type double or long.
-	[0x5b] = {name='dup_x2'},	-- value3, value2, value1 → value1, value3, value2, value1	insert a copy of the top value into the stack two (if value2 is double or long it takes up the entry of value3, too) or three values (if value2 is neither double nor long) from the top
-	[0x5c] = {name='dup2'},	-- {value2, value1} → {value2, value1}, {value2, value1}	duplicate top two stack words (two values, if value1 is not double nor long; a single value, if value1 is double or long)
-	[0x5d] = {name='dup2_x1'},	-- value3, {value2, value1} → {value2, value1}, value3, {value2, value1}	duplicate two words and insert beneath third word (see explanation above)
-	[0x5e] = {name='dup2_x2'},	-- {value4, value3}, {value2, value1} → {value2, value1}, {value4, value3}, {value2, value1}	duplicate two words and insert beneath fourth word
-	[0x5f] = {name='swap'},	-- value2, value1 → value1, value2	swaps two top words on the stack (note that value1 and value2 must not be double or long)
-	[0x60] = {name='iadd'},	-- value1, value2 → result	add two ints
-	[0x61] = {name='ladd'},	-- value1, value2 → result	add two longs
-	[0x62] = {name='fadd'},	-- value1, value2 → result	add two floats
-	[0x63] = {name='dadd'},	-- value1, value2 → result	add two doubles
-	[0x64] = {name='isub'},	-- value1, value2 → result	int subtract
-	[0x65] = {name='lsub'},	-- value1, value2 → result	subtract two longs
-	[0x66] = {name='fsub'},	-- value1, value2 → result	subtract two floats
-	[0x67] = {name='dsub'},	-- value1, value2 → result	subtract a double from another
-	[0x68] = {name='imul'},	-- value1, value2 → result	multiply two integers
-	[0x69] = {name='lmul'},	-- value1, value2 → result	multiply two longs
-	[0x6a] = {name='fmul'},	-- value1, value2 → result	multiply two floats
-	[0x6b] = {name='dmul'},	-- value1, value2 → result	multiply two doubles
-	[0x6c] = {name='idiv'},	-- value1, value2 → result	divide two integers
-	[0x6d] = {name='ldiv'},	-- value1, value2 → result	divide two longs
-	[0x6e] = {name='fdiv'},	-- value1, value2 → result	divide two floats
-	[0x6f] = {name='ddiv'},	-- value1, value2 → result	divide two doubles
-	[0x70] = {name='irem'},	-- value1, value2 → result	logical int remainder
-	[0x71] = {name='lrem'},	-- value1, value2 → result	remainder of division of two longs
-	[0x72] = {name='frem'},	-- value1, value2 → result	get the remainder from a division between two floats
-	[0x73] = {name='drem'},	-- value1, value2 → result	get the remainder from a division between two doubles
-	[0x74] = {name='ineg'},	-- value → result	negate int
-	[0x75] = {name='lneg'},	-- value → result	negate a long
-	[0x76] = {name='fneg'},	-- value → result	negate a float
-	[0x77] = {name='dneg'},	-- value → result	negate a double
-	[0x78] = {name='ishl'},	-- value1, value2 → result	int shift left
-	[0x79] = {name='lshl'},	-- value1, value2 → result	bitwise shift left of a long value1 by int value2 positions
-	[0x7a] = {name='ishr'},	-- value1, value2 → result	int arithmetic shift right
-	[0x7b] = {name='lshr'},	-- value1, value2 → result	bitwise shift right of a long value1 by int value2 positions
-	[0x7c] = {name='iushr'},	-- value1, value2 → result	int logical shift right
-	[0x7d] = {name='lushr'},	-- value1, value2 → result	bitwise shift right of a long value1 by int value2 positions, unsigned
-	[0x7e] = {name='iand'},	-- value1, value2 → result	perform a bitwise AND on two integers
-	[0x7f] = {name='land'},	-- value1, value2 → result	bitwise AND of two longs
-	[0x80] = {name='ior'},	-- value1, value2 → result	bitwise int OR
-	[0x81] = {name='lor'},	-- value1, value2 → result	bitwise OR of two longs
-	[0x82] = {name='ixor'},	-- value1, value2 → result	int xor
-	[0x83] = {name='lxor'},	-- value1, value2 → result	bitwise XOR of two longs
-	[0x84] = {name='iinc', args={'uint8_t', 'int8_t'}},	-- 2: index, const	[No change]	increment local variable #index by signed byte const
-	[0x85] = {name='i2l'},	-- value → result	convert an int into a long
-	[0x86] = {name='i2f'},	-- value → result	convert an int into a float
-	[0x87] = {name='i2d'},	-- value → result	convert an int into a double
-	[0x88] = {name='l2i'},	-- value → result	convert a long to a int
-	[0x89] = {name='l2f'},	-- value → result	convert a long to a float
-	[0x8a] = {name='l2d'},	-- value → result	convert a long to a double
-	[0x8b] = {name='f2i'},	-- value → result	convert a float to an int
-	[0x8c] = {name='f2l'},	-- value → result	convert a float to a long
-	[0x8d] = {name='f2d'},	-- value → result	convert a float to a double
-	[0x8e] = {name='d2i'},	-- value → result	convert a double to an int
-	[0x8f] = {name='d2l'},	-- value → result	convert a double to a long
-	[0x90] = {name='d2f'},	-- value → result	convert a double to a float
-	[0x91] = {name='i2b'},	-- value → result	convert an int into a byte
-	[0x92] = {name='i2c'},	-- value → result	convert an int into a character
-	[0x93] = {name='i2s'},	-- value → result	convert an int into a short
-	[0x94] = {name='lcmp'},	-- value1, value2 → result	push 0 if the two longs are the same, 1 if value1 is greater than value2, -1 otherwise
-	[0x95] = {name='fcmpl'},	-- value1, value2 → result	compare two floats, -1 on NaN
-	[0x96] = {name='fcmpg'},	-- value1, value2 → result	compare two floats, 1 on NaN
-	[0x97] = {name='dcmpl'},	-- value1, value2 → result	compare two doubles, -1 on NaN
-	[0x98] = {name='dcmpg'},	-- value1, value2 → result	compare two doubles, 1 on NaN
-	[0x99] = {name='ifeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9a] = {name='ifne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9b] = {name='iflt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9c] = {name='ifge', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9d] = {name='ifgt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is greater than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9e] = {name='ifle', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is less than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0x9f] = {name='if_icmpeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa0] = {name='if_icmpne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if ints are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa1] = {name='if_icmplt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa2] = {name='if_icmpge', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa3] = {name='if_icmpgt', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is greater than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa4] = {name='if_icmple', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if value1 is less than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa5] = {name='if_acmpeq', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa6] = {name='if_acmpne', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value1, value2 →	if references are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa7] = {name='goto', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	[no change]	goes to another instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xa8] = {name='jsr', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	→ address	jump to subroutine at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2) and place the return address on the stack
-	[0xa9] = {name='ret', args={'int8_t'}},	-- 1: index	[No change]	continue execution from address taken from a local variable #index (the asymmetry with jsr is intentional)
+	-- 1: index .... → value .... load an int value from a local variable #index
+	[0x15] = {
+		name='iload',
+		args={'uint8_t'},
+		stackadd=1,
+		maxLocals = function(inst)
+			return assert(tonumber(inst[2])) + 1
+		end,
+	},
+
+	-- 1: index .... → value .... load a long value from a local variable #index
+	[0x16] = {
+		name='lload',
+		args={'uint8_t'},
+		stackadd=2,
+		maxLocals = function(inst)
+			return assert(tonumber(inst[2])) + 2
+		end,
+	},
+
+	-- 1: index .... → value .... load a float value from a local variable #index
+	[0x17] = {
+		name='fload',
+		args={'uint8_t'},
+		stackadd=1,
+		maxLocals = function(inst)
+			return assert(tonumber(inst[2])) + 1
+		end,
+	},
+
+	-- 1: index .... → value .... load a double value from a local variable #index
+	[0x18] = {
+		name='dload',
+		args={'uint8_t'},
+		stackadd=2,
+		maxLocals = function(inst)
+			return assert(tonumber(inst[2])) + 2
+		end,
+	},
+
+	-- 1: index .... → objectref .... load a reference onto the stack from a local variable #index
+	[0x19] = {
+		name='aload',
+		args={'uint8_t'},
+		stackadd=1,
+		maxLocals = function(inst)
+			return assert(tonumber(inst[2])) + 1
+		end,
+	},
+
+	[0x1a] = {name='iload_0', stackadd=1, maxLocals=1},	-- → value .... load an int value from local variable 0
+	[0x1b] = {name='iload_1', stackadd=1, maxLocals=2},	-- → value .... load an int value from local variable 1
+	[0x1c] = {name='iload_2', stackadd=1, maxLocals=3},	-- → value .... load an int value from local variable 2
+	[0x1d] = {name='iload_3', stackadd=1, maxLocals=4},	-- → value .... load an int value from local variable 3
+	[0x1e] = {name='lload_0', stackadd=2, maxLocals=2},	-- → value .... load a long value from a local variable 0
+	[0x1f] = {name='lload_1', stackadd=2, maxLocals=3},	-- → value .... load a long value from a local variable 1
+	[0x20] = {name='lload_2', stackadd=2, maxLocals=4},	-- → value .... load a long value from a local variable 2
+	[0x21] = {name='lload_3', stackadd=2, maxLocals=5},	-- → value .... load a long value from a local variable 3
+	[0x22] = {name='fload_0', stackadd=1, maxLocals=1},	-- → value .... load a float value from local variable 0
+	[0x23] = {name='fload_1', stackadd=1, maxLocals=2},	-- → value .... load a float value from local variable 1
+	[0x24] = {name='fload_2', stackadd=1, maxLocals=3},	-- → value .... load a float value from local variable 2
+	[0x25] = {name='fload_3', stackadd=1, maxLocals=4},	-- → value .... load a float value from local variable 3
+	[0x26] = {name='dload_0', stackadd=2, maxLocals=2},	-- → value .... load a double from local variable 0
+	[0x27] = {name='dload_1', stackadd=2, maxLocals=3},	-- → value .... load a double from local variable 1
+	[0x28] = {name='dload_2', stackadd=2, maxLocals=4},	-- → value .... load a double from local variable 2
+	[0x29] = {name='dload_3', stackadd=2, maxLocals=5},	-- → value .... load a double from local variable 3
+	[0x2a] = {name='aload_0', stackadd=1, maxLocals=1},	-- → objectref .... load a reference onto the stack from local variable 0
+	[0x2b] = {name='aload_1', stackadd=1, maxLocals=2},	-- → objectref .... load a reference onto the stack from local variable 1
+	[0x2c] = {name='aload_2', stackadd=1, maxLocals=3},	-- → objectref .... load a reference onto the stack from local variable 2
+	[0x2d] = {name='aload_3', stackadd=1, maxLocals=4},	-- → objectref .... load a reference onto the stack from local variable 3
+	[0x2e] = {name='iaload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load an int from an array
+	[0x2f] = {name='laload', stackadd=2, stacksub=2},	-- arrayref, index → value .... load a long from an array
+	[0x30] = {name='faload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a float from an array
+	[0x31] = {name='daload', stackadd=2, stacksub=2},	-- arrayref, index → value .... load a double from an array
+	[0x32] = {name='aaload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load onto the stack a reference from an array
+	[0x33] = {name='baload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a byte or Boolean value from an array
+	[0x34] = {name='caload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a char from an array
+	[0x35] = {name='saload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load short from array
+
+	-- 1: index .... value → .... store int value into variable #index
+	-- TODO in some cases where the previous instruction is a pushed int, the maxLocals from this can be deterministic...
+	[0x36] = {
+		name='istore',
+		args={'uint8_t'},
+		stacksub=1,
+		maxLocals = function(inst)
+			-- istore $localIndex
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 1
+		end,
+	},
+
+	-- 1: index .... value → .... store a long value in a local variable #index
+	[0x37] = {
+		name='lstore',
+		args={'uint8_t'},
+		stacksub=2,
+		maxLocals = function(inst)
+			-- lstore $localIndex
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 2
+		end,
+	},
+
+	-- 1: index .... value → .... store a float value into a local variable #index
+	[0x38] = {
+		name='fstore',
+		args={'uint8_t'},
+		stacksub=1,
+		maxLocals = function(inst)
+			-- fstore $localIndex
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 1
+		end,
+	},
+
+	-- 1: index .... value → .... store a double value into a local variable #index
+	[0x39] = {
+		name='dstore',
+		args={'uint8_t'},
+		stacksub=2,
+		maxLocals = function(inst)
+			-- dstore $localIndex
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 2
+		end,
+	},
+
+	-- 1: index .... objectref → .... store a reference into a local variable #index
+	[0x3a] = {
+		name='astore',
+		args={'uint8_t'},
+		stacksub=1,
+		maxLocals = function(inst)
+			-- astore $localIndex
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 1
+		end,
+	},
+
+	[0x3b] = {name='istore_0', stacksub=1, maxLocals=1},	-- value → .... store int value into variable 0
+	[0x3c] = {name='istore_1', stacksub=1, maxLocals=2},	-- value → .... store int value into variable 1
+	[0x3d] = {name='istore_2', stacksub=1, maxLocals=3},	-- value → .... store int value into variable 2
+	[0x3e] = {name='istore_3', stacksub=1, maxLocals=4},	-- value → .... store int value into variable 3
+	[0x3f] = {name='lstore_0', stacksub=2, maxLocals=2},	-- value → .... store a long value in a local variable 0
+	[0x40] = {name='lstore_1', stacksub=2, maxLocals=3},	-- value → .... store a long value in a local variable 1
+	[0x41] = {name='lstore_2', stacksub=2, maxLocals=4},	-- value → .... store a long value in a local variable 2
+	[0x42] = {name='lstore_3', stacksub=2, maxLocals=5},	-- value → .... store a long value in a local variable 3
+	[0x43] = {name='fstore_0', stacksub=1, maxLocals=1},	-- value → .... store a float value into local variable 0
+	[0x44] = {name='fstore_1', stacksub=1, maxLocals=2},	-- value → .... store a float value into local variable 1
+	[0x45] = {name='fstore_2', stacksub=1, maxLocals=3},	-- value → .... store a float value into local variable 2
+	[0x46] = {name='fstore_3', stacksub=1, maxLocals=4},	-- value → .... store a float value into local variable 3
+	[0x47] = {name='dstore_0', stacksub=2, maxLocals=2},	-- value → .... store a double into local variable 0
+	[0x48] = {name='dstore_1', stacksub=2, maxLocals=3},	-- value → .... store a double into local variable 1
+	[0x49] = {name='dstore_2', stacksub=2, maxLocals=4},	-- value → .... store a double into local variable 2
+	[0x4a] = {name='dstore_3', stacksub=2, maxLocals=5},	-- value → .... store a double into local variable 3
+	[0x4b] = {name='astore_0', stacksub=1, maxLocals=1},	-- objectref → .... store a reference into local variable 0
+	[0x4c] = {name='astore_1', stacksub=1, maxLocals=2},	-- objectref → .... store a reference into local variable 1
+	[0x4d] = {name='astore_2', stacksub=1, maxLocals=3},	-- objectref → .... store a reference into local variable 2
+	[0x4e] = {name='astore_3', stacksub=1, maxLocals=4},	-- objectref → .... store a reference into local variable 3
+	[0x4f] = {name='iastore', stacksub=3},	-- arrayref, index, value → .... store an int into an array
+	[0x50] = {name='lastore', stacksub=4},	-- arrayref, index, value → .... store a long to an array
+	[0x51] = {name='fastore', stacksub=3},	-- arrayref, index, value → .... store a float in an array
+	[0x52] = {name='dastore', stacksub=4},	-- arrayref, index, value → .... store a double into an array
+	[0x53] = {name='aastore', stacksub=3},	-- arrayref, index, value → .... store a reference in an array
+	[0x54] = {name='bastore', stacksub=3},	-- arrayref, index, value → .... store a byte or Boolean value into an array
+	[0x55] = {name='castore', stacksub=3},	-- arrayref, index, value → .... store a char into an array
+	[0x56] = {name='sastore', stacksub=3},	-- arrayref, index, value → .... store short to array
+	[0x57] = {name='pop', stacksub=1},	-- value → .... discard the top value on the stack
+	[0x58] = {name='pop2', stacksub=2},	-- {value2, value1} → .... discard the top two values on the stack (or one value, if it is a double or long)
+	[0x59] = {name='dup', stackadd=2, stacksub=1},	-- value → value, value .... duplicate the value on top of the stack
+	[0x5a] = {name='dup_x1', stackadd=3, stacksub=2},	-- value2, value1 → value1, value2, value1 .... insert a copy of the top value into the stack two values from the top. value1 and value2 must not be of the type double or long.
+	[0x5b] = {name='dup_x2', stackadd=4, stacksub=3},	-- value3, value2, value1 → value1, value3, value2, value1 .... insert a copy of the top value into the stack two (if value2 is double or long it takes up the entry of value3, too) or three values (if value2 is neither double nor long) from the top
+	[0x5c] = {name='dup2', stackadd=4, stacksub=2},	-- {value2, value1} → {value2, value1}, {value2, value1} .... duplicate top two stack words (two values, if value1 is not double nor long; a single value, if value1 is double or long)
+	[0x5d] = {name='dup2_x1', stackadd=5, stacksub=3},	-- value3, {value2, value1} → {value2, value1}, value3, {value2, value1} .... duplicate two words and insert beneath third word (see explanation above)
+	[0x5e] = {name='dup2_x2', stackadd=6, stacksub=4},	-- {value4, value3}, {value2, value1} → {value2, value1}, {value4, value3}, {value2, value1} .... duplicate two words and insert beneath fourth word
+	[0x5f] = {name='swap', stackadd=2, stacksub=2},	-- value2, value1 → value1, value2 .... swaps two top words on the stack (note that value1 and value2 must not be double or long)
+	[0x60] = {name='iadd', stackadd=1, stacksub=2},	-- value1, value2 → result .... add two ints
+	[0x61] = {name='ladd', stackadd=2, stacksub=4},	-- value1, value2 → result .... add two longs
+	[0x62] = {name='fadd', stackadd=1, stacksub=2},	-- value1, value2 → result .... add two floats
+	[0x63] = {name='dadd', stackadd=2, stacksub=4},	-- value1, value2 → result .... add two doubles
+	[0x64] = {name='isub', stackadd=1, stacksub=2},	-- value1, value2 → result .... int subtract
+	[0x65] = {name='lsub', stackadd=2, stacksub=4},	-- value1, value2 → result .... subtract two longs
+	[0x66] = {name='fsub', stackadd=1, stacksub=2},	-- value1, value2 → result .... subtract two floats
+	[0x67] = {name='dsub', stackadd=2, stacksub=4},	-- value1, value2 → result .... subtract a double from another
+	[0x68] = {name='imul', stackadd=1, stacksub=2},	-- value1, value2 → result .... multiply two integers
+	[0x69] = {name='lmul', stackadd=2, stacksub=4},	-- value1, value2 → result .... multiply two longs
+	[0x6a] = {name='fmul', stackadd=1, stacksub=2},	-- value1, value2 → result .... multiply two floats
+	[0x6b] = {name='dmul', stackadd=2, stacksub=4},	-- value1, value2 → result .... multiply two doubles
+	[0x6c] = {name='idiv', stackadd=1, stacksub=2},	-- value1, value2 → result .... divide two integers
+	[0x6d] = {name='ldiv', stackadd=2, stacksub=4},	-- value1, value2 → result .... divide two longs
+	[0x6e] = {name='fdiv', stackadd=1, stacksub=2},	-- value1, value2 → result .... divide two floats
+	[0x6f] = {name='ddiv', stackadd=2, stacksub=4},	-- value1, value2 → result .... divide two doubles
+	[0x70] = {name='irem', stackadd=1, stacksub=2},	-- value1, value2 → result .... logical int remainder
+	[0x71] = {name='lrem', stackadd=2, stacksub=4},	-- value1, value2 → result .... remainder of division of two longs
+	[0x72] = {name='frem', stackadd=1, stacksub=2},	-- value1, value2 → result .... get the remainder from a division between two floats
+	[0x73] = {name='drem', stackadd=2, stacksub=4},	-- value1, value2 → result .... get the remainder from a division between two doubles
+	[0x74] = {name='ineg', stackadd=1, stacksub=1},	-- value → result .... negate int
+	[0x75] = {name='lneg', stackadd=2, stacksub=2},	-- value → result .... negate a long
+	[0x76] = {name='fneg', stackadd=1, stacksub=1},	-- value → result .... negate a float
+	[0x77] = {name='dneg', stackadd=2, stacksub=2},	-- value → result .... negate a double
+	[0x78] = {name='ishl', stackadd=1, stacksub=2},	-- value1, value2 → result .... int shift left
+	[0x79] = {name='lshl', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift left of a long value1 by int value2 positions
+	[0x7a] = {name='ishr', stackadd=1, stacksub=2},	-- value1, value2 → result .... int arithmetic shift right
+	[0x7b] = {name='lshr', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions
+	[0x7c] = {name='iushr', stackadd=1, stacksub=2},	-- value1, value2 → result .... int logical shift right
+	[0x7d] = {name='lushr', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions, unsigned
+	[0x7e] = {name='iand', stackadd=1, stacksub=2},	-- value1, value2 → result .... perform a bitwise AND on two integers
+	[0x7f] = {name='land', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise AND of two longs
+	[0x80] = {name='ior', stackadd=1, stacksub=2},	-- value1, value2 → result .... bitwise int OR
+	[0x81] = {name='lor', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise OR of two longs
+	[0x82] = {name='ixor', stackadd=1, stacksub=2},	-- value1, value2 → result .... int xor
+	[0x83] = {name='lxor', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise XOR of two longs
+
+	-- 2: index, const .... [No change] .... increment local variable #index by signed byte const
+	[0x84] = {
+		name='iinc',
+		args={'uint8_t', 'int8_t'},
+		maxLocals = function(inst)
+			-- iinc $localIndex $amount
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 1
+		end,
+	},
+
+	[0x85] = {name='i2l', stackadd=2, stacksub=1},	-- value → result .... convert an int into a long
+	[0x86] = {name='i2f', stackadd=1, stacksub=1},	-- value → result .... convert an int into a float
+	[0x87] = {name='i2d', stackadd=2, stacksub=1},	-- value → result .... convert an int into a double
+	[0x88] = {name='l2i', stackadd=1, stacksub=2},	-- value → result .... convert a long to a int
+	[0x89] = {name='l2f', stackadd=1, stacksub=2},	-- value → result .... convert a long to a float
+	[0x8a] = {name='l2d', stackadd=2, stacksub=2},	-- value → result .... convert a long to a double
+	[0x8b] = {name='f2i', stackadd=1, stacksub=1},	-- value → result .... convert a float to an int
+	[0x8c] = {name='f2l', stackadd=2, stacksub=1},	-- value → result .... convert a float to a long
+	[0x8d] = {name='f2d', stackadd=2, stacksub=1},	-- value → result .... convert a float to a double
+	[0x8e] = {name='d2i', stackadd=1, stacksub=2},	-- value → result .... convert a double to an int
+	[0x8f] = {name='d2l', stackadd=2, stacksub=2},	-- value → result .... convert a double to a long
+	[0x90] = {name='d2f', stackadd=1, stacksub=2},	-- value → result .... convert a double to a float
+	[0x91] = {name='i2b', stackadd=1, stacksub=1},	-- value → result .... convert an int into a byte
+	[0x92] = {name='i2c', stackadd=1, stacksub=1},	-- value → result .... convert an int into a character
+	[0x93] = {name='i2s', stackadd=1, stacksub=1},	-- value → result .... convert an int into a short
+	[0x94] = {name='lcmp', stackadd=1, stacksub=4},	-- value1, value2 → result .... push 0 if the two longs are the same, 1 if value1 is greater than value2, -1 otherwise
+	[0x95] = {name='fcmpl', stackadd=1, stacksub=2},	-- value1, value2 → result .... compare two floats, -1 on NaN
+	[0x96] = {name='fcmpg', stackadd=1, stacksub=2},	-- value1, value2 → result .... compare two floats, 1 on NaN
+	[0x97] = {name='dcmpl', stackadd=1, stacksub=4},	-- value1, value2 → result .... compare two doubles, -1 on NaN
+	[0x98] = {name='dcmpg', stackadd=1, stacksub=4},	-- value1, value2 → result .... compare two doubles, 1 on NaN
+	[0x99] = {name='ifeq', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9a] = {name='ifne', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is not 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9b] = {name='iflt', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is less than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9c] = {name='ifge', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is greater than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9d] = {name='ifgt', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is greater than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9e] = {name='ifle', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is less than or equal to 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0x9f] = {name='if_icmpeq', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if ints are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa0] = {name='if_icmpne', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if ints are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa1] = {name='if_icmplt', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if value1 is less than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa2] = {name='if_icmpge', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if value1 is greater than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa3] = {name='if_icmpgt', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if value1 is greater than value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa4] = {name='if_icmple', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if value1 is less than or equal to value2, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa5] = {name='if_acmpeq', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if references are equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa6] = {name='if_acmpne', args={'int16_t'}, stacksub=2},	-- 2: branchbyte1, branchbyte2 .... value1, value2 → .... if references are not equal, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa7] = {name='goto', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2 .... [no change] .... goes to another instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xa8] = {name='jsr', args={'int16_t'}, stackadd=1},	-- 2: branchbyte1, branchbyte2 .... → address .... jump to subroutine at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2) and place the return address on the stack
+
+	-- 1: index .... [No change] .... continue execution from address taken from a local variable #index (the asymmetry with jsr is intentional)
+	[0xa9] = {
+		name='ret',
+		args={'int8_t'},
+		maxLocals = function(inst)
+			local localIndex = assert(tonumber(inst[2]))
+			return localIndex + 1
+		end,
+	},
+
+	-- 16+: [0–3 bytes padding], defaultbyte1, defaultbyte2, defaultbyte3, defaultbyte4, lowbyte1, lowbyte2, lowbyte3, lowbyte4, highbyte1, highbyte2, highbyte3, highbyte4, jump offsets... .... index → .... continue execution from an address in the table at offset index
 	[0xaa] = {name='tableswitch',
 		args = function() error'TODO' end,	--...
-	},	-- 16+: [0–3 bytes padding], defaultbyte1, defaultbyte2, defaultbyte3, defaultbyte4, lowbyte1, lowbyte2, lowbyte3, lowbyte4, highbyte1, highbyte2, highbyte3, highbyte4, jump offsets...	index →	continue execution from an address in the table at offset index
+		stacksub = 1,
+	},
+
+	-- 8+: <0–3 bytes padding>, defaultbyte1, defaultbyte2, defaultbyte3, defaultbyte4, npairs1, npairs2, npairs3, npairs4, match-offset pairs... .... key → .... a target address is looked up from a table using a key and execution continues from the instruction at that address
 	[0xab] = {name='lookupswitch',
 		args = function() error'TODO' end,
-	},	-- 8+: <0–3 bytes padding>, defaultbyte1, defaultbyte2, defaultbyte3, defaultbyte4, npairs1, npairs2, npairs3, npairs4, match-offset pairs...	key →	a target address is looked up from a table using a key and execution continues from the instruction at that address
-	[0xac] = {name='ireturn'},	-- value → [empty]	return an integer from a method
-	[0xad] = {name='lreturn'},	-- value → [empty]	return a long value
-	[0xae] = {name='freturn'},	-- value → [empty]	return a float
-	[0xaf] = {name='dreturn'},	-- value → [empty]	return a double from a method
-	[0xb0] = {name='areturn'},	-- objectref → [empty]	return a reference from a method
-	[0xb1] = {name='return'},	-- → [empty]	return from a void method
+		stacksub = 1,
+	},
 
-	-- 2: indexbyte1, indexbyte2	→ value	get a static field value of a class, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
+	[0xac] = {name='ireturn', stacksub=1},	-- value → [empty] .... return an integer from a method
+	[0xad] = {name='lreturn', stacksub=2},	-- value → [empty] .... return a long value
+	[0xae] = {name='freturn', stacksub=1},	-- value → [empty] .... return a float
+	[0xaf] = {name='dreturn', stacksub=2},	-- value → [empty] .... return a double from a method
+	[0xb0] = {name='areturn', stacksub=1},	-- objectref → [empty] .... return a reference from a method
+	[0xb1] = {name='return'},	-- → [empty] .... return from a void method
+
+	-- 2: indexbyte1, indexbyte2 .... → value .... get a static field value of a class, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
 	[0xb2] = {
 		name='getstatic',
 		--args={'uint16_t'},
+		stackadd = function(inst, curStack)	-- NOTICE this will depend on the field type
+			-- getstatic $class $fieldName $fieldSig
+			local fieldSig = assert.index(inst, 4)
+			if fieldSig == 'J' or fieldsig == 'D' then
+				return curStack + 2
+			end
+			return curStack + 1
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushField(inst, insBlob, asmClass)
 		end,
@@ -446,10 +587,18 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	value →	set static field to value in a class, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... value → .... set static field to value in a class, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb3] = {
 		name='putstatic',
 		--args={'uint16_t'},
+		stacksub = function(inst, curStack)	-- NOTICE this will depend on the field type
+			-- putstatic $class $fieldName $fieldSig
+			local fieldSig = assert.index(inst, 4)
+			if fieldSig == 'J' or fieldSig == 'D' then
+				return curStack - 2
+			end
+			return curStack - 1
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushField(inst, insBlob, asmClass)
 		end,
@@ -458,10 +607,19 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	objectref → value	get a field value of an object objectref, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref → value .... get a field value of an object objectref, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
 	[0xb4] = {
 		name='getfield',
 		--args={'uint16_t'},
+		stacksub = 1,
+		stackadd = function(inst, curStack)	-- NOTICE this will depend on the field type
+			-- getfield $class $fieldName $fieldSig
+			local fieldSig = assert.index(inst, 4)
+			if fieldSig == 'J' or fieldsig == 'D' then
+				return curStack + 2
+			end
+			return curStack + 1
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushField(inst, insBlob, asmClass)
 		end,
@@ -470,10 +628,19 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	objectref, value →	set field to value in an object objectref, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref, value → .... set field to value in an object objectref, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb5] = {
 		name='putfield',
 		--args={'uint16_t'},
+		stacksub = function(inst, curStack)	-- NOTICE this will depend on the field type ... -1 for removing the object ref
+			curStack  = curStack - 1	-- object ref
+			-- getfield $class $fieldName $fieldSig
+			local fieldSig = assert.index(inst, 4)
+			if fieldSig == 'J' or fieldsig == 'D' then
+				return curStack - 2
+			end
+			return curStack - 1
+		end,
 		args = function(inst, insBlob, asmClass)
 			assert(xpcall(function()
 				instPushField(inst, insBlob, asmClass)
@@ -488,9 +655,32 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref, [arg1, arg2, ...] → result .... invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb6] = {
 		name='invokevirtual',
+		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+			-- invokevirtual $class $methodName $sig
+			local sig = assert.index(inst,4)
+			if sig:match'J$' or sig:match'D$' then
+				return curStack + 2
+			elseif sig:match'V$' then
+				return curStack
+			end
+			return curStack + 1
+		end,
+		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+			curStack  = curStack - 1
+			local sig = sigStrToObj(assert.index(inst,4))
+			for i=2,#sig do
+				local sigi = sig[i]
+				if sigi == 'long' or sigi == 'double' then
+					curStack = curStack - 2
+				else
+					curStack = curStack - 1
+				end
+			end
+			return curStack
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
 		end,
@@ -499,9 +689,32 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	objectref, [arg1, arg2, ...] → result	invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref, [arg1, arg2, ...] → result .... invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb7] = {
 		name='invokespecial',
+		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+			-- invokespecial $class $methodName $sig
+			local sig = assert.index(inst,4)
+			if sig:match'J$' or sig:match'D$' then
+				return curStack + 2
+			elseif sig:match'V$' then
+				return curStack
+			end
+			return curStack + 1
+		end,
+		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+			curStack  = curStack - 1
+			local sig = sigStrToObj(assert.index(inst,4))
+			for i=2,#sig do
+				local sigi = sig[i]
+				if sigi == 'long' or sigi == 'double' then
+					curStack = curStack - 2
+				else
+					curStack = curStack - 1
+				end
+			end
+			return curStack
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
 		end,
@@ -510,9 +723,32 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	[arg1, arg2, ...] → result	invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... [arg1, arg2, ...] → result .... invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb8] = {
 		name='invokestatic',
+		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+			-- invokestatic $class $methodName $sig
+			local sig = assert.index(inst,4)
+			if sig:match'J$' or sig:match'D$' then
+				return curStack + 2
+			elseif sig:match'V$' then
+				return curStack
+			end
+			return curStack + 1
+		end,
+		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+			-- no -1 since no object
+			local sig = sigStrToObj(assert.index(inst,4))
+			for i=2,#sig do
+				local sigi = sig[i]
+				if sigi == 'long' or sigi == 'double' then
+					curStack = curStack - 2
+				else
+					curStack = curStack - 1
+				end
+			end
+			return curStack
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
 		end,
@@ -521,9 +757,32 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 4: indexbyte1, indexbyte2, count, 0	objectref, [arg1, arg2, ...] → result	invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 4: indexbyte1, indexbyte2, count, 0 .... objectref, [arg1, arg2, ...] → result .... invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb9] = {
 		name='invokeinterface',
+		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+			-- invokeinterface $class $methodName $sig
+			local sig = assert.index(inst,4)
+			if sig:match'J$' or sig:match'D$' then
+				return curStack + 2
+			elseif sig:match'V$' then
+				return curStack
+			end
+			return curStack + 1
+		end,
+		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+			curStack  = curStack - 1
+			local sig = sigStrToObj(assert.index(inst,4))
+			for i=2,#sig do
+				local sigi = sig[i]
+				if sigi == 'long' or sigi == 'double' then
+					curStack = curStack - 2
+				else
+					curStack = curStack - 1
+				end
+			end
+			return curStack
+		end,
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
 			inst:insert(insBlob:readu1())	-- count ... what's count for?
@@ -537,9 +796,32 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 4: indexbyte1, indexbyte2, 0, 0	[arg1, arg2, ...] → result	invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 4: indexbyte1, indexbyte2, 0, 0 .... [arg1, arg2, ...] → result .... invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xba] = {
 		name='invokedynamic',
+		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+			-- invokedynamic $class $methodName $sig
+			local sig = assert.index(inst,4)
+			if sig:match'J$' or sig:match'D$' then
+				return curStack + 2
+			elseif sig:match'V$' then
+				return curStack
+			end
+			return curStack + 1
+		end,
+		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+			-- TODO what is a dynamic method, and how come there's no object ref?
+			local sig = sigStrToObj(assert.index(inst,4))
+			for i=2,#sig do
+				local sigi = sig[i]
+				if sigi == 'long' or sigi == 'double' then
+					curStack = curStack - 2
+				else
+					curStack = curStack - 1
+				end
+			end
+			return curStack
+		end,
 		--args={'uint16_t', 'uint8_t', 'uint8_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushMethod(inst, insBlob, asmClass)
@@ -551,9 +833,10 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	→ objectref	create new object of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... → objectref .... create new object of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2)
 	[0xbb] = {
 		name='new',
+		stackadd = 1,
 		--args={'uint16_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
@@ -563,17 +846,21 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 1: atype	count → arrayref	create new array with count elements of primitive type identified by atype
+	-- 1: atype .... count → arrayref .... create new array with count elements of primitive type identified by atype
 	[0xbc] = {
 		name='newarray',
+		stacksub = 1,
+		stackadd = 1,
 		args={'uint8_t'},
 		-- TODO args is atype is a primitive type
 	},
 
-	-- 2: indexbyte1, indexbyte2	count → arrayref	create a new array of references of length count and component type identified by the class reference index (indexbyte1 << 8 | indexbyte2) in the constant pool
+	-- 2: indexbyte1, indexbyte2 .... count → arrayref .... create a new array of references of length count and component type identified by the class reference index (indexbyte1 << 8 | indexbyte2) in the constant pool
 	[0xbd] = {
 		name='anewarray',
 		--args={'uint16_t'},
+		stacksub = 1,
+		stackadd = 1,
 		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
 		end,
@@ -582,12 +869,14 @@ local instDescForOp = {
 		end,
 	},
 
-	[0xbe] = {name='arraylength'},	-- arrayref → length	get the length of an array
-	[0xbf] = {name='athrow'},	-- objectref → [empty], objectref	throws an error or exception (notice that the rest of the stack is cleared, leaving only a reference to the Throwable)
+	[0xbe] = {name='arraylength', stacksub=1, stackadd=1},	-- arrayref → length .... get the length of an array
+	[0xbf] = {name='athrow', stackadd=function() return 1 end},	-- objectref → [empty], objectref .... throws an error or exception (notice that the rest of the stack is cleared, leaving only a reference to the Throwable)
 
-	-- 2: indexbyte1, indexbyte2	objectref → objectref	checks whether an objectref is of a certain type, the class reference of which is in the constant pool at index (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref → objectref .... checks whether an objectref is of a certain type, the class reference of which is in the constant pool at index (indexbyte1 << 8 | indexbyte2)
 	[0xc0] = {
 		name='checkcast',
+		stacksub = 1,
+		stackadd = 1,
 		--args={'uint16_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
@@ -597,9 +886,11 @@ local instDescForOp = {
 		end,
 	},
 
-	-- 2: indexbyte1, indexbyte2	objectref → result	determines if an object objectref is of a given type, identified by class reference index in constant pool (indexbyte1 << 8 | indexbyte2)
+	-- 2: indexbyte1, indexbyte2 .... objectref → result .... determines if an object objectref is of a given type, identified by class reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xc1] = {
 		name='instanceof',
+		stacksub = 1,
+		stackadd = 1,
 		--args={'uint16_t'},
 		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
@@ -609,13 +900,19 @@ local instDescForOp = {
 		end,
 	},
 
-	[0xc2] = {name='monitorenter'},	-- objectref →	enter monitor for object ("grab the lock" – start of synchronized() section)
-	[0xc3] = {name='monitorexit'},	-- objectref →	exit monitor for object ("release the lock" – end of synchronized() section)
-	[0xc4] = {name='wide', args=function() error'TODO' end},	-- 3/5: opcode, indexbyte1, indexbyte2 or iinc, indexbyte1, indexbyte2, countbyte1, countbyte2	[same as for corresponding instructions]	execute opcode, where opcode is either iload, fload, aload, lload, dload, istore, fstore, astore, lstore, dstore, or ret, but assume the index is 16 bit; or execute iinc, where the index is 16 bits and the constant to increment by is a signed 16 bit short
+	[0xc2] = {name='monitorenter', stacksub=1},	-- objectref → .... enter monitor for object ("grab the lock" – start of synchronized() section)
+	[0xc3] = {name='monitorexit', stacksub=1},	-- objectref → .... exit monitor for object ("release the lock" – end of synchronized() section)
+	[0xc4] = {name='wide', args=function() error'TODO' end, stackadd = function() error'TODO' end},	-- 3/5: opcode, indexbyte1, indexbyte2 or iinc, indexbyte1, indexbyte2, countbyte1, countbyte2 .... [same as for corresponding instructions] .... execute opcode, where opcode is either iload, fload, aload, lload, dload, istore, fstore, astore, lstore, dstore, or ret, but assume the index is 16 bit; or execute iinc, where the index is 16 bits and the constant to increment by is a signed 16 bit short
 
-	-- 3: indexbyte1, indexbyte2, dimensions	count1, [count2,...] → arrayref	create a new array of dimensions dimensions of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2); the sizes of each dimension is identified by count1, [count2, etc.]
+	-- 3: indexbyte1, indexbyte2, dimensions .... count1, [count2,...] → arrayref .... create a new array of dimensions dimensions of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2); the sizes of each dimension is identified by count1, [count2, etc.]
 	[0xc5] = {
 		name='multianewarray',
+		stacksub = function(inst, curStack)
+			-- inst = {'multianewarray' indexhi, indexlo, dimension}
+			local dim = assert(tonumber(inst[4]))
+			curStack = curStack - dim
+		end,
+		stackadd = 1,	-- new ref
 		--args={'uint16_t', 'uint8_t'}
 		args = function(inst, insBlob, asmClass)
 			instPushClass(inst, insBlob, asmClass)
@@ -628,14 +925,14 @@ local instDescForOp = {
 		end,
 	},
 
-	[0xc6] = {name='ifnull', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xc7] = {name='ifnonnull', args={'int16_t'}},	-- 2: branchbyte1, branchbyte2	value →	if value is not null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
-	[0xc8] = {name='goto_w', args={'int32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	[no change]	goes to another instruction at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4)
-	[0xc9] = {name='jsr_w', args={'int32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4	→ address	jump to subroutine at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4) and place the return address on the stack
+	[0xc6] = {name='ifnull', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xc7] = {name='ifnonnull', args={'int16_t'}, stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is not null, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
+	[0xc8] = {name='goto_w', args={'int32_t'}},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4 .... [no change] .... goes to another instruction at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4)
+	[0xc9] = {name='jsr_w', args={'int32_t'}, stackadd=1},	-- 4: branchbyte1, branchbyte2, branchbyte3, branchbyte4 .... → address .... jump to subroutine at branchoffset (signed int constructed from unsigned bytes branchbyte1 << 24 | branchbyte2 << 16 | branchbyte3 << 8 | branchbyte4) and place the return address on the stack
 	[0xca] = {name='breakpoint'},	-- reserved for breakpoints in Java debuggers; should not appear in any class file
 	[0xfe] = {name='impdep1'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
 	[0xff] = {name='impdep2'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
-	--(no name)	cb-fd				these values are currently unassigned for opcodes and are reserved for future use
+	--(no name) .... cb-fd ....  ....  ....  .... these values are currently unassigned for opcodes and are reserved for future use
 }
 
 local opForInstName = table.map(instDescForOp, function(inst,op)
@@ -1402,16 +1699,64 @@ assert.type(const.name, 'string')
 			method.attrs = table()
 
 			if method.code then
-				local cblob = WriteBlob()
-				cblob:writeu2(method.maxStack or 0)
-				cblob:writeu2(method.maxLocals or 0)
---DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
+--DEBUG:io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..'\n')
+				local minStack = 0
+				local maxStack = 0
+				local curStack = 0
+
+				local maxLocals = method.isStatic and 0 or 1
+				local sig = sigStrToObj(method.sig)
+				for i=2,#sig do
+					local sigi = sig[i]
+					if sigi == 'long' or sigi == 'double'  then
+						maxLocals = maxLocals + 2
+					else
+						maxLocals = maxLocals + 1
+					end
+				end
+
 
 				local insBlob = WriteBlob()
-				for _,inst in ipairs(method.code) do
+				for instrIndex,inst in ipairs(method.code) do
 					local op = assert.index(opForInstName, inst[1])
-					insBlob:writeu1(op)
 					local instDesc = assert.index(instDescForOp, op)
+
+					-- while we're here, track the stack level so we can auto set 'maxStack'
+					if instDesc.stacksub then
+						if type(instDesc.stacksub) == 'number' then
+							curStack = curStack - instDesc.stacksub
+						elseif type(instDesc.stacksub) == 'function' then
+							curStack = instDesc.stacksub(inst, curStack)
+						else
+							error("idk how to handle stacksub type "..type(instDesc.stacksub))
+						end
+						minStack = math.min(minStack, curStack)
+						if minStack < 0 then
+							io.stderr:write('!!! WARNING !!! method '
+								..method.name..' instruction #'..instrIndex
+								..': '..table.mapi(inst, function(x) return tostring(x) end):concat()
+								..' stack underflow detected.\n')
+						end
+					end
+					if instDesc.stackadd then
+						if type(instDesc.stackadd) == 'number' then
+							curStack = curStack + instDesc.stackadd
+						elseif type(instDesc.stackadd) == 'function' then
+							curStack = instDesc.stackadd(inst, curStack)
+						else
+							error("idk how to handle stackadd type "..type(instDesc.stackadd))
+						end
+						maxStack = math.max(maxStack, curStack)
+					end
+					if type(instDesc.maxLocals) == 'number' then
+						maxLocals = math.max(maxLocals, instDesc.maxLocals)
+					elseif type(instDesc.maxLocals) == 'function' then
+						maxLocals = math.max(maxLocals, instDesc.maxLocals(inst))
+					elseif type(instDesc.maxLocals) ~= 'nil' then
+						error("idk how to handle maxLocals type "..type(instDesc.maxLocals))
+					end
+
+					insBlob:writeu1(op)
 					local argDesc = instDesc.args
 					if argDesc then
 						if type(argDesc) == 'table' then
@@ -1425,6 +1770,32 @@ assert.type(const.name, 'string')
 						end
 					end
 				end
+
+				if not method.maxStack then
+					method.maxStack = maxStack
+io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxStack='..maxStack..'\n')
+				else
+					-- NOTICE this can't handle labels so ...
+					if method.maxStack ~= maxStack then
+						io.stderr:write('!!! WARNING !!! '..method.name..' you set maxStack to '..method.maxStack..' but I calculated it as '..maxStack..'\n')
+					end
+				end
+
+				if not method.maxLocals then
+					method.maxLocals = maxLocals
+io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxLocals='..maxLocals..'\n')
+				else
+					-- NOTICE this can't handle labels so ...
+					if method.maxLocals ~= maxLocals then
+						io.stderr:write('!!! WARNING !!! '..method.name..' you set maxLocals to '..method.maxLocals..' but I calculated it as '..maxLocals..'\n')
+					end
+				end
+
+				local cblob = WriteBlob()
+
+--DEBUG:print('writing method stack locals', method.maxStack, method.maxLocals)
+				cblob:writeu2(maxStack)
+				cblob:writeu2(maxLocals)
 
 				local insBlobData = insBlob:compile()
 --DEBUG:print('writing method '..i..' insn blob '..#insBlobData)
