@@ -86,7 +86,7 @@ end
 function ReadBlob:readu1() return self:read'uint8_t' end
 function ReadBlob:readu2() return self:read'uint16_t' end
 function ReadBlob:readu4() return self:read'uint32_t' end
-
+function ReadBlob:readu8() return self:read'uint64_t' end
 function ReadBlob:readUleb128()
 	local result = 0
 	local shift = 0
