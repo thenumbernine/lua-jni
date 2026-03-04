@@ -90,6 +90,9 @@ end
 local function readreg(s)
 	return (assert(tonumber(s:match'^v(.*)$', 16)))
 end
+local function readregopt(s)
+	return s and (assert(tonumber(s:match'^v(.*)$', 16))) or 0
+end
 
 
 local rw10x = {}
@@ -235,9 +238,9 @@ function rw23x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(blob:readu1(), 2))
 end
 function rw23x.write(inst, blob, asm)
-	blob:writeu1(readarg(inst[2]))
-	blob:writeu1(readarg(inst[3]))
-	blob:writeu1(readarg(inst[4]))
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu1(readreg(inst[3]))
+	blob:writeu1(readreg(inst[4]))
 end
 
 local rw20t = {}
@@ -357,74 +360,96 @@ end
 
 local rw35c_type = {}
 function rw35c_type.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
+	local argc = bit.band(hi, 0xf)
+	if argc < 1 or argc > 5 then
+		error(inst[1].." expected 1-5 args, found "..argc)
+	end
 
 	local typeIndex = blob:readu2()	-- B = type
 	instPushType(inst, typeIndex, asm)
 
-	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-
+	-- will the 3rd byte be read if there is only 1 argc?
 	local x = blob:readu2()
-	inst:insert('v'..bit.tohex(bit.band(x, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
+
+	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
+	local regs = table{
+		'v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1),
+		'v'..bit.tohex(bit.band(x, 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1),
+	}
+	inst:append(regs:sub(1, argc))
 end
 function rw35c_type.write(inst, blob, asm)
+	local argc = #inst - 2
+	if argc < 1 or argc > 5 then
+		error(inst[1].." expected 1-5 args, found "..argc)
+	end
+
 	blob:writeu1(bit.bor(
-		bit.band(0xf, readconst(inst[2])),
-		bit.lshift(bit.band(0xf, readreg(inst[4])), 4)
+		argc,
+		bit.lshift(bit.band(0xf, readregopt(inst[4])), 4)
 	))
 	blob:writeu2(instReadType(inst, 3, asm))
 	blob:writeu2(bit.bor(
-		bit.band(0xf, readreg(inst[5])),
-		bit.lshift(bit.band(0xf, readreg(inst[6])), 4),
-		bit.lshift(bit.band(0xf, readreg(inst[7])), 8),
-		bit.lshift(bit.band(0xf, readreg(inst[8])), 12)
+		bit.band(0xf, readregopt(inst[5])),
+		bit.lshift(bit.band(0xf, readregopt(inst[6])), 4),
+		bit.lshift(bit.band(0xf, readregopt(inst[7])), 8),
+		bit.lshift(bit.band(0xf, readregopt(inst[8])), 12)
 	))
 end
 
 local rw35c_method = {}
 function rw35c_method.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
+	local argc = bit.band(hi, 0xf)
+	if argc < 0 or argc > 5 then
+		error(inst[1].." expected 0-5 args, found "..argc)
+	end
 
 	local methodIndex = blob:readu2()	-- B = method
 	instPushMethod(inst, methodIndex, asm)
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-
 	local x = blob:readu2()
-	inst:insert('v'..bit.tohex(bit.band(x, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
+	local regs = table{
+		'v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1),
+		'v'..bit.tohex(bit.band(x, 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1),
+	}
+	inst:append(regs:sub(1, argc))
 end
 function rw35c_method.write(inst, blob, asm)
+	local argc = #inst - 4
+	if argc < 0 or argc > 5 then
+		error(inst[1].." expected 0-5 args, found "..argc)
+	end
+
 	blob:writeu1(bit.bor(
-		bit.band(0xf, readconst(inst[2])),
-		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
+		argc,
+		bit.lshift(bit.band(0xf, readregopt(inst[6])), 4)
 	))
 	blob:writeu2(instReadMethod(inst, 3, asm))
 	blob:writeu2(bit.bor(
-		bit.band(0xf, readreg(inst[7])),
-		bit.lshift(bit.band(0xf, readreg(inst[8])), 4),
-		bit.lshift(bit.band(0xf, readreg(inst[9])), 8),
-		bit.lshift(bit.band(0xf, readreg(inst[10])), 12)
+		bit.band(0xf, readregopt(inst[7])),
+		bit.lshift(bit.band(0xf, readregopt(inst[8])), 4),
+		bit.lshift(bit.band(0xf, readregopt(inst[9])), 8),
+		bit.lshift(bit.band(0xf, readregopt(inst[10])), 12)
 	))
 end
 
 local rw3rc_type = {}
 function rw3rc_type.read(inst, hi, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
+	inst:insert('0x'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
 	local typeIndex = blob:readu2()	-- B = type
 	instPushType(inst, typeIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
 function rw3rc_type.write(inst, blob, asm)
-	blob:writeu1(readreg(inst[2]))
+	blob:writeu1(readconst(inst[2]))
 	blob:writeu2(instReadType(inst, 3, asm))
 	blob:writeu2(readreg(inst[4]))
 end
