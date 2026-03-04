@@ -16,7 +16,7 @@ local deepCopy = require 'java.util'.deepCopy
 local sigStrToObj = require 'java.util'.sigStrToObj
 local primSigStrForName = require 'java.util'.primSigStrForName
 local setFlagsToObj = require 'java.util'.setFlagsToObj
-local setFlagsToObj = require 'java.util'.setFlagsToObj
+local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
@@ -974,10 +974,10 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 --DEBUG:print('classDef count', numClasses,'ofs', classOfs)
 
 	local numDatas = blob:readu4()
-	local dataOfs = blob:readu4()
---DEBUG:print('data count', numDatas,'ofs', dataOfs)
+	local datasOfs = blob:readu4()
+--DEBUG:print('data count', numDatas,'ofs', datasOfs)
 	if numDatas > 0 then
-io.stderr:write('TODO support numData/dataOfs\n')
+io.stderr:write('TODO support numDatas/datasOfs\n')
 	end
 
 	-- header is done, read structures
@@ -1044,7 +1044,9 @@ io.stderr:write('TODO support numData/dataOfs\n')
 	self.strings = strings
 	for i=0,numStrings-1 do
 		blob.ofs = stringOfsOfs + ffi.sizeof'uint32_t' * i
+--DEBUG:print('stringOfsOfs', blob.ofs)		
 		blob.ofs = blob:readu4()
+--DEBUG:print('stringOfs', blob.ofs)		
 		if blob.ofs < 0 or blob.ofs >= fileSize then
 			error("string has bad ofs: 0x"..string.hex(blob.ofs))
 		end
@@ -1404,12 +1406,15 @@ function JavaASMDex:compile()
 	end
 	self.addType = addType
 
-	local function addArgTypeList(sig)
+	local function addTypeList(typeStrs)
+		if #typeStrs == 0 then return 0 end	-- 0 means 0
 		local w = WriteBlobLE()
-		for _,sigi in ipairs(sig) do
-			w:writeu4(addType(sigi))
+		w:writeu4(#typeStrs)
+		for _,typeStr in ipairs(typeStrs) do
+			w:writeu4(addType(typeStr))
 		end
-		return addUnique(self.typeLists, w:compile())
+		-- return 1-based index to-be-replaced later
+		return 1+addUnique(self.typeLists, w:compile())
 	end
 
 	local function addProto(sigstr)
@@ -1444,7 +1449,9 @@ function JavaASMDex:compile()
 		-- notice, the args get stoerd in a a separate list later
 		-- so i'll save them in another list
 		-- and in place of an offset, i'll just save that list's index for now...
-		w:writeu4(addArgTypeList(sig))
+		w:writeu4(addTypeList(sig))
+		
+		return addUnique(self.protos, w:compile())
 	end
 	self.addProto = addProto
 
@@ -1472,20 +1479,21 @@ function JavaASMDex:compile()
 	for _,class in ipairs(self.classes) do
 		class.thisClassIndex = addType(class.thisClass)
 		class.superClassIndex = addType(class.superClass)
-		class.interfaceIndexes = table(class.interfaces):mapi(function(ifacesStr)
-			return addType(ifacesStr)
-		end)
+		class.interfaceIndex = addTypeList(class.interfaces)
+		class.accessFlags = getFlagsFromObj(class, classAccessFlags)
 
 		-- classes will need # static and # non-static fields
 		-- and # direct (aka static|private|ctor) and # non-direct methods
 	end
 	for _,field in ipairs(self.fields) do
 		addField(field.class, field.name, field.sig)
+		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
 	end
 	for _,method in ipairs(self.methods) do
 		method.classIndex = addType(method.class)
 		method.sigIndex = addType(method.sig)
 		method.nameIndex = addString(method.name)
+		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
 
 		if method.code then
 			local cblob = WriteBlobLE()
@@ -1548,13 +1556,239 @@ function JavaASMDex:compile()
 	local fieldOfs = blob.ofs
 	blob:writeu4(0)
 
+	blob:writeu4(#self.methodBlobs)
+	local methodOfs = blob.ofs
+	blob:writeu4(0)
+
 	blob:writeu4(#self.classes)
 	local classOfs = blob.ofs
 	blob:writeu4(0)
 
-	blob:writeu4(0)	-- numdata
-	blob:writeu4(0)	-- dataofs
+	blob:writeu4(0)	-- numDatas
+	blob:writeu4(0)	-- datasOfs
 
+	-- fill in header size
+	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = blob.ofs	
+
+	-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
+	ffi.cast('uint32_t*', blob.data.v + stringOfsOfs)[0] = blob.ofs	
+	-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
+	-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
+	--  then the offsets to string data comes much much later in the file.
+	--  maybe in the "support data" section?
+	local stringOfs = blob.ofs
+	-- write placeholders for offsets
+	for i=0,#self.strings-1 do
+		blob:writeu4(0)
+	end
+
+	-- fill in the type offsets
+	ffi.cast('uint32_t*', blob.data.v + typeOfs)[0] = blob.ofs
+	for i,typeIndex in ipairs(self.types) do
+		blob:writeu4(typeIndex)
+	end
+
+	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
+	ffi.cast('uint32_t*', blob.data.v + protoOfs)[0] = blob.ofs
+	local protoDefOfs = blob.ofs
+	for i,proto in ipairs(self.protos) do
+		-- proto+8 is the args offset, which will need to be replaced later
+		assert.len(proto, 12)
+		blob:writeString(proto)
+	end
+
+	-- fill in fields
+	ffi.cast('uint32_t*', blob.data.v + fieldOfs)[0] = blob.ofs
+	for i,field in ipairs(self.fieldBlobs) do
+		assert.len(field, 8)
+		blob:writeString(field)
+	end
+
+	-- fill in methods
+	ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = blob.ofs
+	for i,method in ipairs(self.methodBlobs) do
+		assert.len(method, 8)
+		blob:writeString(method)
+	end
+
+	-- fill in classdata
+	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = blob.ofs
+	local classDefOfs = blob.ofs
+	for i,class in ipairs(self.classes) do
+		blob:writeu4(class.thisClassIndex)
+		blob:writeu4(class.superClassIndex)
+		blob:writeu4(class.interfaceIndex)	-- fill in interface-offset later
+		blob:writeu4(0)	-- fill in annotation-offset later
+		blob:writeu4(0)	-- fill in data-offset later
+		blob:writeu4(0)	-- fill in static-value-offset later
+	end
+
+	-- fill in call sites here
+
+	-- fill in method handles here
+
+	-- now fill in extra data ...
+
+	-- after writing everything else, cirrrrcle back and fill in 'stringOfs' and write the string data into 'stringOfs'
+	for i,s in ipairs(self.strings) do
+		ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))[0] = blob.ofs
+		blob:writeUleb128(#s)
+		blob:writeString(s)
+	end
+
+	-- now fill in proto def type lists
+	local typeListOfs = table()
+	for i,typeList in ipairs(self.typeLists) do
+		typeListOfs[i] = blob.ofs
+		blob:writeString(typeList)
+	end
+	-- now replace all proto type list indexes with offsets
+	for i=1,#self.protos do
+		local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
+		if protoArgTypeListPtr[0] ~= 0 then
+			protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
+		end
+	end
+	-- now replace all class interfaceIndexes
+	for i=1,#self.classes do
+		local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 * (i-1) + 8)
+		if classInterfaceTypeListPtr[0] ~= 0 then
+			classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])  
+		end
+	end
+
+	-- now fill in the class data's method data's instruction data ... before I fill in the method data's code offset as a uleb128 which is going to vary based on its size...
+	for _,method in ipairs(self.methods) do
+		if method.codeData then
+			-- save for later for class data
+			method.codeOfs = blob.ofs
+			blob:writeu2(method.maxRegs or 0)
+			blob:writeu2(method.regsIn or 0)
+			blob:writeu2(method.regsOut or 0)
+			blob:writeu2(method.tries and #method.tries or 0)
+			blob:writeString(method.codeData)
+
+			if bit.band(3, blob.ofs) == 2 then blob:writeu2(0) end
+			assert.eq(bit.band(3, blob.ofs), 0, "blob ofs supposed to be 4-byte aligned")
+
+			if method.tries then
+				for _,try in ipairs(method.tries) do
+					blob:writeu4(try.startAddr or 0)
+					blob:writeu2(try.numInsts or 0)
+					try.handlerOfsOfs = blob.ofs	-- circle back
+					blob:writeu2(try.handlerOfs or 0)
+				end
+				local encodedCatchHandlerListOfs = blob.ofs
+				for _,try in ipairs(method.tries) do
+					-- fill in try.handlerOfs
+					ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)[0] = blob.ofs - encodedCatchHandlerListOfs 
+					blob:writeSleb128(try.catchAllAddr and -#try or #try)
+					for i,addrPair in ipairs(try) do
+						blob:writeUleb128(addrPair.typeIndex)
+						blob:writeUleb128(addrPair.addr)
+					end
+					if try.catchAllAddr then
+						blob:writeUleb128(try.catchAllAddr)
+					end
+				end
+			end
+		end
+	end
+
+	-- now fill in class data
+	for classIndex,class in ipairs(self.classes) do
+		-- per-class 
+		-- collect all fields that are static vs instance
+		local staticFieldIndexes = table()	-- 1-based
+		local instanceFieldIndexes = table()	-- 1-based
+		for i,field in ipairs(self.fields) do 
+			if field.class == class.thisClass 
+			and field.accessFlags
+			and field.accessFlags ~= 0
+			then
+				if field.isStatic then
+					staticFieldIndexes:insert(i)
+				else
+					instanceFieldIndexes:insert(i)
+				end
+			end
+		end
+		
+		-- collect all methods that are direct vs virtual
+		local directMethodIndexes = table() 	-- 1-based
+		local virtualMethodIndexes = table()	-- 1-based
+		for i,method in ipairs(self.methods) do
+			if method.class == class.thisClass
+			and method.accessFlags
+			and method.accessFlags ~= 0
+			then
+				if method.isStatic 
+				or method.isPrivate 
+				or method.isConstructor 
+				then
+					directMethodIndexes:insert(i)
+				else
+					virtualMethodIndexes:insert(i)
+				end
+			end
+		end
+		
+		if #staticFieldIndexes > 0
+		or #instanceFieldIndexes > 0
+		or #directMethodIndexes > 0
+		or #virtualMethodIndexes > 0
+		then
+			-- change the class data offset to here
+			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 16 + (classIndex-1) * 24)
+			classDataPtr[0] = blob.ofs
+
+			blob:writeUleb128(#staticFieldIndexes)
+			blob:writeUleb128(#instanceFieldIndexes)
+			blob:writeUleb128(#directMethodIndexes)
+			blob:writeUleb128(#virtualMethodIndexes)
+
+			local function writeFields(fieldIndexes)
+				local lastFieldIndex
+				for _,fieldIndex in ipairs(fieldIndexes) do
+					if not lastFieldIndex then
+						blob:writeUleb128(fieldIndex-1)	-- from 1-based to 0-based
+					else
+						blob:writeUleb128(fieldIndex - lastFieldIndex)
+					end
+					blob:writeUleb128(self.fields[fieldIndex].accessFlags)
+					lastFieldIndex = fieldIndex
+				end		
+			end
+			writeFields(staticFieldIndexes)
+			writeFields(instanceFieldIndexes)
+		
+			local function writeMethods(methodIndexes)
+				local lastMethodIndex
+				for _,methodIndex in ipairs(methodIndexes) do
+					if not lastMethodIndex then
+						blob:writeUleb128(methodIndex-1)	-- from 1-based to 0-based
+					else
+						blob:writeUleb128(methodIndex - lastMethodIndex)
+					end
+					local method = self.methods[methodIndex]
+					blob:writeUleb128(method.accessFlags)
+					-- I guess this means I better already have written the code offset data
+					blob:writeUleb128(method.codeOfs or 0)
+					lastMethodIndex = methodIndex
+				end
+			end
+			writeMethods(directMethodIndexes)
+			writeMethods(virtualMethodIndexes)
+		end
+	end
+
+	-- TODO link data last?
+
+	-- TODO done?
+
+	-- TODO remove temp write fields?
+
+	return blob:compile()
 end
 
 return JavaASMDex

@@ -156,6 +156,29 @@ function WriteBlob:writeString(s)
 	self.data:resize(ofs + n)
 	ffi.copy(self.data.v + ofs, s, n)
 end
+function WriteBlob:writeUleb128(value)
+	for count=1,5 do
+		local byte = bit.band(0x7f, value) 
+		value = bit.rshift(value, 7)
+		if value ~= 0 then byte = bit.bor(0x80, byte) end
+		self:writeu1(byte)
+		if value == 0 then break end
+	end
+end
+function WriteBlob:writeSleb128()
+	for count=1,5 do
+		local byte = bit.band(0x7f, value) 
+		value = bit.rshift(value, 7)
+		if (value == 0 and bit.band(byte, 0x40) == 0)
+		or (value == -1 and bit.band(byte, 0x40) ~= 0)
+		then
+			self:writeu1(byte)
+			break
+		end
+		byte = bit.band(0x80, byte)
+		self:writeu1(byte)
+	end
+end
 
 function WriteBlob:compile()
 	return self.data:dataToStr()
