@@ -4,6 +4,7 @@ local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'
 local class = require 'ext.class'
+local vector = require 'stl.vector-lua'	-- hmm, for asmdex writing I will need to go back and write buffer contents ... this isn't technically good to do when the buffer is a string ...
 local fromlua = require 'ext.fromlua'
 
 
@@ -124,7 +125,7 @@ end
 local WriteBlob = class()
 WriteBlob.littleEndian = false
 function WriteBlob:init()
-	self.data = table()	-- table-of-strings ... TODO luajit string.buffer ?
+	self.data = vector'uint8_t'	-- TODO luajit string.buffer ?
 end
 function WriteBlob:write(ctype, value)
 	value = castToNumberOrJPrim(value)
@@ -134,12 +135,14 @@ function WriteBlob:write(ctype, value)
 	local result
 	local data = ffi.typeof('$[1]', ctype)()
 	data[0] = value
+	local ofs = #self.data
+	self.data:resize(ofs + size)
 	if ffi.abi'le' == self.littleEndian then
-		self.data:insert(ffi.string(data, size))
+		ffi.copy(self.data.v + ofs, data, size)
 	else
 		local ptr = ffi.cast('uint8_t*', data)
 		for i=0,size-1 do
-			self.data:insert((string.char(ptr[size-1-i])))
+			self.data.v[ofs + i] = ptr[size-1-i]
 		end
 	end
 end
@@ -147,13 +150,15 @@ function WriteBlob:writeu1(...) return self:write('uint8_t', ...) end
 function WriteBlob:writeu2(...) return self:write('uint16_t', ...) end
 function WriteBlob:writeu4(...) return self:write('uint32_t', ...) end
 function WriteBlob:writeString(s)
---DEBUG(@5):print('writestring', #self.data, s)
-	return self.data:insert((assert.type(s, 'string')))
+	local ofs = #self.data
+--DEBUG(@5):print('writestring', ofs, s)
+	local n = #s
+	self.data:resize(ofs + n)
+	ffi.copy(self.data.v + ofs, s, n)
 end
 
 function WriteBlob:compile()
-	self.data = table{(self.data:concat())}
-	return self.data[1]
+	return self.data:dataToStr()
 end
 
 local ReadBlobLE = ReadBlob:subclass()

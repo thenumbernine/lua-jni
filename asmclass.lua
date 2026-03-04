@@ -1932,7 +1932,7 @@ io.stderr:write('determined class '..self.thisClass..' method '..method.name..' 
 	-- no longer need constants
 	self.constants = nil
 
-	return blob.data:concat()
+	return blob:compile()
 end
 
 -- shorthand for env:_defineClass(self, ...)

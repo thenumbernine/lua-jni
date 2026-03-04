@@ -976,7 +976,9 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	local numDatas = blob:readu4()
 	local dataOfs = blob:readu4()
 --DEBUG:print('data count', numDatas,'ofs', dataOfs)
-
+	if numDatas > 0 then
+io.stderr:write('TODO support numData/dataOfs\n')
+	end
 
 	-- header is done, read structures
 
@@ -1504,6 +1506,55 @@ function JavaASMDex:compile()
 			end
 		end
 	end
+
+	-- ok now all constants are accounted for ... start writing
+	local blob = WriteBlobLE()
+	blob:writeString('dex\n')
+	blob:writeString('\30\33\39\0')
+	
+	local checksumOfs = blob.ofs
+	blob:writeu4(0)	-- space for checksum, write it once we're finished
+	
+	local sha1Ofs = blob.ofs
+	blob:writeString(('\0'):rep(20))	-- space for sha1, write it once we're finished
+	
+	-- ... or not, or make a blob for everything but the header.  would that work or would i have to factor in offsets to every struct's offsets i wrote?
+	local fileSizeOfs = blob.ofs
+	blob:writeu4(0)	-- space for file size, write it once we're finished
+	
+	local headerSizeOfs = blob.ofs
+	blob:writeu4(0)	-- space for header size
+	
+	blob:writeu1(0x12345678)	-- endian tag
+	blob:writeu4(0)		-- num links
+	blob:writeu4(0)		-- link ofs
+	
+	local mapOfsOfs = blob.ofs
+	blob:writeu4(0)
+	
+	blob:writeu4(#self.strings)
+	local stringOfsOfs = blob.ofs
+	blob:writeu4(0)
+
+	blob:writeu4(#self.types)
+	local typeOfs = blob.ofs
+	blob:writeu4(0)
+
+	blob:writeu4(#self.protos)
+	local protoOfs = blob.ofs
+	blob:writeu4(0)
+
+	blob:writeu4(#self.fieldBlobs)
+	local fieldOfs = blob.ofs
+	blob:writeu4(0)
+
+	blob:writeu4(#self.classes)
+	local classOfs = blob.ofs
+	blob:writeu4(0)
+
+	blob:writeu4(0)	-- numdata
+	blob:writeu4(0)	-- dataofs
+
 end
 
 return JavaASMDex
