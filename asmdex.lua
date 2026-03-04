@@ -12,6 +12,25 @@ local deepCopy = require 'java.util'.deepCopy
 
 -- https://source.android.com/docs/core/runtime/dalvik-bytecode
 -- https://source.android.com/docs/core/runtime/instruction-formats
+local function instAddField(inst, fieldIndex, asm)
+	local field = asm.fields[1+fieldIndex]
+	if not field then
+		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
+		inst:insert('field '..fieldIndex)
+	else
+		inst:insert(field.class)
+		inst:insert(field.name)
+		inst:insert(field.sig)
+	end
+end
+local function instAddType(inst, typeIndex, asm)
+	local typ = asm.types[1+typeIndex]
+	if not typ then
+		inst:insert('type '..typeIndex)
+	else
+		inst:insert('type '..typeIndex)	-- TODO hmmm how to represent types?
+	end
+end
 local function read10x(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))				-- NOTICE throws away hi
 end
@@ -48,29 +67,21 @@ local function read21c_string(inst, hi, lo, blob, asm)
 end
 local function read21c_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	local typ = assert.index(asm.types, 1+blob:readu2())
-	inst:insert(typ)
+	instAddType(inst, blob:readu2(), asm)
 end
 local function read21c_field(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	local field = assert.index(asm.fields, 1+blob:readu2())
-	inst:insert(field.class)
-	inst:insert(field.name)
-	inst:insert(field.sig)
+	instAddField(inst, blob:readu2(), asm)
 end
 local function read22c_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	local typ = assert.index(asm.types, 1+blob:readu2())
-	inst:insert(typ)
+	instAddType(inst, blob:readu2(), asm)
 end
 local function read22c_field(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	local field = assert.index(asm.fields, 1+blob:readu2())
-	inst:insert(field.class)
-	inst:insert(field.name)
-	inst:insert(field.sig)
+	instAddField(inst, blob:readu2(), asm)
 end
 local function read23x(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
@@ -124,7 +135,7 @@ end
 local function read35c_type(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
 
-	local typ = assert.index(asm.types, 1+blob:readu2())	-- B = type
+	local typeIndex = blob:readu2()	-- B = type
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
@@ -136,7 +147,7 @@ local function read35c_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
 	-- wait, B goes last?
-	inst:insert(typ)
+	instAddType(inst, typeIndex, asm)
 	-- what other args for identifying types?
 end
 local function read35c_method(inst, hi, lo, blob, asm)
@@ -160,10 +171,9 @@ local function read35c_method(inst, hi, lo, blob, asm)
 end
 local function read3rc_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
-	local typ = assert.index(asm.types, 1+blob:readu2())	-- B = type
+	local typeIndex = blob:readu2()	-- B = type
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
-	-- TODO types
-	inst:insert(typ)
+	instAddType(inst, typeIndex, asm)
 end
 local function read3rc_method(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
@@ -777,6 +787,7 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 
 		if classDataOfs ~= 0 then
 			blob.ofs = classDataOfs
+print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))			
 			local numStaticFields = blob:readUleb128()
 			local numInstanceFields = blob:readUleb128()
 			local numDirectMethods = blob:readUleb128()
@@ -795,8 +806,10 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 			local function readMethods(count)
 				local methodIndex = 0
 				for i=0,count-1 do
+local methodStartOfs = blob.ofs					
 					methodIndex = methodIndex + blob:readUleb128()
 					local method = assert.index(self.methods, 1 + methodIndex)
+print('reading method data', method.class, method.name, method.proto.shorty, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
 					method.accessFlags = blob:readUleb128()
 					local codeOfs = blob:readUleb128()
 					assert.le(0, codeOfs)
@@ -813,11 +826,13 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 						method.numOut = blob:readu2()
 						local numTries = blob:readu2()
 						local debugInfoOfs = blob:readu4()
-						local numInsns = blob:readu4()	-- "in 16-bit code units..."
+						local numInsns = blob:readu4()	-- "in 16-bit code units..." ... this is the number of uint16_t's
 --DEBUG:print('method numInsns ', numInsns)
+						local instEndOfs = blob.ofs + bit.lshift(numInsns, 1)
 						local code = table()
 						method.code = code
-						for i=0,numInsns-1 do
+						while blob.ofs < instEndOfs do
+io.write(bit.tohex(blob.ofs, 8), ':\t')
 							-- Is uint16 instruction order influenced by endian order?
 							-- "Also, if this happens to be in an endian-swapped file, then the swapping is only done on individual ushort instances and not on the larger internal structures."
 							-- ...whatever that means. "Sometimes." smh.
@@ -829,23 +844,40 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 							inst:insert(instDesc.name)
 							if not instDesc.read then error("found inst with no read(): "..bit.tohex(lo, 2)) end
 							instDesc.read(inst, hi, lo, blob, self)
+print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
 							code:insert(inst)
 						end
+						assert.eq(blob.ofs, instEndOfs, "instruction decoding failed to end at the correct location (current offset vs desired)")
 
 						if bit.band(3, blob.ofs) == 2 then blob:readu2() end	-- optional padding to be 4-byte aligned
+						assert.eq(bit.band(3, blob.ofs), 0, "blob ofs supposed to be 4-byte aligned")
+
+print('method.numTries', numTries)						
 						if numTries > 0 then
+							assert(not method.tries)
 							method.tries = table()
+							local lasttry
 							for j=0,numTries-1 do
 								-- read tries
 								local try = {}
 								method.tries:insert(try)
+								-- "The address is a count of 16-bit code units to the start of the first covered instruction."
+								--  so does that mean they are indexes into the insns[] table, or are they byte offsets, or are they file offsets?
 								try.startAddr = blob:readu4()
-								try.insnCount = blob:readu2()
+								try.numInsts = blob:readu2()
 								try.handlerOfs = blob:readu2()
-print('got method try', require 'ext.tolua'(try))
+print('got try #'..j..':', require 'ext.tolua'(try))
+								-- "Elements of the array must be non-overlapping in range and in order from low to high address. "
+								if lasttry then
+									assert.le(lasttry.startAddr + lasttry.numInsts, try.startAddr, "try begins after previous try ends")
+								end
+								assert.le(try.startAddr + try.numInsts, numInsns, "try extends past file size")
+								lasttry = try
 							end
 						end
 
+						-- TODO I'm getting errors here
+						-- [=[
 						local encodedCatchHandlerListOfs = blob.ofs
 
 						-- now we're at the end of the code structure
@@ -881,6 +913,7 @@ print('handlers.catchAllAddr', handlers.catchAllAddr)
 								end
 							end
 						end
+						--]=]
 
 						blob.ofs = push
 					end
