@@ -13,79 +13,131 @@ local ReadBlobLE = require 'java.blob'.ReadBlobLE
 local WriteBlobLE = require 'java.blob'.WriteBlobLE
 
 local deepCopy = require 'java.util'.deepCopy
+local sigStrToObj = require 'java.util'.sigStrToObj
+local primSigStrForName = require 'java.util'.primSigStrForName
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 
-local function instAddString(inst, stringIndex, asm)
+local function instPushString(inst, stringIndex, asm)
 	local str = asm.strings[1+stringIndex]
 	if not str then
-		inst:insert('!!! WARNING !!! OOB string '..stringIndex)
-	else
-		inst:insert(str)
+		error('OOB string '..stringIndex)
 	end
+	inst:insert(str)
 end
-local function instAddType(inst, typeIndex, asm)
+local function instReadString(inst, index, asm)
+	return (asm.addString(inst[index]))
+end
+
+local function instPushType(inst, typeIndex, asm)
 	local typ = asm.types[1+typeIndex]
 	if not typ then
-		inst:insert('!!! WARNING !!! OOB type '..typeIndex)
-	else
-		inst:insert(typ)	-- TODO hmmm how to represent types?
+		error('OOB type '..typeIndex)
 	end
+	inst:insert(typ)
 end
-local function instAddProto(inst, protoIndex, asm)
+local function instReadType(inst, index, asm)
+	return (asm.addString(inst[index]))
+end
+
+local function instPushProto(inst, protoIndex, asm)
 	local proto = asm.protos[1+protoIndex]
 	if not proto then
-		inst:insert('!!! WARNING !!! OOB proto '..protoIndex)
-	else
-		inst:insert(proto)
+		error('OOB proto '..protoIndex)
 	end
+	inst:insert(proto)
 end
-local function instAddField(inst, fieldIndex, asm)
+local function instReadProto(inst, index, asm)
+	return (asm.addProto(inst[index]))
+end
+
+local function instPushField(inst, fieldIndex, asm)
 	local field = asm.fields[1+fieldIndex]
 	if not field then
-		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
-		inst:insert('!!! WARNING !!! OOB field '..fieldIndex)
-	else
-		inst:insert(field.class)
-		inst:insert(field.name)
-		inst:insert(field.sig)
+		error('OOB field '..fieldIndex)
 	end
+	inst:insert(field.class)
+	inst:insert(field.name)
+	inst:insert(field.sig)
 end
-local function instAddMethod(inst, methodIndex, asm)
+local function instReadField(inst, index, asm)
+	return (asm.addField(inst[index], inst[index+1], inst[index+2]))
+end
+
+local function instPushMethod(inst, methodIndex, asm)
 	local method = asm.methods[1+methodIndex]
 	if not method then
-		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
-		inst:insert('!!! WARNING !!! OOB method '..methodIndex)
-	else
-		inst:insert(method.class)
-		inst:insert(method.name)
-		inst:insert(method.sig)
+		error('OOB method '..methodIndex)
 	end
+	inst:insert(method.class)
+	inst:insert(method.name)
+	inst:insert(method.sig)
 end
+local function instReadMethod(inst, index, asm)
+	return (asm.addMethod(inst[index], inst[index+1], inst[index+2]))
+end
+
+
+local function readconst(s)
+	return (assert(tonumber(s)))
+end
+local function readconstopt(s)
+	return tonumber(s) or 0
+end
+local function readreg(s)
+	return (assert(tonumber(s:match'^v(.*)$', 16)))
+end
+
+
 local rw10x = {}
 function rw10x.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))				-- NOTICE throws away hi
 end
+function rw10x.write(inst, blob, asm)
+	blob:writeu1(readconstopt(inst[2]))
+end
+
 local rw12x = {}
 function rw12x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 end
+function rw12x.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+end
+
 local rw11x = {}
 function rw11x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 end
+function rw11x.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+end
+
 local rw11n = {}
 function rw11n.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(0xf, hi), 1))	-- A = reg (4 bits)
 	inst:insert('0x'..bit.tohex(bit.band(0xf, bit.rshift(hi, 8)), 1))		-- B = signed 4 bit
 end
+function rw11n.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readconst(inst[3])), 4)
+	))
+end
+
 local rw10t = {}
 function rw10t.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))					-- signed 8 bit branch offset
+end
+function rw10t.write(inst, blob, asm)
+	blob:writeu1(readconst(inst[2]))
 end
 
 local rw22x = {}
@@ -93,71 +145,149 @@ function rw22x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 end
+function rw22x.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(readreg(inst[3]))
+end
+
 local rw21s = {}
 function rw21s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))	-- signed
 end
+function rw21s.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(readconst(inst[3]))
+end
+
 local rw21h = {}
 function rw21h.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
+function rw21h.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(readconst(inst[3]))
+end
+
 local rw21c_string = {}
 function rw21c_string.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	instAddString(inst, blob:readu2(), asm)
+	instPushString(inst, blob:readu2(), asm)
 end
+function rw21c_string.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadString(inst, 3, blob))
+end
+
 local rw21c_type = {}
 function rw21c_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	instAddType(inst, blob:readu2(), asm)
+	instPushType(inst, blob:readu2(), asm)
 end
+function rw21c_type.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadType(inst, 3, blob))
+end
+
 local rw21c_field = {}
 function rw21c_field.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	instAddField(inst, blob:readu2(), asm)
+	instPushField(inst, blob:readu2(), asm)
 end
+function rw21c_field.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadField(inst, 3, asm))
+end
+
 local rw22c_type = {}
 function rw22c_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	instAddType(inst, blob:readu2(), asm)
+	instPushType(inst, blob:readu2(), asm)
 end
+function rw22c_type.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+	blob:writeu2(instReadType(inst, 4, asm))
+end
+
 local rw22c_field = {}
 function rw22c_field.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	instAddField(inst, blob:readu2(), asm)
+	instPushField(inst, blob:readu2(), asm)
 end
+function rw22c_field.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+	blob:writeu2(instReadField(inst, 4, asm))
+end
+
 local rw23x = {}
 function rw23x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('v'..bit.tohex(blob:readu1(), 2))	-- I'm sure I'm doign this wrong but it says vAA vBB vCC and that A is 8 bits and that the whole instruction reads 2 words, so *shrug* no sign of bitness of B or C
 	inst:insert('v'..bit.tohex(blob:readu1(), 2))
 end
+function rw23x.write(inst, blob, asm)
+	blob:writeu1(readarg(inst[2]))
+	blob:writeu1(readarg(inst[3]))
+	blob:writeu1(readarg(inst[4]))
+end
+
 local rw20t = {}
 function rw20t.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
 	inst:insert('0x'..bit.tohex(hi, 2))		-- NOTICE throws away hi
 end
+function rw20t.write(inst, blob, asm)
+	blob:writeu1(readconstopt(inst[3]))	-- out of order, throw-away is last
+	blob:writeu2(readconst(inst[2]))
+end
+
 local rw22t = {}
 function rw22t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
 end
+function rw22t.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+	blob:writeu2(readconst(inst[4]))
+end
+
 local rw21t = {}
 function rw21t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
 end
+function rw21t.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(readconst(inst[3]))
+end
+
 local rw22s = {}
 function rw22s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
 end
+function rw22s.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+	blob:writeu2(readconst(inst[4]))
+end
+
 local rw22b = {}
 function rw22b.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
@@ -165,13 +295,32 @@ function rw22b.read(inst, hi, blob, asm)
 	local C = blob:read'int16_t'				-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
 	inst:insert('0x'..bit.tohex(C, 4))
 end
+function rw22b.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readreg(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
+	))
+	blob:writeu2(readconst(inst[4]))
+end
+
 local rw21c_method = {}
 function rw21c_method.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex( blob:readu2(), 4))	-- TODO
+	inst:insert('v'..bit.tohex(hi, 2))
+	instPushMethod(inst, blob:readu2(), asm)
 end
+function rw21c_method.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadMethod(inst, 3, asm))
+end
+
 local rw21c_proto = {}
 function rw21c_proto.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex( blob:readu2(), 4))	-- TODO
+	inst:insert('v'..bit.tohex(hi, 2))
+	instPushProto(blob:readu2())
+end
+function rw21c_proto.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadProto(inst, 3, asm))
 end
 
 local rw32x = {}
@@ -180,21 +329,38 @@ function rw32x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE throws away hi
 end
+function rw32x.write(inst, blob, asm)
+	blob:writeu1(readconstopt(inst[4]))
+	blob:writeu2(readreg(inst[2]))
+	blob:writeu2(readreg(inst[3]))
+end
+
 local rw31i = {}
 function rw31i.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:readu4(), 8))	-- signed ... will this be 4-byte aligned?
 end
+function rw31i.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu4(readconst(inst[3]))
+end
+
 local rw31c_string = {}
 function rw31c_string.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	instAddString(inst, blob:readu4(), asm)
+	instPushString(inst, blob:readu4(), asm)
 end
+function rw31c_string.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu4(instReadString(inst3, 3, asm))
+end
+
 local rw35c_type = {}
 function rw35c_type.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
 
 	local typeIndex = blob:readu2()	-- B = type
+	instPushType(inst, typeIndex, asm)
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
@@ -204,16 +370,27 @@ function rw35c_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
-
-	-- wait, B goes last?
-	instAddType(inst, typeIndex, asm)
-	-- what other args for identifying types?
 end
+function rw35c_type.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readconst(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[4])), 4)
+	))
+	blob:writeu2(instReadType(inst, 3, asm))
+	blob:writeu2(bit.bor(
+		bit.band(0xf, readreg(inst[5])),
+		bit.lshift(bit.band(0xf, readreg(inst[6])), 4),
+		bit.lshift(bit.band(0xf, readreg(inst[7])), 8),
+		bit.lshift(bit.band(0xf, readreg(inst[8])), 12)
+	))
+end
+
 local rw35c_method = {}
 function rw35c_method.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
 
 	local methodIndex = blob:readu2()	-- B = method
+	instPushMethod(inst, methodIndex, asm)
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
@@ -224,33 +401,67 @@ function rw35c_method.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
-	-- wait, B goes last?
-	instAddMethod(inst, methodIndex, asm)
 end
+function rw35c_method.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readconst(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
+	))
+	blob:writeu2(instReadMethod(inst, 3, asm))
+	blob:writeu2(bit.bor(
+		bit.band(0xf, readreg(inst[7])),
+		bit.lshift(bit.band(0xf, readreg(inst[8])), 4),
+		bit.lshift(bit.band(0xf, readreg(inst[9])), 8),
+		bit.lshift(bit.band(0xf, readreg(inst[10])), 12)
+	))
+end
+
 local rw3rc_type = {}
 function rw3rc_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
 	local typeIndex = blob:readu2()	-- B = type
+	instPushType(inst, typeIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
-	instAddType(inst, typeIndex, asm)
 end
+function rw3rc_type.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadType(inst, 3, asm))
+	blob:writeu2(readreg(inst[4]))
+end
+
 local rw3rc_method = {}
 function rw3rc_method.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
 	local methodIndex = blob:readu2()	-- B = method
+	instPushMethod(inst, methodIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
-	instAddMethod(inst, methodIndex, asm)
 end
+function rw3rc_method.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu2(instReadType(inst, 3, asm))
+	blob:writeu2(readreg(inst[4]))
+end
+
 local rw31t = {}
 function rw31t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed branch offset to table data pseudo-instruction
 end
+function rw31t.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:writeu4(readconst(inst[3]))
+end
+
 local rw30t = {}
 function rw30t.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed
 	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE hi gets thrown away
 end
+function rw30t.write(inst, blob, asm)
+	blob:writeu1(readconstopt(inst[3]))
+	blob:writeu4(readconst(inst[2]))
+end
+
 local rw35c_callsite = {}
 function rw35c_callsite.read(inst, hi, blob, asm)
 	-- TODO
@@ -258,6 +469,12 @@ function rw35c_callsite.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
+function rw35c_callsite.write(inst, blob, asm)
+	blob:writeu1(readconst(inst[2]))
+	blob:writeu2(readconst(inst[3]))
+	blob:writeu2(readconst(inst[4]))
+end
+
 local rw3rc_callsite = {}
 function rw3rc_callsite.read(inst, hi, blob, asm)
 	-- TODO
@@ -265,12 +482,20 @@ function rw3rc_callsite.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
+function rw3rc_callsite.write(inst, blob, asm)
+	blob:writeu1(readconst(inst[2]))
+	blob:writeu2(readconst(inst[3]))
+	blob:writeu2(readconst(inst[4]))
+end
+
 
 local rw45cc = {}
 function rw45cc.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(0xf, hi), 1))	-- arg word count 4 bits
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
+	instPushMethod(inst, methodIndex, asm)
+
 	inst:insert('v'..bit.tohex(bit.rshift(bit.band(0xf, hi), 4), 1))	-- C = receiver 4 bits
 
 	-- D E F G are arg registers
@@ -281,34 +506,60 @@ function rw45cc.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
 	local protoIndex = blob:readu2()	-- H = proto
-
-	instAddMethod(inst, methodIndex, asm)
-	instAddProto(inst, protoIndex, asm)
+	instPushProto(inst, protoIndex, asm)
 end
+function rw45cc.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readconst(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
+	))
+	blob:writeu2(instReadMethod(inst, 3, asm))
+	blob:writeu2(bit.bor(
+		bit.band(0xf, readreg(inst[7])),
+		bit.lshift(bit.band(0xf, readreg(inst[8])), 4),
+		bit.lshift(bit.band(0xf, readreg(inst[9])), 8),
+		bit.lshift(bit.band(0xf, readreg(inst[10])), 12)
+	))
+	blob:writeu2(instReadProto(inst, 11, asm))
+end
+
 local rw4rcc = {}
 function rw4rcc.read(inst, hi, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))	-- arg word count 8 bits
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
+	instPushMethod(inst, methodIndex, asm)
 
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))	-- C = receiver 16 bits
 
 	-- D - G = 16-bit register indexes?
 
 	local protoIndex = blob:readu2()	-- H = proto
+	instPushProto(inst, protoIndex, asm)
 
 	-- I - N = more 16-bit register indexes?
 	-- is there a number on these?
 	--error"idk how to do this"
 
-	instAddMethod(inst, methodIndex, asm)
-	instAddProto(inst, protoIndex, asm)
+end
+function rw4rcc.write(inst, blob, asm)
+	blob:writeu1(bit.bor(
+		bit.band(0xf, readconst(inst[2])),
+		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
+	))
+	blob:writeu2(instReadMethod(inst, 3, asm))
+	blob:writeu2(readreg(inst[7]))
+	blob:writeu2(instReadProto(inst, 8, asm))
 end
 
-local rw51l = {}
-function rw51l.read(inst, hi, blob, asm)
+local rw51l_double = {}
+function rw51l_double.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu8(), 16))
+	inst:insert(tostring(blob:read'jdouble'))
+end
+function rw51l_double.write(inst, blob, asm)
+	blob:writeu1(readreg(inst[2]))
+	blob:write('jdouble', readconst(inst[3]))
 end
 
 local instDescForOp = {
@@ -336,7 +587,7 @@ local instDescForOp = {
 	[0x15] = {name='const/high16', rw=rw21h},			-- 15 21h	const/high16 vAA, #+BBBB0000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 32 bits) into the specified register.
 	[0x16] = {name='const-wide/16', rw=rw21s},			-- 16 21s	const-wide/16 vAA, #+BBBB	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
 	[0x17] = {name='const-wide/32', rw=rw31i},			-- 17 31i	const-wide/32 vAA, #+BBBBBBBB	A: destination register (8 bits) B: signed int (32 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
-	[0x18] = {name='const-wide', rw=rw51l},			-- 18 51l	const-wide vAA, #+BBBBBBBBBBBBBBBB	A: destination register (8 bits) B: arbitrary double-width (64-bit) constant	Move the given literal value into the specified register-pair.
+	[0x18] = {name='const-wide', rw=rw51l_double},			-- 18 51l	const-wide vAA, #+BBBBBBBBBBBBBBBB	A: destination register (8 bits) B: arbitrary double-width (64-bit) constant	Move the given literal value into the specified register-pair.
 	[0x19] = {name='const-wide/high16', rw=rw21h},			-- 19 21h	const-wide/high16 vAA, #+BBBB000000000000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 64 bits) into the specified register-pair.
 	[0x1a] = {name='const-string', rw=rw21c_string},			-- 1a 21c	const-string vAA, string@BBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
 	[0x1b] = {name='const-string/jumbo', rw=rw31c_string},			-- 1b 31c	const-string/jumbo vAA, string@BBBBBBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
@@ -566,7 +817,7 @@ local instDescForOp = {
 	[0xfb] = {name='invoke-polymorphic/range', rw=rw4rcc},			-- fb 4rcc	invoke-polymorphic/range {vCCCC .. vNNNN}, meth@BBBB, proto@HHHH	A: argument word count (8 bits) B: method reference index (16 bits) C: receiver (16 bits) H: prototype reference index (16 bits) N = A + C - 1	Invoke the indicated method handle. See the invoke-polymorphic description above for details. Present in Dex files from version 038 onwards.
 	[0xfc] = {name='invoke-custom', rw=rw35c_callsite},			-- fc 35c	invoke-custom {vC, vD, vE, vF, vG}, call_site@BBBB	A: argument word count (4 bits) B: call site reference index (16 bits) C..G: argument registers (4 bits each)	Resolves and invokes the indicated call site. The result from the invocation (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. This instruction executes in two phases: call site resolution and call site invocation. Call site resolution checks whether the indicated call site has an associated java.lang.invoke.CallSite instance. If not, the bootstrap linker method for the indicated call site is invoked using arguments present in the DEX file (see call_site_item). The bootstrap linker method returns a java.lang.invoke.CallSite instance that will then be associated with the indicated call site if no association exists. Another thread may have already made the association first, and if so execution of the instruction continues with the first associated java.lang.invoke.CallSite instance. Call site invocation is made on the java.lang.invoke.MethodHandle target of the resolved java.lang.invoke.CallSite instance. The target is invoked as if executing invoke-polymorphic (described above) using the method handle and arguments to the invoke-custom instruction as the arguments to an exact method handle invocation. Exceptions raised by the bootstrap linker method are wrapped in a java.lang.BootstrapMethodError. A BootstrapMethodError is also raised if: the bootstrap linker method fails to return a java.lang.invoke.CallSite instance. the returned java.lang.invoke.CallSite has a null method handle target. the method handle target is not of the requested type. Present in Dex files from version 038 onwards.
 	[0xfd] = {name='invoke-custom/range', rw=rw3rc_callsite},			-- fd 3rc	invoke-custom/range {vCCCC .. vNNNN}, call_site@BBBB	A: argument word count (8 bits) B: call site reference index (16 bits) C: first argument register (16-bits) N = A + C - 1	Resolve and invoke a call site. See the invoke-custom description above for details. Present in Dex files from version 038 onwards.
-	[0xfe] = {name='const-method-handle', rw=rw21_methodc},			-- fe 21c	const-method-handle vAA, method_handle@BBBB	A: destination register (8 bits) B: method handle index (16 bits)	Move a reference to the method handle specified by the given index into the specified register. Present in Dex files from version 039 onwards.
+	[0xfe] = {name='const-method-handle', rw=rw21c_method},			-- fe 21c	const-method-handle vAA, method_handle@BBBB	A: destination register (8 bits) B: method handle index (16 bits)	Move a reference to the method handle specified by the given index into the specified register. Present in Dex files from version 039 onwards.
 	[0xff] = {name='const-method-type', rw=rw21c_proto},			-- ff 21c	const-method-type vAA, proto@BBBB	A: destination register (8 bits) B: method prototype reference (16 bits)	Move a reference to the method prototype specified by the given index into the specified register. Present in Dex files from version 039 onwards.
 }
 local opForInstName = table.map(instDescForOp, function(inst,op)
@@ -654,7 +905,7 @@ function JavaASMDex:readData(data)
 	elseif endianTag == 0x12345678 then
 		-- safe
 	else
-		io.stderr:write('!!! WARNING !!! endian is a bad value: 0x'..bit.tohex(endianTag, 8)..', something else will probably go wrong.\n')
+		error('endian is a bad value: 0x'..bit.tohex(endianTag, 8)..', something else will probably go wrong.\n')
 	end
 	assert.eq(fileSize, #data, "fileSize didn't match")	-- when does size not equal #data?
 
@@ -914,9 +1165,9 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 							-- Is uint16 instruction order influenced by endian order?
 							-- "Also, if this happens to be in an endian-swapped file, then the swapping is only done on individual ushort instances and not on the larger internal structures."
 							-- ...whatever that means. "Sometimes." smh.
-							local op = blob:readu2()
-							local lo = bit.band(0xff, op)
-							local hi = bit.rshift(op, 8)
+							-- is the opcode hi and lo swapped as well????
+							local lo = blob:readu1()
+							local hi = blob:readu1()
 							local instDesc = assert.index(instDescForOp, lo)
 							local inst = table()
 							inst:insert(instDesc.name)
@@ -1093,6 +1344,11 @@ function JavaASMDex:compile()
 	self.strings = table()
 	self.types = table()
 	self.protos = table()
+	self.typeLists = table()
+
+	-- table of blobs of converted fields that will either come from .fields which are local to this function, or from field references in instructions
+	self.fieldBlobs = table()
+	self.methodBlobs = table()
 
 	local function addUnique(arr, data)
 		for i=1,#arr do
@@ -1101,16 +1357,84 @@ function JavaASMDex:compile()
 		arr:insert(data)
 		return #arr-1
 	end
+
 	local function addString(str)
 		-- ultimately strings will be preceded by a uleb128 of the length
 		-- but equality is the same with the original so dont convert just yet
 		return addUnique(self.strings, str)
 	end
+	self.addString = addString
+
 	local function addType(str)
 		local w = WriteBlobLE()
 		w:writeu4(addString(str))
 		return addUnique(self.types, w:compile())
 	end
+	self.addType = addType
+
+	local function addArgTypeList(sig)
+		local w = WriteBlobLE()
+		for _,sigi in ipairs(sig) do
+			w:writeu4(addType(sigi))
+		end
+		return addUnique(self.typeLists, w:compile())
+	end
+
+	local function addProto(sigstr)
+		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
+		local sig = sigStrToObj(sigstr)
+		-- now convert them back to their jni strings
+		-- TODO better identifiers between all the different name types
+		-- TODO split out the separating function and the converting function, cuz I have to convert it back now
+		local shorts = table()
+		for i=1,#sig do
+			local sigi = sig[i]
+			local arrayPrefix = ''
+			repeat
+				local rest = sigi:match'^(.*)%[%]$'
+				if not rest then break end
+				sigi = rest
+				arrayPrefix = arrayPrefix .. '['
+			until false
+			-- convert base type to prim if possible
+			sigi = primSigStrForName[sigi] or sigi
+			shorts[i] = arrayPrefix..(sigi:match'^L' or sigi)
+			-- re-add array
+			sigi = arrayPrefix .. sigi
+		end
+
+		local w = WriteBlobLE()
+		w:writeu4(addString(shorts:concat()))
+
+		local returnType = table.remove(sig, 1)
+		w:writeu4(addType(returnType))
+
+		-- notice, the args get stoerd in a a separate list later
+		-- so i'll save them in another list
+		-- and in place of an offset, i'll just save that list's index for now...
+		w:writeu4(addArgTypeList(sig))
+	end
+	self.addProto = addProto
+
+	-- be sure to only call this after processing fields
+	-- not that it matters?
+	local function addField(class, name, sig)
+		local w = WriteBlobLE()
+		w:writeu2(addType(class))
+		w:writeu2(addType(sig))
+		w:writeu4(addString(name))
+		return addUnique(self.fieldBlobs, w:compile())
+	end
+	self.addField = addField
+
+	local function addMethod(class, name, sig)
+		local w = WriteBlobLE()
+		w:writeu2(addType(class))
+		w:writeu2(addType(sig))
+		w:writeu4(addString(name))
+		return addUnique(self.methodBlobs, w:compile())
+	end
+	self.addMethod = addMethod
 
 	-- now to extract out uniques from classes, fields, methods, methods.code
 	for _,class in ipairs(self.classes) do
@@ -1124,9 +1448,7 @@ function JavaASMDex:compile()
 		-- and # direct (aka static|private|ctor) and # non-direct methods
 	end
 	for _,field in ipairs(self.fields) do
-		field.classIndex = addType(field.class)
-		field.sigIndex = addType(field.sig)
-		field.nameIndex = addString(field.name)
+		addField(field.class, field.name, field.sig)
 	end
 	for _,method in ipairs(self.methods) do
 		method.classIndex = addType(method.class)
@@ -1136,8 +1458,9 @@ function JavaASMDex:compile()
 		if method.code then
 			local cblob = WriteBlobLE()
 			for _,inst in ipairs(method.code) do
-				local op = assert.index(opForInstName, inst[1])
-				local instDesc = assert.index(instDescForOp, op)
+				local lo = assert.index(opForInstName, inst[1])
+				local instDesc = assert.index(instDescForOp, lo)
+				cblob:writeu1(lo)
 				instDesc.rw.write(inst, cblob, self)
 			end
 			method.codeData = cblob:compile()
