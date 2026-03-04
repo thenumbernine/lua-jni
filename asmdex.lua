@@ -536,7 +536,17 @@ local instDescForOp = {
 local JavaASMDex = class()
 JavaASMDex.__name = 'JavaASMDex'
 
--- same as JavaASMClass
+--[[
+similar as JavaASMClass
+key differences in ASMDex vs ASMClass:
+- .dex files can have multiple classes, so
+- - they will have a .class table holding the, thisClass, superClass, and class access flags
+- - each method and field will have a .class reference
+- internally .dex uses some weird convoluted arg type list and "shorty" (smh Google...) arg string that is a typical Java function jni arg signature string but with a) return type first, b) parenthesis removed, and c) all class names removed.
+- .dex methods havae "maxRegs", "regsIn", "regsOut" where .class methods have "maxLocals" and "maxStacks"
+- the instruction sets are different
+- optional attributes differ
+--]]
 function JavaASMDex:init(args)
 	if type(args) == 'string' then
 		self:readData(args)	-- assume its raw data
@@ -745,7 +755,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 		local argsOfs = blob:readu4()
 		local argTypes = readTypeList(argsOfs)
-		
+
 		-- sig but in .class format:
 		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
 		protos[i+1] = sig
@@ -810,7 +820,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 		if classDataOfs ~= 0 then
 			blob.ofs = classDataOfs
---DEBUG:print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))			
+--DEBUG:print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))
 			local numStaticFields = blob:readUleb128()
 			local numInstanceFields = blob:readUleb128()
 			local numDirectMethods = blob:readUleb128()
@@ -830,7 +840,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			local function readMethods(count)
 				local methodIndex = 0
 				for i=0,count-1 do
---DEBUG:local methodStartOfs = blob.ofs					
+--DEBUG:local methodStartOfs = blob.ofs
 					methodIndex = methodIndex + blob:readUleb128()
 					local method = assert.index(self.methods, 1 + methodIndex)
 --DEBUG:print('reading method data', method.class, method.name, method.sig, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
@@ -845,7 +855,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						blob.ofs = codeOfs
 
 						-- read code
-						method.maxReg = blob:readu2()	-- same as "maxLocals" but for registers?
+						method.maxRegs = blob:readu2()	-- same as "maxLocals" but for registers?
 						method.regsIn = blob:readu2()
 						method.regsOut = blob:readu2()
 						local numTries = blob:readu2()
@@ -876,7 +886,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						if bit.band(3, blob.ofs) == 2 then blob:readu2() end	-- optional padding to be 4-byte aligned
 						assert.eq(bit.band(3, blob.ofs), 0, "blob ofs supposed to be 4-byte aligned")
 
---DEBUG:print('method.numTries', numTries)						
+--DEBUG:print('method.numTries', numTries)
 						if numTries > 0 then
 							assert(not method.tries)
 							method.tries = table()
@@ -951,6 +961,24 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		end
 
 --DEBUG:print('class['..i..'] = '..require 'ext.tolua'(class))
+	end
+
+	-- remove field and method references that don't belong to any defined class
+	for i=#self.fields,1,-1 do
+		local field = self.fields[i]
+		if not self.classes:find(nil, function(cl)
+			return cl.thisClass == field.class
+		end) then
+			self.fields:remove(i)
+		end
+	end
+	for i=#self.methods,1,-1 do
+		local method = self.methods[i]
+		if not self.classes:find(nil, function(cl)
+			return cl.thisClass == method.class
+		end) then
+			self.methods:remove(i)
+		end
 	end
 
 --[[
