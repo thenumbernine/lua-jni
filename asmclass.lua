@@ -926,7 +926,6 @@ local instDescForOp = {
 	[0xff] = {name='impdep2'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
 	--(no name) .... cb-fd ....  ....  ....  .... these values are currently unassigned for opcodes and are reserved for future use
 }
-
 local opForInstName = table.map(instDescForOp, function(inst,op)
 	return op, inst.name
 end)
