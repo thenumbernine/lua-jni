@@ -8,8 +8,10 @@ local class = require 'ext.class'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
 local string = require 'ext.string'
-local ReadBlob = require 'java.blob'.ReadBlob
-local WriteBlob = require 'java.blob'.WriteBlob
+
+local ReadBlobLE = require 'java.blob'.ReadBlobLE
+local WriteBlobLE = require 'java.blob'.WriteBlobLE
+
 local deepCopy = require 'java.util'.deepCopy
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local setFlagsToObj = require 'java.util'.setFlagsToObj
@@ -594,9 +596,7 @@ end
 
 
 function JavaASMDex:readData(data)
-	local blob = ReadBlob(data)
-
-	blob.littleEndian = true	-- by default
+	local blob = ReadBlobLE(data)
 	assert.eq(blob:readString(4), 'dex\n')
 	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
 --DEBUG:print('version', string.hex(version))
@@ -826,18 +826,20 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			local numDirectMethods = blob:readUleb128()
 			local numVirtualMethods = blob:readUleb128()
 
-			local function readFields(count)
+			local function readFields(count, isStatic)
 				local fieldIndex = 0
 				for i=0,count-1 do
 					fieldIndex = fieldIndex + blob:readUleb128()
 					local field = assert.index(self.fields, 1 + fieldIndex)
 					setFlagsToObj(field, blob:readUleb128(), fieldAccessFlags)
+					-- are all fields in 'numStaticFields' guaranteed to have 'isStatic' set?
+					assert.eq(not not isStatic, not not field.isStatic)
 				end
 			end
-			readFields(numStaticFields)
+			readFields(numStaticFields, true)
 			readFields(numInstanceFields)
 
-			local function readMethods(count)
+			local function readMethods(count, isDirect)
 				local methodIndex = 0
 				for i=0,count-1 do
 --DEBUG:local methodStartOfs = blob.ofs
@@ -845,6 +847,10 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 					local method = assert.index(self.methods, 1 + methodIndex)
 --DEBUG:print('reading method data', method.class, method.name, method.sig, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
 					setFlagsToObj(method, blob:readUleb128(), methodAccessFlags)
+
+					-- if isDirect then methods should have isStatic, isPrivate, or isConstructor
+					assert.eq(not not isDirect, not not (method.isStatic or method.isPrivate or method.isConstructor))
+
 					local codeOfs = blob:readUleb128()
 					assert.le(0, codeOfs)
 					assert.lt(codeOfs, fileSize)
@@ -876,7 +882,6 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 							local instDesc = assert.index(instDescForOp, lo)
 							local inst = table()
 							inst:insert(instDesc.name)
-							if not instDesc.read then error("found inst with no read(): "..bit.tohex(lo, 2)) end
 							instDesc.read(inst, hi, lo, blob, self)
 --DEBUG:print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
 							code:insert(inst)
@@ -922,26 +927,21 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 								try.handlerOfs = nil
 								local catchHandlers = table()
 								try.catchHandlers = catchHandlers
-								local numCatchHandlers = blob:readUleb128()
---DEBUG:print('numCatchHandlers', numCatchHandlers)
-								for j=0,numCatchHandlers-1 do
-									local handlers = table()
-									catchHandlers:insert(handlers)
-									local numCatchTypes = blob:readSleb128()
---DEBUG:print('numCatchTypes', numCatchTypes)
-									for k=0,math.abs(numCatchTypes)-1 do
-										local addrPair = {}
-										local addrType = blob:readUleb128()
-										--addrPair.type = assert.index(types, 1 + addrType )	-- I'm getting bad values...
-										addrPair.typeIndex = addrType
-										addrPair.addr = blob:readUleb128()
+								local handlers = table()
+								catchHandlers:insert(handlers)
+								local encodedCatchHandlerSize = blob:readSleb128()
+--DEBUG:print('encodedCatchHandlerSize', encodedCatchHandlerSize)
+								for j=0,math.abs(encodedCatchHandlerSize)-1 do
+									local addrPair = {}
+									local addrType = blob:readUleb128()
+									addrPair.type = assert.index(types, 1 + addrType)
+									addrPair.addr = blob:readUleb128()
 --DEBUG:print('addrPair', require 'ext.tolua'(addrPair))
-										handlers:insert(addrPair)
-									end
-									if numCatchTypes < 0 then
-										handlers.catchAllAddr = blob:readUleb128()
+									handlers:insert(addrPair)
+								end
+								if encodedCatchHandlerSize <= 0 then
+									handlers.catchAllAddr = blob:readUleb128()
 --DEBUG:print('handlers.catchAllAddr', handlers.catchAllAddr)
-									end
 								end
 							end
 						end
@@ -952,7 +952,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			end
 --DEBUG:print('numDirectMethods', numDirectMethods)
 --DEBUG:print('numVirtualMethods', numVirtualMethods)
-			readMethods(numDirectMethods)
+			readMethods(numDirectMethods, true)
 			readMethods(numVirtualMethods)
 		end
 
@@ -1030,6 +1030,84 @@ function JavaASMDex:compile()
 	--   *) method
 	--     *) method code
 	-- for single-class dex files, auto-insert class into all listed fields and methods
+
+	-- move any class properties from root into a new class object
+	-- (but only if there's no .classes already
+	self.fields = self.fields or table()
+	self.methods = self.methods or table()
+	if not self.classes then
+		local class = {
+			sourceFile = self.sourceFile,
+			thisClass = self.thisClass,
+			superClass = self.superClass,
+			interfaces = self.interfaces,
+		}
+		for k,v in pairs(classAccessFlags) do
+			class[k] = self[k]
+			--self[k] = nil
+		end
+		self.classes = table{class}
+
+		for _,field in ipairs(self.fields) do
+			field.class = self.thisClass
+		end
+		for _,method in ipairs(self.methods) do
+			method.class = self.thisClass
+		end
+	end
+
+	self.strings = table()
+	self.types = table()
+	self.protos = table()
+
+	local function addUnique(arr, data)
+		for i=1,#arr do
+			if arr[i] == data then return i-1 end
+		end
+		arr:insert(data)
+		return #arr-1
+	end
+	local function addString(str)
+		-- ultimately strings will be preceded by a uleb128 of the length
+		-- but equality is the same with the original so dont convert just yet
+		return addUnique(self.strings, str)
+	end
+	local function addType(str)
+		local w = WriteBlobLE()
+		w:writeu4(addString(str))
+		return addUnique(self.types, w:compile())
+	end
+
+	-- now to extract out uniques from classes, fields, methods, methods.code
+	for _,class in ipairs(self.classes) do
+		class.thisClassIndex = addType(class.thisClass)
+		class.superClassIndex = addType(class.superClass)
+		class.interfaceIndexes = table(class.interfaces):mapi(function(ifacesStr)
+			return addType(ifacesStr)
+		end)
+
+		-- classes will need # static and # non-static fields
+		-- and # direct (aka static|private|ctor) and # non-direct methods
+	end
+	for _,field in ipairs(self.fields) do
+		field.classIndex = addType(field.class)
+		field.sigIndex = addType(field.sig)
+		field.nameIndex = addString(field.name)
+	end
+	for _,method in ipairs(self.methods) do
+		method.classIndex = addType(method.class)
+		method.sigIndex = addType(method.sig)
+		method.nameIndex = addString(method.name)
+
+		if method.code then
+			local cblob = WriteBlobLE()
+			for _,inst in ipairs(method.code) do
+				local op = assert.index(opForInstName, inst[1])
+				op.write(inst, cblob, self)
+			end
+			method.codeData = cblob:compile()
+		end
+	end
 end
 
 return JavaASMDex

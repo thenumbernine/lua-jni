@@ -157,9 +157,16 @@ function WriteBlob:compile()
 	return self.data[1]
 end
 
+local ReadBlobLE = ReadBlob:subclass()
+ReadBlobLE.littleEndian = true
+
+local WriteBlobLE = WriteBlob:subclass()
+WriteBlobLE.littleEndian = true
 
 return {
 	ReadBlob = ReadBlob,
 	WriteBlob = WriteBlob,
+	ReadBlobLE = ReadBlobLE,
+	WriteBlobLE = WriteBlobLE,
 	castToNumberOrJPrim = castToNumberOrJPrim,
 }
