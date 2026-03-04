@@ -516,34 +516,46 @@ end
 
 local rw45cc = {}
 function rw45cc.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(bit.band(0xf, hi), 1))	-- arg word count 4 bits
+	local argc = bit.band(0xf, hi)
+	if argc < 1 or argc > 5 then
+		error(inst[1].." expected 1-5 args, found "..argc)
+	end
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
 	instPushMethod(inst, methodIndex, asm)
 
-	inst:insert('v'..bit.tohex(bit.rshift(bit.band(0xf, hi), 4), 1))	-- C = receiver 4 bits
-
 	-- D E F G are arg registers
 	local x = blob:readu2()
-	inst:insert('v'..bit.tohex(bit.band(x, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
+	local regs = table{
+		'v'..bit.tohex(bit.rshift(bit.band(0xf, hi), 4), 1),	-- C = receiver 4 bits
+		'v'..bit.tohex(bit.band(x, 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1),
+		'v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1),
+	}
+	inst:append(regs:sub(1, argc))
 
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(inst, protoIndex, asm)
 end
 function rw45cc.write(inst, blob, asm)
+	local argc = #inst - 5
+	if argc < 1 or argc > 5 then
+		error(inst[1].." expected 1-5 args, found "..argc)
+	end
+
 	blob:writeu1(bit.bor(
-		bit.band(0xf, readconst(inst[2])),
-		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
+		argc,
+		bit.lshift(bit.band(0xf, readregopt(inst[5])), 4)
 	))
-	blob:writeu2(instReadMethod(inst, 3, asm))
+
+	blob:writeu2(instReadMethod(inst, 2, asm))
+
 	blob:writeu2(bit.bor(
-		bit.band(0xf, readreg(inst[7])),
-		bit.lshift(bit.band(0xf, readreg(inst[8])), 4),
-		bit.lshift(bit.band(0xf, readreg(inst[9])), 8),
-		bit.lshift(bit.band(0xf, readreg(inst[10])), 12)
+		bit.band(0xf, readreg(inst[6])),
+		bit.lshift(bit.band(0xf, readreg(inst[7])), 4),
+		bit.lshift(bit.band(0xf, readreg(inst[8])), 8),
+		bit.lshift(bit.band(0xf, readreg(inst[9])), 12)
 	))
 	blob:writeu2(instReadProto(inst, 11, asm))
 end
@@ -557,15 +569,8 @@ function rw4rcc.read(inst, hi, blob, asm)
 
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))	-- C = receiver 16 bits
 
-	-- D - G = 16-bit register indexes?
-
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(inst, protoIndex, asm)
-
-	-- I - N = more 16-bit register indexes?
-	-- is there a number on these?
-	--error"idk how to do this"
-
 end
 function rw4rcc.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
