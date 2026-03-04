@@ -994,6 +994,24 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	self.protos = nil
 	self.strings = nil
 	self.types = nil
+
+	-- if we are in a one-class file then merge classes[1] with root and remove .class from all fields and methods (cuz its redundant anwaysy)
+	if #self.classes == 1 then
+		for k,v in pairs(self.classes[1]) do
+			self[k] = v
+		end
+		self.classes = nil
+		local classname = self.thisClass
+		for _,field in ipairs(self.fields) do
+			assert.eq(field.class, classname)
+			field.class = nil
+		end
+		for _,method in ipairs(self.methods) do
+			assert.eq(method.class, classname)
+			method.class = nil
+		end
+	end
+	-- and at this point our .dex structure will match our .class structure
 end
 
 -------------------------------- WRITING --------------------------------
@@ -1007,6 +1025,7 @@ function JavaASMDex:compile()
 	--   *) classes' thisClass, superClass, sourceFile
 -- TODO put asmclass class properties into a class={} table?
 -- then asmdex when #classes==1 use .class, and then they'd match.
+-- or just read them from root, how about that? and don't touch .asmclass
 	--   *) field
 	--   *) method
 	--     *) method code
