@@ -12,23 +12,50 @@ local deepCopy = require 'java.util'.deepCopy
 
 -- https://source.android.com/docs/core/runtime/dalvik-bytecode
 -- https://source.android.com/docs/core/runtime/instruction-formats
+local function instAddString(inst, stringIndex, asm)
+	local str = asm.strings[1+stringIndex]
+	if not str then
+		inst:insert('!!! WARNING !!! OOB string '..stringIndex)
+	else
+		inst:insert(str)
+	end
+end
+local function instAddType(inst, typeIndex, asm)
+	local typ = asm.types[1+typeIndex]
+	if not typ then
+		inst:insert('!!! WARNING !!! OOB type '..typeIndex)
+	else
+		inst:insert('type '..typeIndex)	-- TODO hmmm how to represent types?
+	end
+end
+local function instAddProto(inst, protoIndex, asm)
+	local proto = asm.protos[1+protoIndex]
+	if not proto then
+		inst:insert('!!! WARNING !!! OOB proto '..protoIndex)
+	else
+		inst:insert('proto '..proto.shorty)	-- TODO hmmm how to represent types?
+	end
+end
 local function instAddField(inst, fieldIndex, asm)
 	local field = asm.fields[1+fieldIndex]
 	if not field then
 		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
-		inst:insert('field '..fieldIndex)
+		inst:insert('!!! WARNING !!! OOB field '..fieldIndex)
 	else
 		inst:insert(field.class)
 		inst:insert(field.name)
 		inst:insert(field.sig)
 	end
 end
-local function instAddType(inst, typeIndex, asm)
-	local typ = asm.types[1+typeIndex]
-	if not typ then
-		inst:insert('type '..typeIndex)
+local function instAddMethod(inst, methodIndex, asm)
+	local method = asm.fields[1+methodIndex]
+	if not method then
+		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
+		inst:insert('!!! WARNING !!! OOB method '..methodIndex)
 	else
-		inst:insert('type '..typeIndex)	-- TODO hmmm how to represent types?
+		inst:insert(method.class)
+		inst:insert(method.name)
+		inst:insert(method.sig)
 	end
 end
 local function read10x(inst, hi, lo, blob, asm)
@@ -63,7 +90,7 @@ local function read21h(inst, hi, lo, blob, asm)
 end
 local function read21c_string(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(( assert.index(asm.strings, 1+blob:readu2()) ))
+	instAddString(inst, blob:readu2(), asm)
 end
 local function read21c_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
@@ -130,7 +157,7 @@ local function read31i(inst, hi, lo, blob, asm)
 end
 local function read31c_string(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(( assert.index(asm.strings, 1+blob:readu4()) ))
+	instAddString(inst, blob:readu4(), asm)
 end
 local function read35c_type(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
@@ -153,7 +180,7 @@ end
 local function read35c_method(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
 
-	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method
+	local methodIndex = blob:readu2()	-- B = method
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
@@ -165,9 +192,7 @@ local function read35c_method(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
 	-- wait, B goes last?
-	inst:insert(method.class)
-	inst:insert(method.name)
-	inst:insert(method.sig)
+	instAddMethod(inst, methodIndex, asm)
 end
 local function read3rc_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
@@ -177,11 +202,9 @@ local function read3rc_type(inst, hi, lo, blob, asm)
 end
 local function read3rc_method(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
-	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method
+	local methodIndex = blob:readu2()	-- B = method
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
-	inst:insert(method.class)
-	inst:insert(method.name)
-	inst:insert(method.sig)
+	instAddMethod(inst, methodIndex, asm)
 end
 local function read31t(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
@@ -207,7 +230,7 @@ end
 local function read45cc(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(0xf, hi), 1))	-- arg word count 4 bits
 
-	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method (16 bits)
+	local methodIndex = blob:readu2()	-- B = method (16 bits)
 	inst:insert('v'..bit.tohex(bit.rshift(bit.band(0xf, hi), 4), 1))	-- C = receiver 4 bits
 
 	-- D E F G are arg registers
@@ -217,34 +240,28 @@ local function read45cc(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
-	local proto = assert.index(asm.protos, 1 + blob:readu2())	-- H = proto
+	local protoIndex = blob:readu2()	-- H = proto
 
-	inst:insert(method.class)
-	inst:insert(method.name)
-	inst:insert(method.sig)
-
-	inst:insert(proto.shorty)	-- identifying args?
+	instAddMethod(inst, methodIndex, asm)
+	instAddProto(inst, protoIndex, asm)
 end
 local function read4rcc(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))	-- arg word count 8 bits
 
-	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method (16 bits)
+	local methodIndex = blob:readu2()	-- B = method (16 bits)
 
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))	-- C = receiver 16 bits
 
 	-- D - G = 16-bit register indexes?
 
-	local proto = assert.index(asm.protos, 1 + blob:readu2())	-- H = proto
+	local protoIndex = blob:readu2()	-- H = proto
 
 	-- I - N = more 16-bit register indexes?
 	-- is there a number on these?
-	error"idk how to do this"
+	--error"idk how to do this"
 
-	inst:insert(method.class)
-	inst:insert(method.name)
-	inst:insert(method.sig)
-
-	inst:insert(proto.shorty)	-- identifying args?
+	instAddMethod(inst, methodIndex, asm)
+	instAddProto(inst, protoIndex, asm)
 end
 
 local function read51l(inst, hi, lo, blob, asm)
