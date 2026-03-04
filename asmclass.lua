@@ -1451,23 +1451,17 @@ io.stderr:write('TODO not yet supported method attr: '..methodAttrName)
 
 	self.attrs = table()
 	readAttrs(blob, function(name, len)
-		self.attrs:insert{
-			name = name,
-			data = blob:readString(len),
-		}
-	end)
-	for _,attr in ipairs(self.attrs) do
-		if attr.name == 'SourceFile' then
-			-- attr.data is a uint16_t into the constants ...
-			assert.len(attr.data, 2)
-			local attrBlob = ReadBlob(attr.data)
-			attr.data = nil
-			attr.source = deepCopyIndex(attrBlob:readu2())
-			attrBlob:assertDone()
+		if name == 'SourceFile' then
+			assert(not self.sourceFile, "can't have two SourceFile attributes (can you?)")
+			self.sourceFile = deepCopyIndex(blob:readu2())
 		else
-			error("TODO handle reading class attr "..tostring(attr.name))
+io.stderr:write("TODO handle reading class attr "..tostring(attr.name))
+			self.attrs:insert{
+				name = name,
+				data = blob:readString(len),
+			}
 		end
-	end
+	end)
 
 	blob:assertDone()
 
@@ -1854,20 +1848,22 @@ io.stderr:write('determined class '..self.thisClass..' method '..method.name..' 
 		end
 	end
 
+	if self.sourceFile then
+		self.attrs = self.attrs or table()
+		local attrBlob = WriteBlob()
+		attrBlob:writeu2(addConst(
+			(assert.type(self.sourceFile, 'string'))
+		))
+		self.attrs:insert{
+			name = 'SourceFile',
+			data = attrBlob:compile(),
+		}
+	end
 	if self.attrs then
 		for _,attr in ipairs(self.attrs) do
-			if attr.name == 'SourceFile' then
-				local attrBlob = WriteBlob()
-				attrBlob:writeu2(addConst(
-					(assert.type(attr.source, 'string'))
-				))
-				attr.data = attrBlob:compile()
-			else
-				error('TODO handle writing class attr '..tostring(attr.name))
-			end
 
 			-- TODO index fields
-			attr.nameIndex = addConst(attr.name)
+			attr.nameIndex = addConst(( assert.type(attr.name, 'string') ))
 			assert.index(attr, 'data')
 
 			--attr.name = nil

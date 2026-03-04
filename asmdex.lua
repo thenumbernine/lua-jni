@@ -998,5 +998,19 @@ end
 
 -------------------------------- WRITING --------------------------------
 
+function JavaASMDex:compile()
+	-- *) traversal fields and methods and method code
+	-- *) build up a list of unique constants:
+	--   *) strings
+	--   *) types (-> strings)
+	--   *) protos (-> types)
+	--   *) classes' thisClass, superClass, sourceFile
+-- TODO put asmclass class properties into a class={} table?
+-- then asmdex when #classes==1 use .class, and then they'd match.
+	--   *) field
+	--   *) method
+	--     *) method code
+	-- for single-class dex files, auto-insert class into all listed fields and methods
+end
 
 return JavaASMDex
