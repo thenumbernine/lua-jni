@@ -194,21 +194,25 @@ local accessFlags = {
 	isSynthetic = 0x1000,
 	isAnnotation = 0x2000,
 	isEnum = 0x4000,
-	isModule = 0x8000,
+	isModule = 0x8000,					-- dalvik: "unused"
+	isConstructor = 0x10000,			-- dalvik-only
+	isDeclaredSynchronized = 0x20000,	-- dalvik-only
 }
 
+-- .class class access flags
 local classAccessFlags = {
 	isPublic = 0x0001,
 	isFinal = 0x0010,
-	isSuper = 0x0020,		-- 'isSuper' for class, 'isSynchronzied' for method
+	isSuper = 0x0020,					-- not in dalvik. 'isSuper' for class, 'isSynchronzied' for method
 	isInterface = 0x0200,
 	isAbstract = 0x0400,
 	isSynthetic = 0x1000,
 	isAnnotation = 0x2000,
 	isEnum = 0x4000,
-	isModule = 0x8000,
+	isModule = 0x8000,					-- dalvik: "unused"
 }
 
+-- .class nested-class access flags
 local nestedClassAccessFlags = {
 	isPublic = 0x0001,
 	isPrivate = 0x0002,
@@ -222,7 +226,7 @@ local nestedClassAccessFlags = {
 	isEnum = 0x4000,
 }
 
-
+-- .class field access flags
 local fieldAccessFlags = {
 	isPublic = 0x0001,
 	isPrivate = 0x0002,
@@ -235,6 +239,7 @@ local fieldAccessFlags = {
 	isEnum = 0x4000,
 }
 
+-- .class method access flags
 local methodAccessFlags = table{
 	isPublic = 0x0001,
 	isPrivate = 0x0002,
@@ -248,6 +253,8 @@ local methodAccessFlags = table{
 	isAbstract = 0x0400,
 	isStrict = 0x0800,
 	isSynthetic = 0x1000,
+	isConstructor = 0x10000,			-- dalvik-only
+	isDeclaredSynchronized = 0x20000,	-- dalvik-only
 }
 
 local function setFlagsToObj(obj, flagsValue, flagsTable)

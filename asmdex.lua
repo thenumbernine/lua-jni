@@ -1,5 +1,7 @@
 --[[
 https://source.android.com/docs/core/runtime/dex-format
+https://source.android.com/docs/core/runtime/dalvik-bytecode
+https://source.android.com/docs/core/runtime/instruction-formats
 --]]
 local ffi = require 'ffi'
 local class = require 'ext.class'
@@ -9,9 +11,12 @@ local string = require 'ext.string'
 local ReadBlob = require 'java.blob'.ReadBlob
 local WriteBlob = require 'java.blob'.WriteBlob
 local deepCopy = require 'java.util'.deepCopy
+local setFlagsToObj = require 'java.util'.setFlagsToObj
+local setFlagsToObj = require 'java.util'.setFlagsToObj
+local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
+local fieldAccessFlags = require 'java.util'.fieldAccessFlags
+local methodAccessFlags = require 'java.util'.methodAccessFlags
 
--- https://source.android.com/docs/core/runtime/dalvik-bytecode
--- https://source.android.com/docs/core/runtime/instruction-formats
 local function instAddString(inst, stringIndex, asm)
 	local str = asm.strings[1+stringIndex]
 	if not str then
@@ -25,7 +30,7 @@ local function instAddType(inst, typeIndex, asm)
 	if not typ then
 		inst:insert('!!! WARNING !!! OOB type '..typeIndex)
 	else
-		inst:insert('type '..typeIndex)	-- TODO hmmm how to represent types?
+		inst:insert(typ)	-- TODO hmmm how to represent types?
 	end
 end
 local function instAddProto(inst, protoIndex, asm)
@@ -33,7 +38,7 @@ local function instAddProto(inst, protoIndex, asm)
 	if not proto then
 		inst:insert('!!! WARNING !!! OOB proto '..protoIndex)
 	else
-		inst:insert('proto '..proto.shorty)	-- TODO hmmm how to represent types?
+		inst:insert(proto)
 	end
 end
 local function instAddField(inst, fieldIndex, asm)
@@ -48,7 +53,7 @@ local function instAddField(inst, fieldIndex, asm)
 	end
 end
 local function instAddMethod(inst, methodIndex, asm)
-	local method = asm.fields[1+methodIndex]
+	local method = asm.methods[1+methodIndex]
 	if not method then
 		-- TODO this is a placeholder, I'm getting bad instructions because of bad other things ...
 		inst:insert('!!! WARNING !!! OOB method '..methodIndex)
@@ -584,17 +589,17 @@ function JavaASMDex:readData(data)
 	blob.littleEndian = true	-- by default
 	assert.eq(blob:readString(4), 'dex\n')
 	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
-print('version', string.hex(version))
+--DEBUG:print('version', string.hex(version))
 	local checksum = blob:readu4()
-print('checksum = 0x'..bit.tohex(checksum, 8))
+--DEBUG:print('checksum = 0x'..bit.tohex(checksum, 8))
 	local sha1sig = blob:readString(20)
-print('sha1sig', string.hex(sha1sig))
+--DEBUG:print('sha1sig', string.hex(sha1sig))
 	local fileSize = blob:readu4()
-print('fileSize', fileSize)
+--DEBUG:print('fileSize', fileSize)
 	local headerSize = blob:readu4()
-print('headerSize', headerSize)
+--DEBUG:print('headerSize', headerSize)
 	local endianTag = blob:readu4()
-print('endianTag = 0x'..bit.tohex(endianTag, 8))
+--DEBUG:print('endianTag = 0x'..bit.tohex(endianTag, 8))
 	if endianTag == 0x78563412 then
 		-- then do I flip size and checksum as well?
 		blob.littleEndian = false
@@ -607,41 +612,41 @@ print('endianTag = 0x'..bit.tohex(endianTag, 8))
 
 	local numLinks = blob:readu4()
 	local linkOfs = blob:readu4()
-print('link count', numLinks,'ofs', linkOfs)
+--DEBUG:print('link count', numLinks,'ofs', linkOfs)
 	if numLinks ~= 0 then
 io.stderr:write('TODO support dynamically-linked .dex files\n')
 	end
 
 	local mapOfs = blob:readu4()
-print('map ofs', mapOfs)
+--DEBUG:print('map ofs', mapOfs)
 
 	local numStrings = blob:readu4()
 	local stringOfsOfs = blob:readu4()
-print('stringId count', numStrings, 'ofs', stringOfsOfs)
+--DEBUG:print('stringId count', numStrings, 'ofs', stringOfsOfs)
 
 	local numTypes = blob:readu4()
 	local typeOfs = blob:readu4()
-print('typeId count', numTypes,'ofs', typeOfs)
+--DEBUG:print('typeId count', numTypes,'ofs', typeOfs)
 
 	local numProtos = blob:readu4()
 	local protoOfs = blob:readu4()
-print('protoId count', numProtos,'ofs', protoOfs)
+--DEBUG:print('protoId count', numProtos,'ofs', protoOfs)
 
 	local numFields = blob:readu4()
 	local fieldOfs = blob:readu4()
-print('fieldId count', numFields,'ofs', fieldOfs)
+--DEBUG:print('fieldId count', numFields,'ofs', fieldOfs)
 
 	local numMethods = blob:readu4()
 	local methodOfs = blob:readu4()
-print('methodId count', numMethods,'ofs', methodOfs)
+--DEBUG:print('methodId count', numMethods,'ofs', methodOfs)
 
 	local numClasses = blob:readu4()
 	local classOfs = blob:readu4()
-print('classDef count', numClasses,'ofs', classOfs)
+--DEBUG:print('classDef count', numClasses,'ofs', classOfs)
 
 	local numDatas = blob:readu4()
 	local dataOfs = blob:readu4()
-print('data count', numDatas,'ofs', dataOfs)
+--DEBUG:print('data count', numDatas,'ofs', dataOfs)
 
 
 	-- header is done, read structures
@@ -696,7 +701,7 @@ print('data count', numDatas,'ofs', dataOfs)
 			blob:readu2()	-- unused
 			map.count = blob:readu4()
 			map.offset = blob:readu4()
-print('map['..i..'] = '..require 'ext.tolua'(map))
+--DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -715,7 +720,7 @@ print('map['..i..'] = '..require 'ext.tolua'(map))
 		local len = blob:readUleb128()
 		local str = blob:readString(len)
 		strings[i+1] = str
-		print('string['..i..'] = '..str)
+--DEBUG:print('string['..i..'] = '..str)
 	end
 
 	assert.le(0, typeOfs)
@@ -723,7 +728,7 @@ print('map['..i..'] = '..require 'ext.tolua'(map))
 	blob.ofs = typeOfs
 	for i=0,numTypes-1 do
 		types[i+1] = assert.index(strings, blob:readu4()+1)
-print('type['..i..'] = '..types[i+1])
+--DEBUG:print('type['..i..'] = '..types[i+1])
 	end
 
 	assert.le(0, protoOfs)
@@ -735,16 +740,17 @@ print('type['..i..'] = '..types[i+1])
 		blob.ofs = protoOfs + i * sizeofProto
 		local proto = {}
 		-- I don't get ShortyDescritpor ... is it redundant to returnType + args?
-		proto.shorty = assert.index(strings, 1 + blob:readu4())
-		-- TODO I'm probably going to have to JNISig-to-sig or something here
-		-- TODO how come when the shorty says return-type-void, I get return type as an excption here?
-		-- TODO what's an empty return type string mean?
-		proto.returnType = assert.index(strings, 1 + blob:readu4())
+		local shorty = assert.index(strings, 1 + blob:readu4())
+		local returnType = assert.index(types, 1 + blob:readu4())
 
 		local argsOfs = blob:readu4()
-		proto.args = readTypeList(argsOfs)
-		protos[i+1] = proto
-print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
+		local argTypes = readTypeList(argsOfs)
+		
+		-- sig but in .class format:
+		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
+		protos[i+1] = sig
+
+--DEBUG:print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 	end
 
 	local sizeOfField = 2*ffi.sizeof'uint32_t'
@@ -768,7 +774,7 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 		local method = {}
 		self.methods[i+1] = method
 		method.class = assert.index(types, 1 + blob:readu2())
-		method.proto = deepCopy(assert.index(protos, 1 + blob:readu2()))
+		method.sig = deepCopy(assert.index(protos, 1 + blob:readu2()))
 		method.name = assert.index(strings, 1 + blob:readu4())
 	end
 
@@ -784,13 +790,13 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 		local class = {}
 		self.classes[i+1] = class
 		class.thisClass = assert.index(types, 1 + blob:readu4())
-		class.accessFlags = blob:readu4()
+		setFlagsToObj(class, blob:readu4(), classAccessFlags)
 		class.superClass = assert.index(types, 1 + blob:readu4())
 		local interfacesOfs = blob:readu4()
 		class.sourceFile = assert.index(strings, 1 + blob:readu4())
 		local annotationsOfs = blob:readu4()
 		local classDataOfs = blob:readu4()
-		local staticValuesOfs = blob:readu4()
+		local staticValueOfs = blob:readu4()
 
 		-- done reading classdef, read its properties:
 
@@ -804,7 +810,7 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 
 		if classDataOfs ~= 0 then
 			blob.ofs = classDataOfs
-print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))			
+--DEBUG:print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))			
 			local numStaticFields = blob:readUleb128()
 			local numInstanceFields = blob:readUleb128()
 			local numDirectMethods = blob:readUleb128()
@@ -814,7 +820,8 @@ print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))
 				local fieldIndex = 0
 				for i=0,count-1 do
 					fieldIndex = fieldIndex + blob:readUleb128()
-					assert.index(self.fields, 1 + fieldIndex).accessFlags = blob:readUleb128()
+					local field = assert.index(self.fields, 1 + fieldIndex)
+					setFlagsToObj(field, blob:readUleb128(), fieldAccessFlags)
 				end
 			end
 			readFields(numStaticFields)
@@ -823,24 +830,24 @@ print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))
 			local function readMethods(count)
 				local methodIndex = 0
 				for i=0,count-1 do
-local methodStartOfs = blob.ofs					
+--DEBUG:local methodStartOfs = blob.ofs					
 					methodIndex = methodIndex + blob:readUleb128()
 					local method = assert.index(self.methods, 1 + methodIndex)
-print('reading method data', method.class, method.name, method.proto.shorty, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
-					method.accessFlags = blob:readUleb128()
+--DEBUG:print('reading method data', method.class, method.name, method.sig, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
+					setFlagsToObj(method, blob:readUleb128(), methodAccessFlags)
 					local codeOfs = blob:readUleb128()
 					assert.le(0, codeOfs)
 					assert.lt(codeOfs, fileSize)
--- [[
+
 					if codeOfs ~= 0 then
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
 --DEBUG:print('method codeOfs', codeOfs)
 						blob.ofs = codeOfs
 
 						-- read code
-						method.numRegs = blob:readu2()
-						method.numIn = blob:readu2()
-						method.numOut = blob:readu2()
+						method.maxReg = blob:readu2()	-- same as "maxLocals" but for registers?
+						method.regsIn = blob:readu2()
+						method.regsOut = blob:readu2()
 						local numTries = blob:readu2()
 						local debugInfoOfs = blob:readu4()
 						local numInsns = blob:readu4()	-- "in 16-bit code units..." ... this is the number of uint16_t's
@@ -849,7 +856,7 @@ print('reading method data', method.class, method.name, method.proto.shorty, 'fr
 						local code = table()
 						method.code = code
 						while blob.ofs < instEndOfs do
-io.write(bit.tohex(blob.ofs, 8), ':\t')
+--DEBUG:io.write(bit.tohex(blob.ofs, 8), ':\t')
 							-- Is uint16 instruction order influenced by endian order?
 							-- "Also, if this happens to be in an endian-swapped file, then the swapping is only done on individual ushort instances and not on the larger internal structures."
 							-- ...whatever that means. "Sometimes." smh.
@@ -861,7 +868,7 @@ io.write(bit.tohex(blob.ofs, 8), ':\t')
 							inst:insert(instDesc.name)
 							if not instDesc.read then error("found inst with no read(): "..bit.tohex(lo, 2)) end
 							instDesc.read(inst, hi, lo, blob, self)
-print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
+--DEBUG:print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
 							code:insert(inst)
 						end
 						assert.eq(blob.ofs, instEndOfs, "instruction decoding failed to end at the correct location (current offset vs desired)")
@@ -869,7 +876,7 @@ print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
 						if bit.band(3, blob.ofs) == 2 then blob:readu2() end	-- optional padding to be 4-byte aligned
 						assert.eq(bit.band(3, blob.ofs), 0, "blob ofs supposed to be 4-byte aligned")
 
-print('method.numTries', numTries)						
+--DEBUG:print('method.numTries', numTries)						
 						if numTries > 0 then
 							assert(not method.tries)
 							method.tries = table()
@@ -883,7 +890,7 @@ print('method.numTries', numTries)
 								try.startAddr = blob:readu4()
 								try.numInsts = blob:readu2()
 								try.handlerOfs = blob:readu2()
-print('got try #'..j..':', require 'ext.tolua'(try))
+--DEBUG:print('got try #'..j..':', require 'ext.tolua'(try))
 								-- "Elements of the array must be non-overlapping in range and in order from low to high address. "
 								if lasttry then
 									assert.le(lasttry.startAddr + lasttry.numInsts, try.startAddr, "try begins after previous try ends")
@@ -893,8 +900,6 @@ print('got try #'..j..':', require 'ext.tolua'(try))
 							end
 						end
 
-						-- TODO I'm getting errors here
-						-- [=[
 						local encodedCatchHandlerListOfs = blob.ofs
 
 						-- now we're at the end of the code structure
@@ -902,43 +907,41 @@ print('got try #'..j..':', require 'ext.tolua'(try))
 						-- so now translate tries.handlerOfs into tries.handlers
 						if method.tries then
 							for tryIndex,try in ipairs(method.tries) do
-print('in method try', tryIndex)
+--DEBUG:print('in method try', tryIndex)
 								blob.ofs = encodedCatchHandlerListOfs + try.handlerOfs
 								try.handlerOfs = nil
 								local catchHandlers = table()
 								try.catchHandlers = catchHandlers
 								local numCatchHandlers = blob:readUleb128()
-print('numCatchHandlers', numCatchHandlers)
+--DEBUG:print('numCatchHandlers', numCatchHandlers)
 								for j=0,numCatchHandlers-1 do
 									local handlers = table()
 									catchHandlers:insert(handlers)
 									local numCatchTypes = blob:readSleb128()
-print('numCatchTypes', numCatchTypes)
+--DEBUG:print('numCatchTypes', numCatchTypes)
 									for k=0,math.abs(numCatchTypes)-1 do
 										local addrPair = {}
 										local addrType = blob:readUleb128()
 										--addrPair.type = assert.index(types, 1 + addrType )	-- I'm getting bad values...
 										addrPair.typeIndex = addrType
 										addrPair.addr = blob:readUleb128()
-print('addrPair', require 'ext.tolua'(addrPair))
+--DEBUG:print('addrPair', require 'ext.tolua'(addrPair))
 										handlers:insert(addrPair)
 									end
 									if numCatchTypes < 0 then
 										handlers.catchAllAddr = blob:readUleb128()
-print('handlers.catchAllAddr', handlers.catchAllAddr)
+--DEBUG:print('handlers.catchAllAddr', handlers.catchAllAddr)
 									end
 								end
 							end
 						end
-						--]=]
 
 						blob.ofs = push
 					end
---]]
 				end
 			end
-print('numDirectMethods', numDirectMethods)
-print('numVirtualMethods', numVirtualMethods)
+--DEBUG:print('numDirectMethods', numDirectMethods)
+--DEBUG:print('numVirtualMethods', numVirtualMethods)
 			readMethods(numDirectMethods)
 			readMethods(numVirtualMethods)
 		end
@@ -947,20 +950,25 @@ print('numVirtualMethods', numVirtualMethods)
 			io.stderr:write'TODO staticValueOfs\n'
 		end
 
-print('class['..i..'] = '..require 'ext.tolua'(class))
+--DEBUG:print('class['..i..'] = '..require 'ext.tolua'(class))
 	end
 
+--[[
 	for i,field in ipairs(self.fields) do
 		print('field['..(i-1)..'] = '..require 'ext.tolua'(field))
 	end
 	for i,method in ipairs(self.methods) do
 		print('method['..(i-1)..'] = '..require 'ext.tolua'(method))
 	end
+--]]
 
-	-- now baked into instructions, no longer needed
+	-- these are now baked into instructions, no longer needed
 	self.protos = nil
 	self.strings = nil
 	self.types = nil
 end
+
+-------------------------------- WRITING --------------------------------
+
 
 return JavaASMDex
