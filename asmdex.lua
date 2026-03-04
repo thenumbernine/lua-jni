@@ -13,21 +13,11 @@ local deepCopy = require 'java.util'.deepCopy
 -- https://source.android.com/docs/core/runtime/dalvik-bytecode
 -- https://source.android.com/docs/core/runtime/instruction-formats
 local function read10x(inst, hi, lo, blob, asm)
-	-- NOTICE throws away hi
-	--inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(hi, 2))				-- NOTICE throws away hi
 end
 local function read12x(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-end
-local function read22x(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('v'..bit.tohex(blob:readu2(), 4))
-end
-local function read32x(inst, hi, lo, blob, asm)
-	-- NOTICE throws away hi
-	inst:insert('v'..bit.tohex(blob:readu2(), 4))
-	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 end
 local function read11x(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
@@ -36,29 +26,25 @@ local function read11n(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(0xf, hi), 1))	-- A = reg (4 bits)
 	inst:insert('0x'..bit.tohex(bit.band(0xf, bit.rshift(hi, 8)), 1))		-- B = signed 4 bit
 end
+local function read10t(inst, hi, lo, blob, asm)
+	inst:insert('0x'..bit.tohex(hi, 2))					-- signed 8 bit branch offset
+end
+
+local function read22x(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('v'..bit.tohex(blob:readu2(), 4))
+end
 local function read21s(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))	-- signed
-end
-local function read31i(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu4(), 8))	-- signed ... will this be 4-byte aligned?
 end
 local function read21h(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
-local function read51l(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu8(), 16))
-end
 local function read21c_string(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(( assert.index(asm.strings, 1+blob:readu2()) ))
-end
-local function read31c_string(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(( assert.index(asm.strings, 1+blob:readu4()) ))
 end
 local function read21c_type(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
@@ -86,30 +72,87 @@ local function read22c_field(inst, hi, lo, blob, asm)
 	inst:insert(field.name)
 	inst:insert(field.sig)
 end
+local function read23x(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('v'..bit.tohex(blob:readu1(), 2))	-- I'm sure I'm doign this wrong but it says vAA vBB vCC and that A is 8 bits and that the whole instruction reads 2 words, so *shrug* no sign of bitness of B or C
+	inst:insert('v'..bit.tohex(blob:readu1(), 2))
+end
+local function read20t(inst, hi, lo, blob, asm)
+	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
+	inst:insert('0x'..bit.tohex(hi, 2))		-- NOTICE throws away hi
+end
+local function read22t(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
+	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
+	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
+end
+local function read21t(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
+end
+local function read22s(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
+	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
+	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
+end
+local function read22b(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
+	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
+	local C = blob:read'int16_t'				-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
+	inst:insert('0x'..bit.tohex(C, 4))
+end
+local function read21c_method(inst, hi, lo, blob, asm)
+	inst:insert('0x'..bit.tohex( blob:readu2(), 4))	-- TODO
+end
+local function read21c_proto(inst, hi, lo, blob, asm)
+	inst:insert('0x'..bit.tohex( blob:readu2(), 4))	-- TODO
+end
+
+local function read32x(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(blob:readu2(), 4))
+	inst:insert('v'..bit.tohex(blob:readu2(), 4))
+	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE throws away hi
+end
+local function read31i(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(blob:readu4(), 8))	-- signed ... will this be 4-byte aligned?
+end
+local function read31c_string(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert(( assert.index(asm.strings, 1+blob:readu4()) ))
+end
 local function read35c_type(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
+
 	local typ = assert.index(asm.types, 1+blob:readu2())	-- B = type
+
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
+
 	local x = blob:readu2()
 	inst:insert('v'..bit.tohex(bit.band(x, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
+
 	-- wait, B goes last?
 	inst:insert(typ)
 	-- what other args for identifying types?
 end
 local function read35c_method(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(hi, 0xf), 1))	-- A = array size ... 4 bits ...
+
 	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method
+
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
+
 	local x = blob:readu2()
 	inst:insert('v'..bit.tohex(bit.band(x, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 4), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 8), 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
+
 	-- wait, B goes last?
 	inst:insert(method.class)
 	inst:insert(method.name)
@@ -132,45 +175,28 @@ local function read3rc_method(inst, hi, lo, blob, asm)
 end
 local function read31t(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(blob:read'int32_t')	-- signed branch offset to table data pseudo-instruction
-end
-local function read23x(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('v'..bit.tohex(blob:readu1(), 2))	-- I'm sure I'm doign this wrong but it says vAA vBB vCC and that A is 8 bits and that the whole instruction reads 2 words, so *shrug* no sign of bitness of B or C
-	inst:insert('v'..bit.tohex(blob:readu1(), 2))
-end
-local function read10t(inst, hi, lo, blob, asm)
-	inst:insert('0x'..bit.tohex(hi, 2))
-end
-local function read20t(inst, hi, lo, blob, asm)
-	inst:insert(blob:read'int16_t')
+	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed branch offset to table data pseudo-instruction
 end
 local function read30t(inst, hi, lo, blob, asm)
-	inst:insert(blob:read'int32_t')
+	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed
+	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE hi gets thrown away
 end
-local function read22t(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	inst:insert(blob:read'int16_t')
+local function read35c_callsite(inst, hi, lo, blob, asm)
+	-- TODO
+	inst:insert('0x'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
+	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
-local function read21t(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(blob:read'int16_t')
+local function read3rc_callsite(inst, hi, lo, blob, asm)
+	-- TODO
+	inst:insert('0x'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
+	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
 end
-local function read22s(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	inst:insert(blob:read'int16_t')
-end
-local function read22b(inst, hi, lo, blob, asm)
-	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
-	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	local C = blob:read'int16_t'				-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
-	inst:insert('0x'..bit.tohex(C, 4))
-end
+
 local function read45cc(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(bit.band(0xf, hi), 1))	-- arg word count 4 bits
-	
+
 	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method (16 bits)
 	inst:insert('v'..bit.tohex(bit.rshift(bit.band(0xf, hi), 4), 1))	-- C = receiver 4 bits
 
@@ -182,7 +208,7 @@ local function read45cc(inst, hi, lo, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(x, 12), 0xf), 1))
 
 	local proto = assert.index(asm.protos, 1 + blob:readu2())	-- H = proto
-	
+
 	inst:insert(method.class)
 	inst:insert(method.name)
 	inst:insert(method.sig)
@@ -191,7 +217,7 @@ local function read45cc(inst, hi, lo, blob, asm)
 end
 local function read4rcc(inst, hi, lo, blob, asm)
 	inst:insert('0x'..bit.tohex(hi, 2))	-- arg word count 8 bits
-	
+
 	local method = assert.index(asm.methods, 1+blob:readu2())	-- B = method (16 bits)
 
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))	-- C = receiver 16 bits
@@ -207,21 +233,15 @@ local function read4rcc(inst, hi, lo, blob, asm)
 	inst:insert(method.class)
 	inst:insert(method.name)
 	inst:insert(method.sig)
-	
+
 	inst:insert(proto.shorty)	-- identifying args?
 end
-local function read35c_callsite(inst, hi, lo, blob, asm)
-	error'idk'
+
+local function read51l(inst, hi, lo, blob, asm)
+	inst:insert('v'..bit.tohex(hi, 2))
+	inst:insert('0x'..bit.tohex(blob:readu8(), 16))
 end
-local function read3rc_callsite(inst, hi, lo, blob, asm)
-	error'idk'
-end
-local function read21c_method(inst, hi, lo, blob, asm)
-	error'idk'
-end
-local function read21c_proto(inst, hi, lo, blob, asm)
-	error'idk'
-end
+
 local instDescForOp = {
 	[0x00] = {name='nop', read=read10x},					-- 00 10x	nop	 	Waste cycles.	Note: Data-bearing pseudo-instructions are tagged with this opcode, in which case the high-order byte of the opcode unit indicates the nature of the data. See "packed-switch-payload Format", "sparse-switch-payload Format", and "fill-array-data-payload Format" below.
 	[0x01] = {name='move', read=read12x},					-- 01 12x	move vA, vB	A: destination register (4 bits) B: source register (4 bits)	Move the contents of one non-object register to another.
@@ -533,7 +553,7 @@ end
 
 function JavaASMDex:readData(data)
 	local blob = ReadBlob(data)
-	
+
 	blob.littleEndian = true	-- by default
 	assert.eq(blob:readString(4), 'dex\n')
 	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
@@ -649,7 +669,7 @@ print('data count', numDatas,'ofs', dataOfs)
 			blob:readu2()	-- unused
 			map.count = blob:readu4()
 			map.offset = blob:readu4()
-print('map['..i..'] = '..require 'ext.tolua'(map))		
+print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -663,7 +683,7 @@ print('map['..i..'] = '..require 'ext.tolua'(map))
 		blob.ofs = stringOfsOfs + ffi.sizeof'uint32_t' * i
 		blob.ofs = blob:readu4()
 		if blob.ofs < 0 or blob.ofs >= fileSize then
-			error("string has bad ofs: 0x"..string.hex(blob.ofs)) 
+			error("string has bad ofs: 0x"..string.hex(blob.ofs))
 		end
 		local len = blob:readUleb128()
 		local str = blob:readString(len)
@@ -685,7 +705,7 @@ print('type['..i..'] = '..types[i+1])
 	local protos = table()
 	self.protos = protos
 	for i=0,numProtos-1 do
-		blob.ofs = protoOfs + i * sizeofProto 
+		blob.ofs = protoOfs + i * sizeofProto
 		local proto = {}
 		-- I don't get ShortyDescritpor ... is it redundant to returnType + args?
 		proto.shorty = assert.index(strings, 1 + blob:readu4())
@@ -693,7 +713,7 @@ print('type['..i..'] = '..types[i+1])
 		-- TODO how come when the shorty says return-type-void, I get return type as an excption here?
 		-- TODO what's an empty return type string mean?
 		proto.returnType = assert.index(strings, 1 + blob:readu4())
-		
+
 		local argsOfs = blob:readu4()
 		proto.args = readTypeList(argsOfs)
 		protos[i+1] = proto
@@ -756,12 +776,12 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 		end
 
 		if classDataOfs ~= 0 then
-			blob.ofs = classDataOfs 
+			blob.ofs = classDataOfs
 			local numStaticFields = blob:readUleb128()
 			local numInstanceFields = blob:readUleb128()
 			local numDirectMethods = blob:readUleb128()
 			local numVirtualMethods = blob:readUleb128()
-			
+
 			local function readFields(count)
 				local fieldIndex = 0
 				for i=0,count-1 do
@@ -784,9 +804,9 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 -- [[
 					if codeOfs ~= 0 then
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
---DEBUG:print('method codeOfs', codeOfs)					
+--DEBUG:print('method codeOfs', codeOfs)
 						blob.ofs = codeOfs
-							
+
 						-- read code
 						method.numRegs = blob:readu2()
 						method.numIn = blob:readu2()
@@ -822,7 +842,7 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 								try.startAddr = blob:readu4()
 								try.insnCount = blob:readu2()
 								try.handlerOfs = blob:readu2()
-print('got method try', require 'ext.tolua'(try))							
+print('got method try', require 'ext.tolua'(try))
 							end
 						end
 
@@ -833,13 +853,13 @@ print('got method try', require 'ext.tolua'(try))
 						-- so now translate tries.handlerOfs into tries.handlers
 						if method.tries then
 							for tryIndex,try in ipairs(method.tries) do
-print('in method try', tryIndex)								
+print('in method try', tryIndex)
 								blob.ofs = encodedCatchHandlerListOfs + try.handlerOfs
 								try.handlerOfs = nil
 								local catchHandlers = table()
 								try.catchHandlers = catchHandlers
 								local numCatchHandlers = blob:readUleb128()
-print('numCatchHandlers', numCatchHandlers)  								
+print('numCatchHandlers', numCatchHandlers)
 								for j=0,numCatchHandlers-1 do
 									local handlers = table()
 									catchHandlers:insert(handlers)
@@ -851,28 +871,28 @@ print('numCatchTypes', numCatchTypes)
 										--addrPair.type = assert.index(types, 1 + addrType )	-- I'm getting bad values...
 										addrPair.typeIndex = addrType
 										addrPair.addr = blob:readUleb128()
-print('addrPair', require 'ext.tolua'(addrPair))										
-										handlers:insert(addrPair) 
+print('addrPair', require 'ext.tolua'(addrPair))
+										handlers:insert(addrPair)
 									end
 									if numCatchTypes < 0 then
 										handlers.catchAllAddr = blob:readUleb128()
-print('handlers.catchAllAddr', handlers.catchAllAddr)									
+print('handlers.catchAllAddr', handlers.catchAllAddr)
 									end
 								end
 							end
 						end
-						
+
 						blob.ofs = push
 					end
---]]				
-				end	
+--]]
+				end
 			end
 print('numDirectMethods', numDirectMethods)
-print('numVirtualMethods', numVirtualMethods)			
+print('numVirtualMethods', numVirtualMethods)
 			readMethods(numDirectMethods)
 			readMethods(numVirtualMethods)
 		end
-		
+
 		if staticValueOfs ~= 0 then
 			io.stderr:write'TODO staticValueOfs\n'
 		end
