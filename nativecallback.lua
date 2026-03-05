@@ -47,8 +47,8 @@ function M:run(env)
 		local JavaASMDex = require 'java.asmdex'
 		asmClass = JavaASMDex{
 			isPublic = true,
-			thisClass = 'L'..newClassNameSlashSep..';',
-			superClass = "Ljava/lang/Object;",
+			thisClass = newClassNameSlashSep,
+			superClass = "java/lang/Object",
 			methods={
 				{	-- needs a ctor? even though it's never used?
 					isConstructor=true,

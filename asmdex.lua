@@ -1364,6 +1364,15 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			method.class = nil
 		end
 	end
+
+	-- convert self.thisClass from dex's L...; to just ...
+	-- to make the args match up with asmclass
+	if self.thisClass then
+		self.thisClass = self.thisClass:match'^L(.*);' or self.thisClass
+	end
+	if self.superClass then
+		self.superClass = self.superClass:match'^L(.*);' or self.superClass
+	end
 	-- and at this point our .dex structure will match our .class structure
 end
 
@@ -1396,6 +1405,15 @@ function JavaASMDex:compile()
 	--   *) method
 	--     *) method code
 	-- for single-class dex files, auto-insert class into all listed fields and methods
+
+	-- convert back from ... to L...;
+	-- to make the args match up with asmclass
+	if self.thisClass then
+		self.thisClass = 'L'..self.thisClass..';'
+	end
+	if self.superClass then
+		self.superClass = 'L'..self.superClass..';'
+	end
 
 	-- move any class properties from root into a new class object
 	-- (but only if there's no .classes already
