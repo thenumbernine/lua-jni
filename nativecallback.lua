@@ -31,7 +31,6 @@ M.nativeMethods[0].fnPtr = M.nativeCallbackRunClosure
 
 function M:run(env)
 	local newClassName = 'io.github.thenumbernine.NativeCallback'
-	local newClassNameSlashSep = newClassName:gsub('%.', '/')
 
 	-- check if it's already loaded
 	local cl = env:_findClass(newClassName)
@@ -47,8 +46,8 @@ function M:run(env)
 		local JavaASMDex = require 'java.asmdex'
 		asmClass = JavaASMDex{
 			isPublic = true,
-			thisClass = newClassNameSlashSep,
-			superClass = "java/lang/Object",
+			thisClass = newClassName,
+			superClass = 'java.lang.Object',
 			methods={
 				{	-- needs a ctor? even though it's never used?
 					isConstructor=true,
@@ -77,8 +76,8 @@ return-void
 		asmClass = JavaASMClass{
 			isPublic = true,
 			isSuper = true,
-			thisClass = newClassNameSlashSep,
-			superClass = 'java/lang/Object',
+			thisClass = newClassName,
+			superClass = 'java.lang.Object',
 			methods = {
 				{	-- needs a ctor? even though it's never used?
 					isPublic = true,

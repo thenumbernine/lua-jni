@@ -19,6 +19,22 @@ local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's 
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 
+
+local function LSlashToDotName(s)
+	s = s:match'^L(.*);$' or s
+	s = s:gsub('/', '.')
+	return s
+end
+
+local function dotToLSlashName(s)
+	s = s:gsub('%.', '/')
+	if not s:match'^L.*;$' then
+		s = 'L'..s..';'
+	end
+	return s
+end
+
+
 local NO_INDEX = 0xffffffff
 local sizeOfProto = 3 * ffi.sizeof'uint32_t'
 local sizeOfClass = 8 * ffi.sizeof'uint32_t'
@@ -1353,11 +1369,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 	-- if we are in a one-class file then merge classes[1] with root and remove .class from all fields and methods (cuz its redundant anwaysy)
 	if #self.classes == 1 then
-		for k,v in pairs(self.classes[1]) do
-			self[k] = v
-		end
-		self.classes = nil
-		local classname = self.thisClass
+		local classname = self.classes[1].thisClass
 		for _,field in ipairs(self.fields) do
 			assert.eq(field.class, classname)
 			field.class = nil
@@ -1368,14 +1380,29 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		end
 	end
 
-	-- convert self.thisClass from dex's L...; to just ...
-	-- to make the args match up with asmclass
-	if self.thisClass then
-		self.thisClass = self.thisClass:match'^L(.*);' or self.thisClass
+	-- [[ convert self.thisClass from dex's L...; to just ...
+	-- to make the args match up with ASMClass
+	for _,class in ipairs(self.classes) do
+		class.thisClass = LSlashToDotName(class.thisClass)
+		class.superClass = LSlashToDotName(class.superClass)
+		if class.interfaces then
+			for i=1,#class.interfaces do
+				class.interfaces[i] = LSlashToDotName(class.interfaces[i])
+			end
+		end
 	end
-	if self.superClass then
-		self.superClass = self.superClass:match'^L(.*);' or self.superClass
+	--]]
+
+	-- now that names are fixed,
+	-- if there is just 1 class then merge it into the base
+	-- (to match up with ASMClass structure)
+	if #self.classes == 1 then
+		for k,v in pairs(self.classes[1]) do
+			self[k] = v
+		end
+		self.classes = nil
 	end
+
 	-- and at this point our .dex structure will match our .class structure
 end
 
@@ -1411,18 +1438,15 @@ function JavaASMDex:compile()
 
 	-- convert back from ... to L...;
 	-- to make the args match up with asmclass
-	if self.thisClass then
-		self.thisClass = 'L'..self.thisClass..';'
-	end
-	if self.superClass then
-		self.superClass = 'L'..self.superClass..';'
-	end
+
 
 	-- move any class properties from root into a new class object
 	-- (but only if there's no .classes already
 	self.fields = self.fields or table()
 	self.methods = self.methods or table()
+	local buildingSingleClass
 	if not self.classes then
+		buildingSingleClass = true
 		local class = {
 			sourceFile = self.sourceFile,
 			thisClass = self.thisClass,
@@ -1434,12 +1458,26 @@ function JavaASMDex:compile()
 			--self[k] = nil
 		end
 		self.classes = table{class}
+	end
 
+	-- [[ now convert dot names to L...; names
+	for _,class in ipairs(self.classes) do
+		class.thisClass = dotToLSlashName(class.thisClass)
+		class.superClass = dotToLSlashName(class.superClass)
+		if class.interfaces then
+			for i=1,#class.interfaces do
+				class.interfaces[i] = dotToLSlashName(class.interfaces[i])
+			end
+		end
+	end
+	--]]
+
+	if buildingSingleClass then
 		for _,field in ipairs(self.fields) do
-			field.class = self.thisClass
+			field.class = self.classes[1].thisClass
 		end
 		for _,method in ipairs(self.methods) do
-			method.class = self.thisClass
+			method.class = self.classes[1].thisClass
 		end
 	end
 

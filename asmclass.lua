@@ -44,6 +44,14 @@ local jlong = ffi.typeof'jlong'
 local jdouble = ffi.typeof'jdouble'
 
 
+local function dotToSlashName(s)
+	return (s:gsub('%.', '/'))
+end
+
+local function slashToDotName(s)
+	return (s:gsub('/', '.'))
+end
+
 -- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
 local function readClassName(asm, index)
 	local const = assert.index(asm.constants, index, 'asm.constants')
@@ -1505,6 +1513,15 @@ io.stderr:write("TODO handle reading class attr "..tostring(attr.name))
 
 	-- now that all consants have been deep-copied into where they are going, we dont really need the constants table anymore...
 	self.constants = nil
+
+	-- also standardize some names
+	self.thisClass = slashToDotName(self.thisClass)
+	self.superClass = slashToDotName(self.superClass)
+	if self.interfaces then
+		for i=1,#self.interfaces do
+			self.interfaces[i] = slashToDotName(self.interfaces[i])
+		end
+	end
 end
 
 
@@ -1512,6 +1529,17 @@ end
 
 -- hmm maybe 'toByteCode()' ?
 function JavaASMClass:compile()
+
+	-- un-standardize names:
+	self.thisClass = dotToSlashName(self.thisClass)
+	self.superClass = dotToSlashName(self.superClass)
+	if self.interfaces then
+		for i=1,#self.interfaces do
+			self.interfaces[i] = dotToSlashName(self.interfaces[i])
+		end
+	end
+
+
 	--[[
 	build constants fresh?  why not?
 	cycle through all fields and all methods and their instructions

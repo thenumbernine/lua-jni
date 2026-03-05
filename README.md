@@ -301,7 +301,7 @@ This is a bytecode reader/writer.
 It is meant to be an equivalent / replacement for Java-ASM.
 Lets you read and write java assembler in text and generate bytecode and run it live, no `javac` needed.
 
-Notice that, like Lua class bytecode, the names in this tend to all be slash-separated unlike the dot-separated names in classes above.
+Notice that the names in instructions are slash-separated unlike the dot-separated names in classes above.
 
 - `asmClass = JavaASMClass(bytecode)` = build a `JavaASMClass` object from a Java `.class` file contents.
 - `asmClass = JavaASMClass:fromFile(filename)` = helper function.
@@ -309,9 +309,9 @@ Notice that, like Lua class bytecode, the names in this tend to all be slash-sep
 - `asmClass = JavaASMClass(args)` = build a `JavaASMClass` from a table of properties.
 - args:
 - - `isPublic`... etc `classAccessFlags` found in `java/util.lua`
-- - `thisClass` = slash-separated name of this class.
-- - `superClass` = slash-separated name of parent class.
-- - `interfaces` = list of slash-separated names of interface classes.
+- - `thisClass` = dot-separated name of this class.
+- - `superClass` = dot-separated name of parent class.
+- - `interfaces` = list of dot-separated names of interface classes.
 - - `attrs = {...}` = optional class attributes.
 - - `fields = {...}`
 - - - `isPublic`... etc `fieldAccessFlags` found in `java/util.lua`
