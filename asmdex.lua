@@ -1485,6 +1485,12 @@ function JavaASMDex:compile()
 	end
 	self.addField = addField
 
+	-- extract out unique fields here first to keep fields in-order
+	for _,field in ipairs(self.fields) do
+		addField(field.class, field.name, field.sig)
+		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
+	end
+
 	self.methodBlobs = table()
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
@@ -1554,10 +1560,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		-- classes will need # static and # non-static fields
 		-- and # direct (aka static|private|ctor) and # non-direct methods
 	end
-	for _,field in ipairs(self.fields) do
-		addField(field.class, field.name, field.sig)
-		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
-	end
+
 
 
 	self.map = table()
