@@ -931,25 +931,26 @@ assert.eq(true, env._ignoringExceptions)
 	return Name{env=env, name=classpath}
 end
 
--- _defineClass points to JavaASMClass = require 'java.asmclass'
+-- _defineClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
 --[[
-'asmClass' can be a JavaASMClass, or a Lua string of bytecode (returned with :compile() above)
-'newClassName' = classname, not necessary if using a JavaASMClass to call this.
+'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)
+'newClassName' = classname, not necessary if using a JavaASMClass/JavaASMDex object.
 --]]
-function JNIEnv:_defineClass(asmClass, newClassName)
-	local JavaASMClass = require 'java.asmclass'
+JNIEnv._usingDex = false	-- set this to 'true' in Android
+function JNIEnv:_defineClass(asm, newClassName)
 	local code
-	if type(asmClass) == 'string' then
-		code = asmClass
-	elseif JavaASMClass:isa(asmClass) then
+	if type(asm) == 'string' then
+		code = asm
+	elseif type(asm) == 'table' then
+		--if JavaASMClass:isa(asm) or JavaASMDex:isa(asm) then
 --DEBUG:print('asm class:')
---DEBUG:print(require 'ext.tolua'(asmClass))
-		code = asmClass:compile()
+--DEBUG:print(require 'ext.tolua'(asm))
+		code = asm:compile()
 --DEBUG:print('asm class code')
 --DEBUG:print(require 'ext.string'.hexdump(code))
-		newClassName = newClassName or asmClass.thisClass
+		newClassName = newClassName or asm.thisClass
 	else
-		error('JavaASMClass.defineClass accepts its own objects or Lua strings')
+		error('JNIEnv:_defineClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
 	end
 
 	newClassName = newClassName:gsub('%.', '/')

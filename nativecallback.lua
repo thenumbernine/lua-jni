@@ -43,9 +43,9 @@ function M:run(env)
 	local asmClass
 	-- you will have to set this,
 	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
-	if M.useDex then
-		local JavaDexClass = require 'java.dexclass'
-		asmClass = JavaDexClass{
+	if env._usingDex then
+		local JavaASMDex = require 'java.asmdex'
+		asmClass = JavaASMDex{
 			isPublic = true,
 			thisClass = 'L'..newClassNameSlashSep..';',
 			superClass = "Ljava/lang/Object;",
