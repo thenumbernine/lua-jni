@@ -194,6 +194,7 @@ function WriteBlob:writeSleb128()
 		self:writeu1(byte)
 	end
 end
+function WriteBlob:__len() return #self.data end
 
 function WriteBlob:compile()
 	return self.data:dataToStr()

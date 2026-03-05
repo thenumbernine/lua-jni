@@ -280,6 +280,7 @@ return {
 	deepCopy = deepCopy,
 	prims = prims,
 	infoForPrims = infoForPrims,
+	primSigStrForName = primSigStrForName,
 	getJNISig = getJNISig,
 	sigStrToObj = sigStrToObj,
 	classAccessFlags = classAccessFlags,

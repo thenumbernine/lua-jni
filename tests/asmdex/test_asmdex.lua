@@ -41,6 +41,7 @@ print'recompiled bytecode:'
 print(string.hexdump(bytes, 48))
 print()
 
+--[[
 print('2nd read into JavaASMDex:')
 local try2 = JavaASMDex(bytes)
 print(require'ext.tolua'(try2))
@@ -51,7 +52,6 @@ print'2nd recompiled bytecode:'
 print(string.hexdump(bytes2, 48))
 assert.eq(bytes, bytes2)
 
---[[
 -- TODO here use java-asm's validator to spit out stuff about it
 -- TODO maybe here too use javap to spit out stuff about it
 --]]

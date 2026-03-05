@@ -103,6 +103,12 @@ local function instPushMethod(inst, methodIndex, asm)
 	inst:insert(method.sig)
 end
 local function instReadMethod(inst, index, asm)
+	if not inst[index]
+	or not inst[index+1]
+	or not inst[index+2]
+	then
+		error("instruction needs args "..index..'-'..(index+2)..': '..require'ext.tolua'(inst)) 
+	end
 	return (asm.addMethod(inst[index], inst[index+1], inst[index+2]))
 end
 
@@ -452,14 +458,14 @@ function Instr35c_method.write(inst, blob, asm)
 
 	blob:writeu1(bit.bor(
 		argc,
-		bit.lshift(bit.band(0xf, readregopt(inst[6])), 4)
+		bit.lshift(bit.band(0xf, readregopt(inst[5])), 4)
 	))
-	blob:writeu2(instReadMethod(inst, 3, asm))
+	blob:writeu2(instReadMethod(inst, 2, asm))
 	blob:writeu2(bit.bor(
-		bit.band(0xf, readregopt(inst[7])),
-		bit.lshift(bit.band(0xf, readregopt(inst[8])), 4),
-		bit.lshift(bit.band(0xf, readregopt(inst[9])), 8),
-		bit.lshift(bit.band(0xf, readregopt(inst[10])), 12)
+		bit.band(0xf, readregopt(inst[6])),
+		bit.lshift(bit.band(0xf, readregopt(inst[7])), 4),
+		bit.lshift(bit.band(0xf, readregopt(inst[8])), 8),
+		bit.lshift(bit.band(0xf, readregopt(inst[9])), 12)
 	))
 end
 
@@ -1394,17 +1400,25 @@ function JavaASMDex:compile()
 
 	-- return 0-based index into strings
 	local function addString(str)
+		assert.type(str, 'string')
 		-- ultimately strings will be preceded by a uleb128 of the length
 		-- but equality is the same with the original so dont convert just yet
-		return addUnique(self.strings, str)
+		local stringIndex = addUnique(self.strings, str)
+print('adding string', stringIndex, str)		
+		return stringIndex
 	end
 	self.addString = addString
 
 	-- return 0-based index into types
 	local function addType(str)
+		assert.type(str, 'string')
 		local w = WriteBlobLE()
-		w:writeu4(addString(str))
-		return addUnique(self.types, w:compile())
+		local stringIndex = addString(str)
+		w:writeu4(stringIndex)
+		local b = w:compile()
+		local typeIndex = addUnique(self.types, b)
+print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strings[stringIndex+1])
+		return typeIndex
 	end
 	self.addType = addType
 
@@ -1424,8 +1438,10 @@ function JavaASMDex:compile()
 
 	-- return 0-based index into protos
 	local function addProto(sigstr)
+		assert(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
 		local sig = sigStrToObj(sigstr)
+assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 		-- now convert them back to their jni strings
 		-- TODO better identifiers between all the different name types
 		-- TODO split out the separating function and the converting function, cuz I have to convert it back now
@@ -1475,18 +1491,26 @@ function JavaASMDex:compile()
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
 		w:writeu2(addType(class))
-		w:writeu2(addType(sig))
+		w:writeu2(addProto(sig))
 		w:writeu4(addString(name))
-		return addUnique(self.methodBlobs, w:compile())
+		local b = w:compile()
+		local methodIndex = addUnique(self.methodBlobs, b)
+print('adding method '..methodIndex..' = '..string.hex(b))
+		return methodIndex
 	end
 	self.addMethod = addMethod
 
 	-- now to extract out uniques from classes, fields, methods, methods.code
 	for _,class in ipairs(self.classes) do
 		class.thisClassIndex = addType(class.thisClass)
-		class.superClassIndex = addType(class.superClass)
-		class.interfaceIndex = addTypeList(class.interfaces)
 		class.accessFlags = getFlagsFromObj(class, classAccessFlags)
+		class.superClassIndex = addType(class.superClass)
+print('adding superclass', class.superClass, class.superClassIndex)
+		class.interfaceIndex = addTypeList(class.interfaces)
+		class.sourceFileIndex = addString(class.sourceFile)
+		-- then annotations
+		-- then classDataOfs
+		-- then staticValueOfs
 
 		-- classes will need # static and # non-static fields
 		-- and # direct (aka static|private|ctor) and # non-direct methods
@@ -1533,7 +1557,7 @@ function JavaASMDex:compile()
 	end
 
 	blob:writeString('dex\n')
-	blob:writeString('\30\33\39\0')
+	blob:writeString('\x30\x33\x39\0')
 
 	local checksumOfs = #blob
 	blob:writeu4(0)	-- space for checksum, write it once we're finished
@@ -1548,7 +1572,7 @@ function JavaASMDex:compile()
 	local headerSizeOfs = #blob
 	blob:writeu4(0)	-- space for header size
 
-	blob:writeu1(0x12345678)	-- endian tag
+	blob:writeu4(0x12345678)	-- endian tag
 	blob:writeu4(0)		-- num links
 	blob:writeu4(0)		-- link ofs
 
@@ -1585,6 +1609,8 @@ function JavaASMDex:compile()
 
 	-- fill in header size
 	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = #blob
+
+--do return blob:compile() end
 
 	local stringOfs
 	if #self.strings > 0 then
@@ -1658,8 +1684,10 @@ function JavaASMDex:compile()
 	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
 		blob:writeu4(class.thisClassIndex)
+		blob:writeu4(class.accessFlags)
 		blob:writeu4(class.superClassIndex)
 		blob:writeu4(class.interfaceIndex)	-- fill in interface-offset later
+		blob:writeu4(class.sourceFileIndex)
 		blob:writeu4(0)	-- fill in annotation-offset later
 		blob:writeu4(0)	-- fill in data-offset later
 		blob:writeu4(0)	-- fill in static-value-offset later
@@ -1704,7 +1732,7 @@ function JavaASMDex:compile()
 		end
 		-- now replace all class interfaceIndexes
 		for i=1,#self.classes do
-			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 * (i-1) + 8)
+			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 8 + (i-1) * 32)
 			if classInterfaceTypeListPtr[0] ~= 0 then
 				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
 			end
@@ -1806,7 +1834,7 @@ function JavaASMDex:compile()
 		then
 			classDataCount = classDataCount + 1
 			-- change the class data offset to here
-			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 16 + (classIndex-1) * 24)
+			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 16 + (classIndex-1) * 32)
 			classDataPtr[0] = #blob
 
 			blob:writeUleb128(#staticFieldIndexes)
