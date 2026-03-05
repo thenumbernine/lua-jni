@@ -18,10 +18,12 @@ local toolsDir = path(assert(os.home()))/'Android/Sdk/build-tools/36.0.0'	-- pat
 local d8 = toolsDir/'d8'
 assert(d8:exists())
 
-local dexfn = path'classes.dex'	-- to make d8 produce a dex file you need to set its --output to a folder, then it writes in that folder 'classes.dex' ...
+local classesDexFn = path'classes.dex'	-- to make d8 produce a dex file you need to set its --output to a folder, then it writes in that folder 'classes.dex' ...
 assert(os.exec(d8..' --output . '..classfn))
-assert(dexfn:exists(), "d8 didn't produce a dex file "..dexfn)
+assert(classesDexFn:exists(), "d8 didn't produce a dex file "..classesDexFn)
 
+local dexfn = srcfn:setext'dex'
+classesDexFn:move(dexfn)
 local dexBC = assert(dexfn:read())
 
 print(dexfn)

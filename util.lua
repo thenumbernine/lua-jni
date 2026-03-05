@@ -95,6 +95,41 @@ function getJNISigMethod(sig)
 	..')'..getJNISig(sig[1] or 'void')
 end
 
+-- takes a JNI style signature for a method, "(" first, return last
+-- returns it as a table with the return-type first
+local function splitMethodJNISig(str)
+	local sig = table()
+	local index = 1
+
+	assert.eq(str:sub(index,index), '(')
+	index = index + 1
+
+	while str:sub(index, index) ~= ')' do
+		assert.le(index, #str)
+		local indexStart = index
+
+		while str:sub(index, index) == '[' do
+			index = index + 1
+		end
+
+		local prim = primNameForSigStr[str:sub(index, index)]
+		if prim then
+			sig:insert(str:sub(indexStart, index))
+			index = index + 1
+		else
+			assert.eq(str:sub(index, index), 'L')
+			index = assert(str:find(';', index, true), "got improper class name")
+
+			sig:insert(str:sub(indexStart, index))
+			index = index + 1
+		end
+	end
+	index = index + 1
+	assert.le(index, #str)
+	sig:insert(1, (str:sub(index)))
+	return sig
+end
+
 -- accepts a signature string and an index to start reading
 -- returns the most recent read type and the next index
 -- or nil upon error
@@ -120,12 +155,12 @@ local function sigStrToObjSingle(str, index)
 	end
 
 	-- what's left? objects?
-	local classpath = str:sub(index):match'^([^;]*);'
+	local classpath = str:sub(index):match'^L([^;]*);'
 --DEBUG:print('classpath', classpath)
 	if not classpath then
 		return nil	--error("sigStrToObj "..tostring(str))
 	end
-	index = index + #classpath + 1	-- +1 for ;
+	index = index + #classpath + 2	-- +1 for L, +1 for ;
 	-- convert from /-separator when it is to .-separator
 	classpath = classpath:gsub('/', '%.')
 --DEBUG:print('returning', 	classpath..arraySuffix)
@@ -133,6 +168,7 @@ local function sigStrToObjSingle(str, index)
 end
 
 -- opposite of getJNISig
+-- TODO TODO TODO if it's a method then run splitMethodJNISig() on it then convert members individually
 local function sigStrToObj(str)
 	str = tostring(str)
 	if str:sub(1,1) == '(' then
@@ -283,6 +319,7 @@ return {
 	primSigStrForName = primSigStrForName,
 	getJNISig = getJNISig,
 	sigStrToObj = sigStrToObj,
+	splitMethodJNISig = splitMethodJNISig,
 	classAccessFlags = classAccessFlags,
 	nestedClassAccessFlags = nestedClassAccessFlags,
 	fieldAccessFlags = fieldAccessFlags,

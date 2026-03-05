@@ -11,8 +11,7 @@ local string = require 'ext.string'
 local ReadBlobLE = require 'java.blob'.ReadBlobLE
 local WriteBlobLE = require 'java.blob'.WriteBlobLE
 local deepCopy = require 'java.util'.deepCopy
-local sigStrToObj = require 'java.util'.sigStrToObj
-local primSigStrForName = require 'java.util'.primSigStrForName
+local splitMethodJNISig = require 'java.util'.splitMethodJNISig
 local setFlagsToObj = require 'java.util'.setFlagsToObj
 local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
@@ -1453,33 +1452,13 @@ function JavaASMDex:compile()
 --DEBUG:print('addProto', sigstr)
 		assert(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
-		local sig = sigStrToObj(sigstr)
+		local sig = splitMethodJNISig(sigstr)
 assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
-		-- now convert them back to their jni strings
-		-- TODO better identifiers between all the different name types
-		-- TODO split out the separating function and the converting function, cuz I have to convert it back now
-		local shorts = table()
-		for i=1,#sig do
-			local sigi = sig[i]
-			local arrayPrefix = ''
-			repeat
-				local rest = sigi:match'^(.*)%[%]$'
-				if not rest then break end
-				sigi = rest
-				arrayPrefix = arrayPrefix .. '['
-			until false
-			-- convert base type to prim if possible
-			local prim = primSigStrForName[sigi]
-			if prim then
-				sigi = prim
-			else
-				sigi = 'L'..sigi:gsub('%.', '/')..';'
-			end
-			shorts[i] = arrayPrefix..(sigi:match'^L' or sigi)
-			-- re-add array
-			sigi = arrayPrefix .. sigi
-			sig[i] = sigi
-		end
+--DEBUG:print('from', sigstr, 'to', require 'ext.tolua'(sig))
+
+		local shorts = sig:mapi(function(sigi)
+			return #sigi > 1 and 'L' or sigi
+		end)
 
 		local w = WriteBlobLE()
 		w:writeu4(addString(shorts:concat()))
