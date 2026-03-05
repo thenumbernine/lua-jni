@@ -888,6 +888,9 @@ end)
 local JavaASMDex = class()
 JavaASMDex.__name = 'JavaASMDex'
 
+-- ; is a popular asm comment syntax, right?
+JavaASMDex.lineComment = ';'
+
 --[[
 similar as JavaASMClass
 key differences in ASMDex vs ASMClass:
