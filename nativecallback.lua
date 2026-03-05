@@ -43,13 +43,38 @@ function M:run(env)
 	local asmClass
 	-- you will have to set this,
 	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
-	if M.isDalvik then
-
-
+	if M.useDex then
+		local JavaDexClass = require 'java.dexclass'
+		asmClass = JavaDexClass{
+			isPublic = true,
+			thisClass = 'L'..newClassNameSlashSep..';',
+			superClass = "Ljava/lang/Object;",
+			methods={
+				{	-- needs a ctor? even though it's never used?
+					isConstructor=true,
+					isPublic=true,
+					name="<init>",
+					sig="()V"
+					maxRegs=1,
+					regsIn=1,
+					regsOut=1,
+					code = [[
+invoke-direct Ljava/lang/Object; <init> ()V
+return-void
+]],
+				},
+				{
+					isNative=true,
+					isPublic=true,
+					isStatic=true,
+					name = M.runMethodName,
+					sig = M.runMethodSig,
+				},
+			},
+		}
 	else
 		local JavaASMClass = require 'java.asmclass'
 		asmClass = JavaASMClass{
-			version = 0x41,
 			isPublic = true,
 			isSuper = true,
 			thisClass = newClassNameSlashSep,
@@ -59,13 +84,13 @@ function M:run(env)
 					isPublic = true,
 					name = '<init>',
 					sig = '()V',
+					maxStack = 1,
+					maxLocals = 1,
 					code = [[
 aload_0
 invokespecial java/lang/Object <init> ()V
 return
 ]],
-					maxStack = 1,
-					maxLocals = 1,
 				},
 				{
 					isNative = true,

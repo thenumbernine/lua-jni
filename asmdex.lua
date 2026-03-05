@@ -18,6 +18,7 @@ local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's 
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 
+local NO_INDEX = 0xffffffff
 local sizeOfProto = 3 * ffi.sizeof'uint32_t'
 local sizeOfClass = 8 * ffi.sizeof'uint32_t'
 
@@ -1017,13 +1018,13 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		if ofs == 0 then return end
 		blob.ofs = ofs
 		local numArgs = blob:readu4()
---DEBUG:print('read type list #args', numArgs)		
+--DEBUG:print('read type list #args', numArgs)
 		if numArgs == 0 then return end
 		local args = table()
 		for i=0,numArgs-1 do
 			local typeIndex = blob:readu2()
 			args[i+1] = assert.index(types, 1+typeIndex)
---DEBUG:print('read type list arg['..i..'] = '..typeIndex, args[i+1])			
+--DEBUG:print('read type list arg['..i..'] = '..typeIndex, args[i+1])
 		end
 		return args
 	end
@@ -1082,14 +1083,14 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		local proto = {}
 		-- I don't get ShortyDescritpor ... is it redundant to returnType + args?
 		local shortyIndex = blob:readu4()
---DEBUG:print('read proto shortyIndex', shortyIndex)		
+--DEBUG:print('read proto shortyIndex', shortyIndex)
 		local shorty = assert.index(strings, 1 + shortyIndex)
 		local returnTypeIndex = blob:readu4()
---DEBUG:print('read proto returnTypeIndex', returnTypeIndex)		
+--DEBUG:print('read proto returnTypeIndex', returnTypeIndex)
 		local returnType = assert.index(types, 1 + returnTypeIndex)
 
 		local argTypeListOfs = blob:readu4()
---DEBUG:print('read proto argTypeListOfs', argTypeListOfs)		
+--DEBUG:print('read proto argTypeListOfs', argTypeListOfs)
 		local argTypes = readTypeList(argTypeListOfs)
 
 		-- sig but in .class format:
@@ -1120,13 +1121,13 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		local method = {}
 		self.methods[i+1] = method
 		local classIndex = blob:readu2()
---DEBUG:print('read method class index', classIndex)		
+--DEBUG:print('read method class index', classIndex)
 		method.class = assert.index(types, 1 + classIndex)
 		local protoIndex = blob:readu2()
---DEBUG:print('read method proto index', protoIndex)		
+--DEBUG:print('read method proto index', protoIndex)
 		method.sig = deepCopy(assert.index(protos, 1 + protoIndex))
 		local nameIndex = blob:readu4()
---DEBUG:print('read method name index', nameIndex)	
+--DEBUG:print('read method name index', nameIndex)
 		method.name = assert.index(strings, 1 + nameIndex)
 --DEBUG:print('read method['..i..'] = '..require 'ext.tolua'(method))
 	end
@@ -1154,7 +1155,9 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		local interfacesOfs = blob:readu4()
 		local sourceFileIndex = blob:readu4()
 --DEBUG:print('read class sourceFileIndex', sourceFileIndex)
-		class.sourceFile = assert.index(strings, 1 + sourceFileIndex)
+		if sourceFileIndex ~= NO_INDEX then
+			class.sourceFile = assert.index(strings, 1 + sourceFileIndex)
+		end
 		local annotationsOfs = blob:readu4()
 		local classDataOfs = blob:readu4()
 		local staticValueOfs = blob:readu4()
@@ -1459,8 +1462,8 @@ function JavaASMDex:compile()
 		-- return 1-based index to-be-replaced later
 		local b = w:compile()
 		local typeListIndex = addUnique(self.typeLists, b)
---DEBUG:print('adding type list index '..typeListIndex..' '..string.hex(b)..' from '..require 'ext.tolua'(typeStrs))		
-		return 1+typeListIndex 
+--DEBUG:print('adding type list index '..typeListIndex..' '..string.hex(b)..' from '..require 'ext.tolua'(typeStrs))
+		return 1+typeListIndex
 	end
 
 	-- return 0-based index into protos
@@ -1484,7 +1487,7 @@ function JavaASMDex:compile()
 
 		local returnType = table.remove(sig, 1)
 		local returnTypeIndex = addType(returnType)
---DEBUG:print('adding proto returnType', returnType, 'index', returnTypeIndex)		
+--DEBUG:print('adding proto returnType', returnType, 'index', returnTypeIndex)
 		w:writeu4(returnTypeIndex)
 
 		local argTypeListIndex = addTypeList(sig)
@@ -1582,7 +1585,11 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		class.superClassIndex = addType(class.superClass)
 --DEBUG:print('adding class superclass', class.superClass, class.superClassIndex)
 		class.interfaceIndex = addTypeList(class.interfaces)
-		class.sourceFileIndex = addString(class.sourceFile)
+		if class.sourceFile then
+			class.sourceFileIndex = addString(class.sourceFile)
+		else
+			class.sourceFileIndex = NO_INDEX
+		end
 		-- then annotations
 		-- then classDataOfs
 		-- then staticValueOfs
@@ -1604,7 +1611,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	end
 
 	blob:writeString('dex\n')
-	blob:writeString('\x30\x33\x39\0')
+	blob:writeString(self.version or '\x30\x33\x39\0')
 
 	local checksumOfs = #blob
 	blob:writeu4(0)	-- space for checksum, write it once we're finished
@@ -1958,7 +1965,7 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		local ptr = ffi.cast('uint32_t*', blob.data.v + mapOfsOfs)
 --DEBUG:local from = ptr[0]
 		ptr[0] = #blob
---DEBUG:print('changing mapOfs from', from, 'to', #blob)		
+--DEBUG:print('changing mapOfs from', from, 'to', #blob)
 		blob:writeu4(#self.map)
 		for _,entry in ipairs(self.map) do
 			blob:writeu2((assert.index(mapListTypeForName, entry.type)))
