@@ -1196,7 +1196,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 					if codeOfs ~= 0 then
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
---DEBUG:print('method codeOfs', codeOfs)
+--DEBUG:print('reading code for method', methodIndex)
 						blob.ofs = codeOfs
 
 						-- read code
@@ -1398,7 +1398,6 @@ function JavaASMDex:compile()
 
 	-- table of blobs of converted fields that will either come from .fields which are local to this function, or from field references in instructions
 	self.fieldBlobs = table()
-	self.methodBlobs = table()
 
 	-- return 0-based index into our list of unique values
 	local function addUnique(arr, data)
@@ -1453,7 +1452,7 @@ function JavaASMDex:compile()
 		assert(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
 		local sig = splitMethodJNISig(sigstr)
-assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
+		assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 --DEBUG:print('from', sigstr, 'to', require 'ext.tolua'(sig))
 
 		local shorts = sig:mapi(function(sigi)
@@ -1486,6 +1485,7 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 	end
 	self.addField = addField
 
+	self.methodBlobs = table()
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
 		w:writeu2(addType(class))
@@ -1498,6 +1498,44 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 		return methodIndex
 	end
 	self.addMethod = addMethod
+
+-- add methods first so they can be unique first and 1-1 with themselves
+--DEBUG:print('checking '..#self.methods..' for writing')
+	for i,method in ipairs(self.methods) do
+--DEBUG:print('starting method #'..(i-1)..', #methodBlobs', #self.methodBlobs)
+--DEBUG:print('checking method '..i..' = '..require'ext.tolua'(method))
+		method.methodIndex = addMethod(method.class, method.name, method.sig)
+--DEBUG:print('checking method '..(i-1)..' =', method.class, method.name, method.sig, 'index', method.methodIndex)
+assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
+
+		-- the rest goes in the method's extra info
+		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
+	end
+
+	-- do code later so methods stay in-order with methodBlobs
+	for i,method in ipairs(self.methods) do
+		if method.code then
+			local cblob = WriteBlobLE()
+			for _,inst in ipairs(method.code) do
+				local lo = assert.index(opForInstName, inst[1])
+				local instDesc = assert.index(instDescForOp, lo)
+				cblob:writeu1(lo)
+				instDesc.write(inst, cblob, self)
+				assert.eq(0, bit.band(#cblob, 1))
+			end
+			method.codeData = cblob:compile()
+		end
+
+		if method.tries then
+			for _,try in ipairs(method.tries) do
+				for _,addrPair in ipairs(try) do
+					addrPair.typeIndex = addType(addrPair.type)
+				end
+			end
+		end
+	end
+--DEBUG:print('came up with '..#self.methodBlobs..' unique method signatures')
+
 
 	-- now to extract out uniques from classes, fields, methods, methods.code
 	for _,class in ipairs(self.classes) do
@@ -1520,36 +1558,7 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 		addField(field.class, field.name, field.sig)
 		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
 	end
---DEBUG:print('checking '..#self.methods..' for writing')
-	for i,method in ipairs(self.methods) do
---DEBUG:print('checking method '..i..' = '..require'ext.tolua'(method))
-		method.methodIndex = addMethod(method.class, method.name, method.sig)
 
-		-- the rest goes in the method's extra info
-
-		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
-
-		if method.code then
-			local cblob = WriteBlobLE()
-			for _,inst in ipairs(method.code) do
-				local lo = assert.index(opForInstName, inst[1])
-				local instDesc = assert.index(instDescForOp, lo)
-				cblob:writeu1(lo)
-				instDesc.write(inst, cblob, self)
-				assert.eq(0, bit.band(#cblob, 1))
-			end
-			method.codeData = cblob:compile()
-		end
-
-		if method.tries then
-			for _,try in ipairs(method.tries) do
-				for _,addrPair in ipairs(try) do
-					addrPair.typeIndex = addType(addrPair.type)
-				end
-			end
-		end
-	end
---DEBUG:print('came up with '..#self.methodBlobs..' unique method signatures')
 
 	self.map = table()
 	self.map:insert{type='header_item', count=1, offset=0}
@@ -1760,7 +1769,7 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 	align(4)
 	local codeItemOfs = #blob
 	local codeItemCount = 0
-	-- TODO sort by methodIndex, or iterate by methodIndex, or somethign
+	-- I've asseretd method == self.methods[method.methodIndex+1]
 	for _,method in ipairs(self.methods) do
 		if method.codeData then
 			codeItemCount = codeItemCount + 1
