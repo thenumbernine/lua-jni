@@ -49,7 +49,7 @@ print()
 local bytes2 = try2:compile()
 print'2nd recompiled bytecode:'
 print(string.hexdump(bytes2, 48))
-assert.eq(bytes, bytes2)
+if bytes ~= bytes2 then error("recompile didn't match first compile") end
 
 -- TODO here use java-asm's validator to spit out stuff about it
 -- TODO maybe here too use javap to spit out stuff about it

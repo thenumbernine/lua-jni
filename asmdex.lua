@@ -108,7 +108,7 @@ local function instReadMethod(inst, index, asm)
 	or not inst[index+1]
 	or not inst[index+2]
 	then
-		error("instruction needs args "..index..'-'..(index+2)..': '..require'ext.tolua'(inst)) 
+		error("instruction needs args "..index..'-'..(index+2)..': '..require'ext.tolua'(inst))
 	end
 	return (asm.addMethod(inst[index], inst[index+1], inst[index+2]))
 end
@@ -947,17 +947,17 @@ function JavaASMDex:readData(data)
 	local blob = ReadBlobLE(data)
 	assert.eq(blob:readString(4), 'dex\n')
 	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
-print('version', string.hex(version))
+--DEBUG:print('version', string.hex(version))
 	local checksum = blob:readu4()
-print('checksum = 0x'..bit.tohex(checksum, 8))
+--DEBUG:print('checksum = 0x'..bit.tohex(checksum, 8))
 	local sha1sig = blob:readString(20)
-print('sha1sig', string.hex(sha1sig))
+--DEBUG:print('sha1sig', string.hex(sha1sig))
 	local fileSize = blob:readu4()
-print('fileSize', fileSize)
+--DEBUG:print('fileSize', fileSize)
 	local headerSize = blob:readu4()
-print('headerSize', headerSize)
+--DEBUG:print('headerSize', headerSize)
 	local endianTag = blob:readu4()
-print('endianTag = 0x'..bit.tohex(endianTag, 8))
+--DEBUG:print('endianTag = 0x'..bit.tohex(endianTag, 8))
 	if endianTag == 0x78563412 then
 		-- then do I flip size and checksum as well?
 		blob.littleEndian = false
@@ -970,42 +970,42 @@ print('endianTag = 0x'..bit.tohex(endianTag, 8))
 
 	local numLinks = blob:readu4()
 	local linkOfs = blob:readu4()
-print('link count', numLinks,'ofs', linkOfs)
+--DEBUG:print('link count', numLinks,'ofs', linkOfs)
 	if numLinks ~= 0 then
 io.stderr:write('TODO support dynamically-linked .dex files\n')
 	end
 
 	local mapOfs = blob:readu4()
-print('map ofs', mapOfs)
+--DEBUG:print('map ofs', mapOfs)
 
 	local numStrings = blob:readu4()
 	local stringOfsOfs = blob:readu4()
-print('stringId count', numStrings, 'ofs', stringOfsOfs)
+--DEBUG:print('stringId count', numStrings, 'ofs', stringOfsOfs)
 
 	local numTypes = blob:readu4()
 	local typeOfs = blob:readu4()
-print('typeId count', numTypes,'ofs', typeOfs)
+--DEBUG:print('typeId count', numTypes,'ofs', typeOfs)
 
 	local numProtos = blob:readu4()
 	local protoOfs = blob:readu4()
-print('protoId count', numProtos,'ofs', protoOfs)
+--DEBUG:print('protoId count', numProtos,'ofs', protoOfs)
 
 	local numFields = blob:readu4()
 	local fieldOfs = blob:readu4()
-print('fieldId count', numFields,'ofs', fieldOfs)
+--DEBUG:print('fieldId count', numFields,'ofs', fieldOfs)
 
 	local numMethods = blob:readu4()
 	local methodOfs = blob:readu4()
-print('methodId count', numMethods,'ofs', methodOfs)
+--DEBUG:print('methodId count', numMethods,'ofs', methodOfs)
 
 	local numClasses = blob:readu4()
 	local classOfs = blob:readu4()
-print('classDef count', numClasses,'ofs', classOfs)
+--DEBUG:print('classDef count', numClasses,'ofs', classOfs)
 
 	-- wait is this used for anything, or just annotation as to where the 'extra' data of other header fields puts stuff?
 	local numDatas = blob:readu4()
 	local datasOfs = blob:readu4()
-print('data count', numDatas,'ofs', datasOfs)
+--DEBUG:print('data count', numDatas,'ofs', datasOfs)
 
 	-- header is done, read structures
 
@@ -1038,7 +1038,7 @@ print('data count', numDatas,'ofs', datasOfs)
 			blob:readu2()	-- unused
 			map.count = blob:readu4()
 			map.offset = blob:readu4()
-print('map['..i..'] = '..require 'ext.tolua'(map))
+--DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -1059,7 +1059,7 @@ print('map['..i..'] = '..require 'ext.tolua'(map))
 		local len = blob:readUleb128()
 		local str = blob:readString(len)
 		strings[i+1] = str
-print('string['..i..'] = '..require 'ext.tolua'(str))
+--DEBUG:print('string['..i..'] = '..require 'ext.tolua'(str))
 	end
 
 	assert.le(0, typeOfs)
@@ -1089,7 +1089,7 @@ print('string['..i..'] = '..require 'ext.tolua'(str))
 		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
 		protos[i+1] = sig
 
-print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
+--DEBUG:print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 	end
 
 	local sizeOfField = 2*ffi.sizeof'uint32_t'
@@ -1115,7 +1115,7 @@ print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 		method.class = assert.index(types, 1 + blob:readu2())
 		method.sig = deepCopy(assert.index(protos, 1 + blob:readu2()))
 		method.name = assert.index(strings, 1 + blob:readu4())
-print('read method['..i..'] = '..require 'ext.tolua'(method))	
+--DEBUG:print('read method['..i..'] = '..require 'ext.tolua'(method))
 	end
 
 	-- so this is interesting
@@ -1124,23 +1124,23 @@ print('read method['..i..'] = '..require 'ext.tolua'(method))
 	assert.le(0, classOfs)
 	assert.le(classOfs + sizeOfClass * numClasses, fileSize)
 	self.classes = table()
-print('read classDataOfs', classOfs)
+--DEBUG:print('read classDataOfs', classOfs)
 	for i=0,numClasses-1 do
 		blob.ofs = classOfs + i * sizeOfClass
 		local class = {}
 		self.classes[i+1] = class
 		local thisClassIndex = blob:readu4()
-print('read class thisClassIndex', thisClassIndex) 		
+--DEBUG:print('read class thisClassIndex', thisClassIndex)
 		class.thisClass = assert.index(types, 1 + thisClassIndex)
 		local accessFlags = blob:readu4()
-print('read class accessFlags', accessFlags)		
+--DEBUG:print('read class accessFlags', accessFlags)
 		setFlagsToObj(class, accessFlags, classAccessFlags)
 		local superClassIndex = blob:readu4()
-print('read class superClassIndex', superClassIndex)
+--DEBUG:print('read class superClassIndex', superClassIndex)
 		class.superClass = assert.index(types, 1 + superClassIndex)
 		local interfacesOfs = blob:readu4()
 		local sourceFileIndex = blob:readu4()
-print('read class sourceFileIndex', sourceFileIndex)
+--DEBUG:print('read class sourceFileIndex', sourceFileIndex)
 		class.sourceFile = assert.index(strings, 1 + sourceFileIndex)
 		local annotationsOfs = blob:readu4()
 		local classDataOfs = blob:readu4()
@@ -1183,7 +1183,7 @@ print('read class sourceFileIndex', sourceFileIndex)
 --DEBUG:local methodStartOfs = blob.ofs
 					local delta = blob:readUleb128()
 					methodIndex = methodIndex + delta
-print('read class data methodIndex delta', delta, 'index', methodIndex)
+--DEBUG:print('read class data methodIndex delta', delta, 'index', methodIndex)
 					local method = assert.index(self.methods, 1 + methodIndex)
 --DEBUG:print('reading method data', method.class, method.name, method.sig, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
 					setFlagsToObj(method, blob:readUleb128(), methodAccessFlags)
@@ -1416,7 +1416,7 @@ function JavaASMDex:compile()
 		-- ultimately strings will be preceded by a uleb128 of the length
 		-- but equality is the same with the original so dont convert just yet
 		local stringIndex = addUnique(self.strings, str)
---DEBUG:print('adding string', stringIndex, str)		
+--DEBUG:print('adding string', stringIndex, str)
 		return stringIndex
 	end
 	self.addString = addString
@@ -1450,7 +1450,7 @@ function JavaASMDex:compile()
 
 	-- return 0-based index into protos
 	local function addProto(sigstr)
-print('addProto', sigstr)		
+--DEBUG:print('addProto', sigstr)
 		assert(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
 		local sig = sigStrToObj(sigstr)
@@ -1510,7 +1510,7 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
 		w:writeu2(addType(class))
-print('adding method with sig', sig)		
+--DEBUG:print('adding method with sig', sig)
 		w:writeu2(addProto(sig))
 		w:writeu4(addString(name))
 		local b = w:compile()
@@ -1523,11 +1523,11 @@ print('adding method with sig', sig)
 	-- now to extract out uniques from classes, fields, methods, methods.code
 	for _,class in ipairs(self.classes) do
 		class.thisClassIndex = addType(class.thisClass)
-print('adding class thisClass', class.thisClass, class.thisClassIndex)
+--DEBUG:print('adding class thisClass', class.thisClass, class.thisClassIndex)
 		class.accessFlags = getFlagsFromObj(class, classAccessFlags)
-print('adding class accessFlags', class.accessFlags)
+--DEBUG:print('adding class accessFlags', class.accessFlags)
 		class.superClassIndex = addType(class.superClass)
-print('adding class superclass', class.superClass, class.superClassIndex)
+--DEBUG:print('adding class superclass', class.superClass, class.superClassIndex)
 		class.interfaceIndex = addTypeList(class.interfaces)
 		class.sourceFileIndex = addString(class.sourceFile)
 		-- then annotations
@@ -1541,11 +1541,11 @@ print('adding class superclass', class.superClass, class.superClassIndex)
 		addField(field.class, field.name, field.sig)
 		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
 	end
-print('checking '..#self.methods..' for writing')	
+--DEBUG:print('checking '..#self.methods..' for writing')
 	for i,method in ipairs(self.methods) do
-print('checking method '..i..' = '..require'ext.tolua'(method))
+--DEBUG:print('checking method '..i..' = '..require'ext.tolua'(method))
 		method.methodIndex = addMethod(method.class, method.name, method.sig)
-		
+
 		-- the rest goes in the method's extra info
 
 		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
@@ -1570,14 +1570,14 @@ print('checking method '..i..' = '..require'ext.tolua'(method))
 			end
 		end
 	end
-print('came up with '..#self.methodBlobs..' unique method signatures')
+--DEBUG:print('came up with '..#self.methodBlobs..' unique method signatures')
 
 	self.map = table()
 	self.map:insert{type='header_item', count=1, offset=0}
 
 	-- ok now all constants are accounted for ... start writing
 	local blob = WriteBlobLE()
-	
+
 	local function align(n)
 		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
 	end
@@ -1667,7 +1667,7 @@ print('came up with '..#self.methodBlobs..' unique method signatures')
 	end
 
 	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
-	local protoDefOfs 
+	local protoDefOfs
 	if #self.protos > 0 then
 		align(4)
 		ffi.cast('uint32_t*', blob.data.v + protoOfs)[0] = #blob
@@ -1697,7 +1697,7 @@ print('came up with '..#self.methodBlobs..' unique method signatures')
 		ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = #blob
 		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodBlobs}
 		for i,method in ipairs(self.methodBlobs) do
-print('writing method', i-1, require 'ext.string'.hex(method))
+--DEBUG:print('writing method', i-1, require 'ext.string'.hex(method))
 			assert.len(method, 8)
 			blob:writeString(method)
 		end
@@ -1706,21 +1706,21 @@ print('writing method', i-1, require 'ext.string'.hex(method))
 	-- fill in classdata
 	assert.gt(#self.classes, 0) 	-- otherwise why are we here...
 	align(4)
-print('write classDataOfs', #blob)
+--DEBUG:print('write classDataOfs', #blob)
 	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = #blob
 	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
 	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
 local startOfs = #blob
-print('writing class thisClassIndex', class.thisClassIndex)
+--DEBUG:print('writing class thisClassIndex', class.thisClassIndex)
 		blob:writeu4(class.thisClassIndex)
-print('writing class accessFlags', class.accessFlags)
+--DEBUG:print('writing class accessFlags', class.accessFlags)
 		blob:writeu4(class.accessFlags)
-print('writing class superClassIndex', class.superClassIndex)
+--DEBUG:print('writing class superClassIndex', class.superClassIndex)
 		blob:writeu4(class.superClassIndex)
-print('writing class interfaceIndex', class.interfaceIndex)
+--DEBUG:print('writing class interfaceIndex', class.interfaceIndex)
 		blob:writeu4(class.interfaceIndex)	-- fill in interface-offset later
-print('writing class sourceFileIndex', class.sourceFileIndex)
+--DEBUG:print('writing class sourceFileIndex', class.sourceFileIndex)
 		blob:writeu4(class.sourceFileIndex)
 		blob:writeu4(0)	-- fill in annotation-offset later
 		blob:writeu4(0)	-- fill in data-offset later
@@ -1764,7 +1764,7 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
 			if protoArgTypeListPtr[0] ~= 0 then
 				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
---DEBUG:print('setting protoArgTypeListPtr to', protoArgTypeListPtr[0])	
+--DEBUG:print('setting protoArgTypeListPtr to', protoArgTypeListPtr[0])
 			end
 		end
 		-- now replace all class interfaceIndexes
@@ -1822,13 +1822,13 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 			end
 		end
 	end
-	
+
 	align(4)
 	-- if we wrote anything, insert a map entry
 	if codeItemCount > 0 then
 		self.map:insert{type='code_item', offset=codeItemOfs, count=codeItemCount }
 	end
-	
+
 	-- now fill in class data
 	local classDataOfs = #blob
 	local classDataCount = 0
@@ -1853,7 +1853,7 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		-- collect all methods that are direct vs virtual
 		local directMethodIndexes = table() 	-- 1-based
 		local virtualMethodIndexes = table()	-- 1-based
-print('class data checking '..#self.methods..' methods')		
+--DEBUG:print('class data checking '..#self.methods..' methods')
 		for i,method in ipairs(self.methods) do
 			if method.class == class.thisClass
 			and (
@@ -1864,10 +1864,10 @@ print('class data checking '..#self.methods..' methods')
 				or method.isPrivate
 				or method.isConstructor
 				then
-print('class data adding method '..i..' to direct')					
+--DEBUG:print('class data adding method '..i..' to direct')
 					directMethodIndexes:insert(i)
 				else
-print('class data adding method '..i..' to virtual')					
+--DEBUG:print('class data adding method '..i..' to virtual')
 					virtualMethodIndexes:insert(i)
 				end
 			end
@@ -1903,7 +1903,7 @@ print('class data adding method '..i..' to virtual')
 			local function writeMethods(methodIndexes)
 				local lastMethodIndex = 1	-- from 1-based to 0-based
 				for _,methodIndex in ipairs(methodIndexes) do
-print('writing class data for method', methodIndex-1)
+--DEBUG:print('writing class data for method', methodIndex-1)
 					blob:writeUleb128(methodIndex - lastMethodIndex)
 					local method = self.methods[methodIndex]
 					blob:writeUleb128(method.accessFlags)
