@@ -81,6 +81,7 @@ local function instReadMethod(inst, index, asm)
 end
 
 
+-- TODO even bother with this, why not just read/write numbers?
 local function readreg(s)
 	return (assert(tonumber(s:match'^v(.*)$', 16)))
 end
@@ -89,121 +90,123 @@ local function readregopt(s)
 end
 
 
-local rw10x = {}
-function rw10x.read(inst, hi, blob, asm)
+local Instr = class()
+
+local Instr10x = Instr:subclass()
+function Instr10x.read(inst, hi, blob, asm)
 	inst:insert(hi)				-- NOTICE throws away hi
 end
-function rw10x.write(inst, blob, asm)
+function Instr10x.write(inst, blob, asm)
 	blob:writeu1(inst[2] or 0)
 end
 
-local rw12x = {}
-function rw12x.read(inst, hi, blob, asm)
+local Instr12x = Instr:subclass()
+function Instr12x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 end
-function rw12x.write(inst, blob, asm)
+function Instr12x.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
 	))
 end
 
-local rw11x = {}
-function rw11x.read(inst, hi, blob, asm)
+local Instr11x = Instr:subclass()
+function Instr11x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 end
-function rw11x.write(inst, blob, asm)
+function Instr11x.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 end
 
-local rw11n = {}
-function rw11n.read(inst, hi, blob, asm)
+local Instr11n = Instr:subclass()
+function Instr11n.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(0xf, hi), 1))	-- A = reg (4 bits)
 	inst:insert(bit.band(0xf, bit.rshift(hi, 8)))		-- B = signed 4 bit
 end
-function rw11n.write(inst, blob, asm)
+function Instr11n.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, inst[3]), 4)
 	))
 end
 
-local rw10t = {}
-function rw10t.read(inst, hi, blob, asm)
+local Instr10t = Instr:subclass()
+function Instr10t.read(inst, hi, blob, asm)
 	inst:insert(hi)					-- signed 8 bit branch offset
 end
-function rw10t.write(inst, blob, asm)
+function Instr10t.write(inst, blob, asm)
 	blob:writeu1(inst[2])
 end
 
-local rw22x = {}
-function rw22x.read(inst, hi, blob, asm)
+local Instr22x = Instr:subclass()
+function Instr22x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 end
-function rw22x.write(inst, blob, asm)
+function Instr22x.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(readreg(inst[3]))
 end
 
-local rw21s = {}
-function rw21s.read(inst, hi, blob, asm)
+local Instr21s = Instr:subclass()
+function Instr21s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:readu2())	-- signed
 end
-function rw21s.write(inst, blob, asm)
+function Instr21s.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(inst[3])
 end
 
-local rw21h = {}
-function rw21h.read(inst, hi, blob, asm)
+local Instr21h = Instr:subclass()
+function Instr21h.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:readu2())
 end
-function rw21h.write(inst, blob, asm)
+function Instr21h.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(inst[3])
 end
 
-local rw21c_string = {}
-function rw21c_string.read(inst, hi, blob, asm)
+local Instr21c_string = Instr:subclass()
+function Instr21c_string.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushString(inst, blob:readu2(), asm)
 end
-function rw21c_string.write(inst, blob, asm)
+function Instr21c_string.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadString(inst, 3, blob))
 end
 
-local rw21c_type = {}
-function rw21c_type.read(inst, hi, blob, asm)
+local Instr21c_type = Instr:subclass()
+function Instr21c_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushType(inst, blob:readu2(), asm)
 end
-function rw21c_type.write(inst, blob, asm)
+function Instr21c_type.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadType(inst, 3, blob))
 end
 
-local rw21c_field = {}
-function rw21c_field.read(inst, hi, blob, asm)
+local Instr21c_field = Instr:subclass()
+function Instr21c_field.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushField(inst, blob:readu2(), asm)
 end
-function rw21c_field.write(inst, blob, asm)
+function Instr21c_field.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadField(inst, 3, asm))
 end
 
-local rw22c_type = {}
-function rw22c_type.read(inst, hi, blob, asm)
+local Instr22c_type = Instr:subclass()
+function Instr22c_type.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	instPushType(inst, blob:readu2(), asm)
 end
-function rw22c_type.write(inst, blob, asm)
+function Instr22c_type.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
@@ -211,13 +214,13 @@ function rw22c_type.write(inst, blob, asm)
 	blob:writeu2(instReadType(inst, 4, asm))
 end
 
-local rw22c_field = {}
-function rw22c_field.read(inst, hi, blob, asm)
+local Instr22c_field = Instr:subclass()
+function Instr22c_field.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	instPushField(inst, blob:readu2(), asm)
 end
-function rw22c_field.write(inst, blob, asm)
+function Instr22c_field.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
@@ -225,35 +228,35 @@ function rw22c_field.write(inst, blob, asm)
 	blob:writeu2(instReadField(inst, 4, asm))
 end
 
-local rw23x = {}
-function rw23x.read(inst, hi, blob, asm)
+local Instr23x = Instr:subclass()
+function Instr23x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert('v'..bit.tohex(blob:readu1(), 2))	-- I'm sure I'm doign this wrong but it says vAA vBB vCC and that A is 8 bits and that the whole instruction reads 2 words, so *shrug* no sign of bitness of B or C
 	inst:insert('v'..bit.tohex(blob:readu1(), 2))
 end
-function rw23x.write(inst, blob, asm)
+function Instr23x.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu1(readreg(inst[3]))
 	blob:writeu1(readreg(inst[4]))
 end
 
-local rw20t = {}
-function rw20t.read(inst, hi, blob, asm)
+local Instr20t = Instr:subclass()
+function Instr20t.read(inst, hi, blob, asm)
 	inst:insert(blob:reads2())		-- signed
 	inst:insert(hi)		-- NOTICE throws away hi
 end
-function rw20t.write(inst, blob, asm)
+function Instr20t.write(inst, blob, asm)
 	blob:writeu1(inst[3] or 0)	-- out of order, throw-away is last
 	blob:writes2(inst[2])
 end
 
-local rw22t = {}
-function rw22t.read(inst, hi, blob, asm)
+local Instr22t = Instr:subclass()
+function Instr22t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	inst:insert(blob:reads2())
 end
-function rw22t.write(inst, blob, asm)
+function Instr22t.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
@@ -261,23 +264,23 @@ function rw22t.write(inst, blob, asm)
 	blob:writes2(inst[4])
 end
 
-local rw21t = {}
-function rw21t.read(inst, hi, blob, asm)
+local Instr21t = Instr:subclass()
+function Instr21t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:reads2())
 end
-function rw21t.write(inst, blob, asm)
+function Instr21t.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writes2(inst[3])
 end
 
-local rw22s = {}
-function rw22s.read(inst, hi, blob, asm)
+local Instr22s = Instr:subclass()
+function Instr22s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	inst:insert(blob:reads2())
 end
-function rw22s.write(inst, blob, asm)
+function Instr22s.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
@@ -285,13 +288,13 @@ function rw22s.write(inst, blob, asm)
 	blob:writes2(inst[4])
 end
 
-local rw22b = {}
-function rw22b.read(inst, hi, blob, asm)
+local Instr22b = Instr:subclass()
+function Instr22b.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	inst:insert(blob:reads2())	-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
 end
-function rw22b.write(inst, blob, asm)
+function Instr22b.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
@@ -299,60 +302,60 @@ function rw22b.write(inst, blob, asm)
 	blob:writes2(inst[4])
 end
 
-local rw21c_method = {}
-function rw21c_method.read(inst, hi, blob, asm)
+local Instr21c_method = Instr:subclass()
+function Instr21c_method.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushMethod(inst, blob:readu2(), asm)
 end
-function rw21c_method.write(inst, blob, asm)
+function Instr21c_method.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadMethod(inst, 3, asm))
 end
 
-local rw21c_proto = {}
-function rw21c_proto.read(inst, hi, blob, asm)
+local Instr21c_proto = Instr:subclass()
+function Instr21c_proto.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushProto(blob:readu2())
 end
-function rw21c_proto.write(inst, blob, asm)
+function Instr21c_proto.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadProto(inst, 3, asm))
 end
 
-local rw32x = {}
-function rw32x.read(inst, hi, blob, asm)
+local Instr32x = Instr:subclass()
+function Instr32x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 	inst:insert(hi)	-- NOTICE throws away hi
 end
-function rw32x.write(inst, blob, asm)
+function Instr32x.write(inst, blob, asm)
 	blob:writeu1(inst[4] or 0)
 	blob:writeu2(readreg(inst[2]))
 	blob:writeu2(readreg(inst[3]))
 end
 
-local rw31i = {}
-function rw31i.read(inst, hi, blob, asm)
+local Instr31i = Instr:subclass()
+function Instr31i.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:reads4())	-- will this be 4-byte aligned?
 end
-function rw31i.write(inst, blob, asm)
+function Instr31i.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writes4(inst[3])
 end
 
-local rw31c_string = {}
-function rw31c_string.read(inst, hi, blob, asm)
+local Instr31c_string = Instr:subclass()
+function Instr31c_string.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	instPushString(inst, blob:readu4(), asm)
 end
-function rw31c_string.write(inst, blob, asm)
+function Instr31c_string.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu4(instReadString(inst3, 3, asm))
 end
 
-local rw35c_type = {}
-function rw35c_type.read(inst, hi, blob, asm)
+local Instr35c_type = Instr:subclass()
+function Instr35c_type.read(inst, hi, blob, asm)
 	local argc = bit.band(hi, 0xf)
 	if argc < 1 or argc > 5 then
 		error(inst[1].." expected 1-5 args, found "..argc)
@@ -374,7 +377,7 @@ function rw35c_type.read(inst, hi, blob, asm)
 	}
 	inst:append(regs:sub(1, argc))
 end
-function rw35c_type.write(inst, blob, asm)
+function Instr35c_type.write(inst, blob, asm)
 	local argc = #inst - 2
 	if argc < 1 or argc > 5 then
 		error(inst[1].." expected 1-5 args, found "..argc)
@@ -393,8 +396,8 @@ function rw35c_type.write(inst, blob, asm)
 	))
 end
 
-local rw35c_method = {}
-function rw35c_method.read(inst, hi, blob, asm)
+local Instr35c_method = Instr:subclass()
+function Instr35c_method.read(inst, hi, blob, asm)
 	local argc = bit.band(hi, 0xf)
 	if argc < 0 or argc > 5 then
 		error(inst[1].." expected 0-5 args, found "..argc)
@@ -415,7 +418,7 @@ function rw35c_method.read(inst, hi, blob, asm)
 	}
 	inst:append(regs:sub(1, argc))
 end
-function rw35c_method.write(inst, blob, asm)
+function Instr35c_method.write(inst, blob, asm)
 	local argc = #inst - 4
 	if argc < 0 or argc > 5 then
 		error(inst[1].." expected 0-5 args, found "..argc)
@@ -434,81 +437,81 @@ function rw35c_method.write(inst, blob, asm)
 	))
 end
 
-local rw3rc_type = {}
-function rw3rc_type.read(inst, hi, blob, asm)
+local Instr3rc_type = Instr:subclass()
+function Instr3rc_type.read(inst, hi, blob, asm)
 	inst:insert(hi)	-- A = array size and argument word count ... N = A + C - 1
 	local typeIndex = blob:readu2()	-- B = type
 	instPushType(inst, typeIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
-function rw3rc_type.write(inst, blob, asm)
+function Instr3rc_type.write(inst, blob, asm)
 	blob:writeu1(inst[2])
 	blob:writeu2(instReadType(inst, 3, asm))
 	blob:writeu2(readreg(inst[4]))
 end
 
-local rw3rc_method = {}
-function rw3rc_method.read(inst, hi, blob, asm)
+local Instr3rc_method = Instr:subclass()
+function Instr3rc_method.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
 	local methodIndex = blob:readu2()	-- B = method
 	instPushMethod(inst, methodIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
-function rw3rc_method.write(inst, blob, asm)
+function Instr3rc_method.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writeu2(instReadType(inst, 3, asm))
 	blob:writeu2(readreg(inst[4]))
 end
 
-local rw31t = {}
-function rw31t.read(inst, hi, blob, asm)
+local Instr31t = Instr:subclass()
+function Instr31t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:reads4())	-- signed branch offset to table data pseudo-instruction
 end
-function rw31t.write(inst, blob, asm)
+function Instr31t.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:writes4(inst[3])
 end
 
-local rw30t = {}
-function rw30t.read(inst, hi, blob, asm)
+local Instr30t = Instr:subclass()
+function Instr30t.read(inst, hi, blob, asm)
 	inst:insert(blob:reads4())
 	inst:insert(hi)	-- NOTICE hi gets thrown away
 end
-function rw30t.write(inst, blob, asm)
+function Instr30t.write(inst, blob, asm)
 	blob:writeu1(inst[3] or 0)
 	blob:writes4(inst[2])
 end
 
-local rw35c_callsite = {}
-function rw35c_callsite.read(inst, hi, blob, asm)
+local Instr35c_callsite = Instr:subclass()
+function Instr35c_callsite.read(inst, hi, blob, asm)
 	-- TODO
 	inst:insert(hi)
 	inst:insert(blob:readu2())
 	inst:insert(blob:readu2())
 end
-function rw35c_callsite.write(inst, blob, asm)
+function Instr35c_callsite.write(inst, blob, asm)
 	blob:writeu1(inst[2])
 	blob:writeu2(inst[3])
 	blob:writeu2(inst[4])
 end
 
-local rw3rc_callsite = {}
-function rw3rc_callsite.read(inst, hi, blob, asm)
+local Instr3rc_callsite = Instr:subclass()
+function Instr3rc_callsite.read(inst, hi, blob, asm)
 	-- TODO
 	inst:insert(hi)
 	inst:insert(blob:readu2())
 	inst:insert(blob:readu2())
 end
-function rw3rc_callsite.write(inst, blob, asm)
+function Instr3rc_callsite.write(inst, blob, asm)
 	blob:writeu1(inst[2])
 	blob:writeu2(inst[3])
 	blob:writeu2(inst[4])
 end
 
 
-local rw45cc = {}
-function rw45cc.read(inst, hi, blob, asm)
+local Instr45cc = Instr:subclass()
+function Instr45cc.read(inst, hi, blob, asm)
 	local argc = bit.band(0xf, hi)
 	if argc < 1 or argc > 5 then
 		error(inst[1].." expected 1-5 args, found "..argc)
@@ -531,7 +534,7 @@ function rw45cc.read(inst, hi, blob, asm)
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(inst, protoIndex, asm)
 end
-function rw45cc.write(inst, blob, asm)
+function Instr45cc.write(inst, blob, asm)
 	local argc = #inst - 5
 	if argc < 1 or argc > 5 then
 		error(inst[1].." expected 1-5 args, found "..argc)
@@ -553,8 +556,8 @@ function rw45cc.write(inst, blob, asm)
 	blob:writeu2(instReadProto(inst, 11, asm))
 end
 
-local rw4rcc = {}
-function rw4rcc.read(inst, hi, blob, asm)
+local Instr4rcc = Instr:subclass()
+function Instr4rcc.read(inst, hi, blob, asm)
 	inst:insert(hi)	-- arg word count 8 bits
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
@@ -565,7 +568,7 @@ function rw4rcc.read(inst, hi, blob, asm)
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(inst, protoIndex, asm)
 end
-function rw4rcc.write(inst, blob, asm)
+function Instr4rcc.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, inst[2]),
 		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
@@ -575,273 +578,273 @@ function rw4rcc.write(inst, blob, asm)
 	blob:writeu2(instReadProto(inst, 8, asm))
 end
 
-local rw51l_double = {}
-function rw51l_double.read(inst, hi, blob, asm)
+local Instr51l_double = Instr:subclass()
+function Instr51l_double.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
 	inst:insert(blob:read'jdouble')
 end
-function rw51l_double.write(inst, blob, asm)
+function Instr51l_double.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
 	blob:write('jdouble', inst[3])
 end
 
 local instDescForOp = {
-	[0x00] = {name='nop', rw=rw10x},					-- 00 10x	nop	 	Waste cycles.	Note: Data-bearing pseudo-instructions are tagged with this opcode, in which case the high-order byte of the opcode unit indicates the nature of the data. See "packed-switch-payload Format", "sparse-switch-payload Format", and "fill-array-data-payload Format" below.
-	[0x01] = {name='move', rw=rw12x},					-- 01 12x	move vA, vB	A: destination register (4 bits) B: source register (4 bits)	Move the contents of one non-object register to another.
-	[0x02] = {name='move/from16', rw=rw22x},			-- 02 22x	move/from16 vAA, vBBBB	A: destination register (8 bits) B: source register (16 bits)	Move the contents of one non-object register to another.
-	[0x03] = {name='move/16', rw=rw32x},				-- 03 32x	move/16 vAAAA, vBBBB	A: destination register (16 bits) B: source register (16 bits)	Move the contents of one non-object register to another.
-	[0x04] = {name='move-wide', rw=rw12x},				-- 04 12x	move-wide vA, vB	A: destination register pair (4 bits) B: source register pair (4 bits)	Move the contents of one register-pair to another. Note: It is legal to move from vN to either vN-1 or vN+1, so implementations must arrange for both halves of a register pair to be read before anything is written.
-	[0x05] = {name='move-wide/from16', rw=rw22x},		-- 05 22x	move-wide/from16 vAA, vBBBB	A: destination register pair (8 bits) B: source register pair (16 bits)	Move the contents of one register-pair to another. Note: Implementation considerations are the same as move-wide, above.
-	[0x06] = {name='move-wide/16', rw=rw32x},			-- 06 32x	move-wide/16 vAAAA, vBBBB	A: destination register pair (16 bits) B: source register pair (16 bits)	Move the contents of one register-pair to another. Note: Implementation considerations are the same as move-wide, above.
-	[0x07] = {name='move-object', rw=rw12x},			-- 07 12x	move-object vA, vB	A: destination register (4 bits) B: source register (4 bits)	Move the contents of one object-bearing register to another.
-	[0x08] = {name='move-object/from16', rw=rw22x},		-- 08 22x	move-object/from16 vAA, vBBBB	A: destination register (8 bits) B: source register (16 bits)	Move the contents of one object-bearing register to another.
-	[0x09] = {name='move-object/16', rw=rw32x},			-- 09 32x	move-object/16 vAAAA, vBBBB	A: destination register (16 bits) B: source register (16 bits)	Move the contents of one object-bearing register to another.
-	[0x0a] = {name='move-result', rw=rw11x},			-- 0a 11x	move-result vAA	A: destination register (8 bits)	Move the single-word non-object result of the most recent invoke-kind into the indicated register. This must be done as the instruction immediately after an invoke-kind whose (single-word, non-object) result is not to be ignored; anywhere else is invalid.
-	[0x0b] = {name='move-result-wide', rw=rw11x},			-- 0b 11x	move-result-wide vAA	A: destination register pair (8 bits)	Move the double-word result of the most recent invoke-kind into the indicated register pair. This must be done as the instruction immediately after an invoke-kind whose (double-word) result is not to be ignored; anywhere else is invalid.
-	[0x0c] = {name='move-result-object', rw=rw11x},			-- 0c 11x	move-result-object vAA	A: destination register (8 bits)	Move the object result of the most recent invoke-kind into the indicated register. This must be done as the instruction immediately after an invoke-kind or filled-new-array whose (object) result is not to be ignored; anywhere else is invalid.
-	[0x0d] = {name='move-exception', rw=rw11x},			-- 0d 11x	move-exception vAA	A: destination register (8 bits)	Save a just-caught exception into the given register. This must be the first instruction of any exception handler whose caught exception is not to be ignored, and this instruction must only ever occur as the first instruction of an exception handler; anywhere else is invalid.
-	[0x0e] = {name='return-void', rw=rw10x},			-- 0e 10x	return-void	 	Return from a void method.
-	[0x0f] = {name='return', rw=rw11x},			-- 0f 11x	return vAA	A: return value register (8 bits)	Return from a single-width (32-bit) non-object value-returning method.
-	[0x10] = {name='return-wide', rw=rw11x},			-- 10 11x	return-wide vAA	A: return value register-pair (8 bits)	Return from a double-width (64-bit) value-returning method.
-	[0x11] = {name='return-object', rw=rw11x},			-- 11 11x	return-object vAA	A: return value register (8 bits)	Return from an object-returning method.
-	[0x12] = {name='const/4', rw=rw11n},			-- 12 11n	const/4 vA, #+B	A: destination register (4 bits) B: signed int (4 bits)	Move the given literal value (sign-extended to 32 bits) into the specified register.
-	[0x13] = {name='const/16', rw=rw21s},			-- 13 21s	const/16 vAA, #+BBBB	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (sign-extended to 32 bits) into the specified register.
-	[0x14] = {name='const', rw=rw31i},			-- 14 31i	const vAA, #+BBBBBBBB	A: destination register (8 bits) B: arbitrary 32-bit constant	Move the given literal value into the specified register.
-	[0x15] = {name='const/high16', rw=rw21h},			-- 15 21h	const/high16 vAA, #+BBBB0000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 32 bits) into the specified register.
-	[0x16] = {name='const-wide/16', rw=rw21s},			-- 16 21s	const-wide/16 vAA, #+BBBB	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
-	[0x17] = {name='const-wide/32', rw=rw31i},			-- 17 31i	const-wide/32 vAA, #+BBBBBBBB	A: destination register (8 bits) B: signed int (32 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
-	[0x18] = {name='const-wide', rw=rw51l_double},			-- 18 51l	const-wide vAA, #+BBBBBBBBBBBBBBBB	A: destination register (8 bits) B: arbitrary double-width (64-bit) constant	Move the given literal value into the specified register-pair.
-	[0x19] = {name='const-wide/high16', rw=rw21h},			-- 19 21h	const-wide/high16 vAA, #+BBBB000000000000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 64 bits) into the specified register-pair.
-	[0x1a] = {name='const-string', rw=rw21c_string},			-- 1a 21c	const-string vAA, string@BBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
-	[0x1b] = {name='const-string/jumbo', rw=rw31c_string},			-- 1b 31c	const-string/jumbo vAA, string@BBBBBBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
-	[0x1c] = {name='const-class', rw=rw21c_type},			-- 1c 21c	const-class vAA, type@BBBB	A: destination register (8 bits) B: type index	Move a reference to the class specified by the given index into the specified register. In the case where the indicated type is primitive, this will store a reference to the primitive type's degenerate class.
-	[0x1d] = {name='monitor-enter', rw=rw11x},			-- 1d 11x	monitor-enter vAA	A: reference-bearing register (8 bits)	Acquire the monitor for the indicated object.
-	[0x1e] = {name='monitor-exit', rw=rw11x},			-- 1e 11x	monitor-exit vAA	A: reference-bearing register (8 bits)	Release the monitor for the indicated object. Note: If this instruction needs to throw an exception, it must do so as if the pc has already advanced past the instruction. It may be useful to think of this as the instruction successfully executing (in a sense), and the exception getting thrown after the instruction but before the next one gets a chance to run. This definition makes it possible for a method to use a monitor cleanup catch-all (e.g., finally) block as the monitor cleanup for that block itself, as a way to handle the arbitrary exceptions that might get thrown due to the historical implementation of Thread.stop(), while still managing to have proper monitor hygiene.
-	[0x1f] = {name='check-cast', rw=rw21c_type},			-- 1f 21c	check-cast vAA, type@BBBB	A: reference-bearing register (8 bits) B: type index (16 bits)	Throw a ClassCastException if the reference in the given register cannot be cast to the indicated type. Note: Since A must always be a reference (and not a primitive value), this will necessarily fail at runtime (that is, it will throw an exception) if B refers to a primitive type.
-	[0x20] = {name='instance-of', rw=rw22c_type},			-- 20 22c	instance-of vA, vB, type@CCCC	A: destination register (4 bits) B: reference-bearing register (4 bits) C: type index (16 bits)	Store in the given destination register 1 if the indicated reference is an instance of the given type, or 0 if not. Note: Since B must always be a reference (and not a primitive value), this will always result in 0 being stored if C refers to a primitive type.
-	[0x21] = {name='array-length', rw=rw12x},			-- 21 12x	array-length vA, vB	A: destination register (4 bits) B: array reference-bearing register (4 bits)	Store in the given destination register the length of the indicated array, in entries
-	[0x22] = {name='new-instance', rw=rw21c_type},			-- 22 21c	new-instance vAA, type@BBBB	A: destination register (8 bits) B: type index	Construct a new instance of the indicated type, storing a reference to it in the destination. The type must refer to a non-array class.
-	[0x23] = {name='new-array', rw=rw22c_type},			-- 23 22c	new-array vA, vB, type@CCCC	A: destination register (4 bits) B: size register C: type index	Construct a new array of the indicated type and size. The type must be an array type.
-	[0x24] = {name='filled-new-array', rw=rw35c_type},			-- 24 35c	filled-new-array {vC, vD, vE, vF, vG}, type@BBBB	A: array size and argument word count (4 bits) B: type index (16 bits) C..G: argument registers (4 bits each)	Construct an array of the given type and size, filling it with the supplied contents. The type must be an array type. The array's contents must be single-word (that is, no arrays of long or double, but reference types are acceptable). The constructed instance is stored as a "result" in the same way that the method invocation instructions store their results, so the constructed instance must be moved to a register with an immediately subsequent move-result-object instruction (if it is to be used).
-	[0x25] = {name='filled-new-array/range', rw=rw3rc_type},			-- 25 3rc	filled-new-array/range {vCCCC .. vNNNN}, type@BBBB	A: array size and argument word count (8 bits) B: type index (16 bits) C: first argument register (16 bits) N = A + C - 1	Construct an array of the given type and size, filling it with the supplied contents. Clarifications and restrictions are the same as filled-new-array, described above.
-	[0x26] = {name='fill-array-data', rw=rw31t},			-- 26 31t	fill-array-data vAA, +BBBBBBBB (with supplemental data as specified below in "fill-array-data-payload Format")	A: array reference (8 bits) B: signed "branch" offset to table data pseudo-instruction (32 bits)	Fill the given array with the indicated data. The reference must be to an array of primitives, and the data table must match it in type and must contain no more elements than will fit in the array. That is, the array may be larger than the table, and if so, only the initial elements of the array are set, leaving the remainder alone.
-	[0x27] = {name='throw', rw=rw11x},			-- 27 11x	throw vAA	A: exception-bearing register (8 bits) Throw the indicated exception.
-	[0x28] = {name='goto', rw=rw10t},			-- 28 10t	goto +AA	A: signed branch offset (8 bits)	Unconditionally jump to the indicated instruction. Note: The branch offset must not be 0. (A spin loop may be legally constructed either with goto/32 or by including a nop as a target before the branch.)
-	[0x29] = {name='goto/16', rw=rw20t},			-- 29 20t	goto/16 +AAAA	A: signed branch offset (16 bits) Unconditionally jump to the indicated instruction. Note: The branch offset must not be 0. (A spin loop may be legally constructed either with goto/32 or by including a nop as a target before the branch.)
-	[0x2a] = {name='goto/32', rw=rw30t},			-- 2a 30t	goto/32 +AAAAAAAA	A: signed branch offset (32 bits) Unconditionally jump to the indicated instruction.
-	[0x2b] = {name='packed-switch', rw=rw31t},			-- 2b 31t	packed-switch vAA, +BBBBBBBB (with supplemental data as specified below in "packed-switch-payload Format")	A: register to test B: signed "branch" offset to table data pseudo-instruction (32 bits)	Jump to a new instruction based on the value in the given register, using a table of offsets corresponding to each value in a particular integral range, or fall through to the next instruction if there is no match.
-	[0x2c] = {name='sparse-switch', rw=rw31t},			-- 2c 31t	sparse-switch vAA, +BBBBBBBB (with supplemental data as specified below in "sparse-switch-payload Format")	A: register to test B: signed "branch" offset to table data pseudo-instruction (32 bits)	Jump to a new instruction based on the value in the given register, using an ordered table of value-offset pairs, or fall through to the next instruction if there is no match.
-	[0x2d] = {name='cmpl-float', rw=rw23x},			-- 2d 23x	cmpl-float vAA, vBB, vCC
-	[0x2e] = {name='cmpg-float', rw=rw23x},			-- 2e 23x	cmpg-float vAA, vBB, vCC
-	[0x2f] = {name='cmpl-double', rw=rw23x},			-- 2f 23x	cmpl-double vAA, vBB, vCC
-	[0x30] = {name='cmpg-double', rw=rw23x},			-- 30 23x	cmpg-double vAA, vBB, vCC
-	[0x31] = {name='cmp-long', rw=rw23x},			-- 31 23x	cmp-long vAA, vBB, vCC		A: destination register (8 bits) B: first source register or pair C: second source register or pair	Perform the indicated floating point or long comparison, setting a to 0 if b == c, 1 if b > c, or -1 if b < c. The "bias" listed for the floating point operations indicates how NaN comparisons are treated: "gt bias" instructions return 1 for NaN comparisons, and "lt bias" instructions return -1. For example, to check to see if floating point x < y it is advisable to use cmpg-float; a result of -1 indicates that the test was true, and the other values indicate it was false either due to a valid comparison or because one of the values was NaN.
-	[0x32] = {name='if-eq', rw=rw22t},			-- 32 22t	if-eq vA, vB, +CCCC
-	[0x33] = {name='if-ne', rw=rw22t},			-- 33 22t	if-ne vA, vB, +CCCC
-	[0x34] = {name='if-lt', rw=rw22t},			-- 34 22t	if-lt vA, vB, +CCCC
-	[0x35] = {name='if-ge', rw=rw22t},			-- 35 22t	if-ge vA, vB, +CCCC
-	[0x36] = {name='if-gt', rw=rw22t},			-- 36 22t	if-gt vA, vB, +CCCC
-	[0x37] = {name='if-le', rw=rw22t},			-- 37 22t	if-le vA, vB, +CCCC A: first register to test (4 bits) B: second register to test (4 bits) C: signed branch offset (16 bits)	Branch to the given destination if the given two registers' values compare as specified. Note: The branch offset must not be 0. (A spin loop may be legally constructed either by branching around a backward goto or by including a nop as a target before the branch.)
-	[0x38] = {name='if-eqz', rw=rw21t},			-- 38 21t	if-eqz vAA, +BBBB
-	[0x39] = {name='if-nez', rw=rw21t},			-- 39 21t	if-nez vAA, +BBBB
-	[0x3a] = {name='if-ltz', rw=rw21t},			-- 3a 21t	if-ltz vAA, +BBBB
-	[0x3b] = {name='if-gez', rw=rw21t},			-- 3b 21t	if-gez vAA, +BBBB
-	[0x3c] = {name='if-gtz', rw=rw21t},			-- 3c 21t	if-gtz vAA, +BBBB
-	[0x3d] = {name='if-lez', rw=rw21t},			-- 3d 21t	if-lez vAA, +BBBB A: register to test (8 bits) B: signed branch offset (16 bits)	Branch to the given destination if the given register's value compares with 0 as specified. Note: The branch offset must not be 0. (A spin loop may be legally constructed either by branching around a backward goto or by including a nop as a target before the branch.)
-	[0x3e] = {name='unused', rw=rw10x},			-- 3e 10x	unused	 	unused
-	[0x3f] = {name='unused', rw=rw10x},			-- 3f 10x	unused	 	unused
-	[0x40] = {name='unused', rw=rw10x},			-- 40 10x	unused	 	unused
-	[0x41] = {name='unused', rw=rw10x},			-- 41 10x	unused	 	unused
-	[0x42] = {name='unused', rw=rw10x},			-- 42 10x	unused	 	unused
-	[0x43] = {name='unused', rw=rw10x},			-- 43 10x	unused	 	unused
-	[0x44] = {name='aget', rw=rw23x},			-- 44 23x	aget vAA, vBB, vCC
-	[0x45] = {name='aget-wide', rw=rw23x},			-- 45 23x	aget-wide vAA, vBB, vCC
-	[0x46] = {name='aget-object', rw=rw23x},			-- 46 23x	aget-object vAA, vBB, vCC
-	[0x47] = {name='aget-boolean', rw=rw23x},			-- 47 23x	aget-boolean vAA, vBB, vCC
-	[0x48] = {name='aget-byte', rw=rw23x},			-- 48 23x	aget-byte vAA, vBB, vCC
-	[0x49] = {name='aget-char', rw=rw23x},			-- 49 23x	aget-char vAA, vBB, vCC
-	[0x4a] = {name='aget-short', rw=rw23x},			-- 4a 23x	aget-short vAA, vBB, vCC
-	[0x4b] = {name='aput', rw=rw23x},			-- 4b 23x	aput vAA, vBB, vCC
-	[0x4c] = {name='aput-wide', rw=rw23x},			-- 4c 23x	aput-wide vAA, vBB, vCC
-	[0x4d] = {name='aput-object', rw=rw23x},			-- 4d 23x	aput-object vAA, vBB, vCC
-	[0x4e] = {name='aput-boolean', rw=rw23x},			-- 4e 23x	aput-boolean vAA, vBB, vCC
-	[0x4f] = {name='aput-byte', rw=rw23x},			-- 4f 23x	aput-byte vAA, vBB, vCC
-	[0x50] = {name='aput-char', rw=rw23x},			-- 50 23x	aput-char vAA, vBB, vCC
-	[0x51] = {name='aput-short', rw=rw23x},			-- 51 23x	aput-short vAA, vBB, vCC	A: value register or pair; may be source or dest (8 bits) B: array register (8 bits) C: index register (8 bits)	Perform the identified array operation at the identified index of the given array, loading or storing into the value register.
-	[0x52] = {name='iget', rw=rw22c_field},			-- 52 22c	iget vA, vB, field@CCCC
-	[0x53] = {name='iget-wide', rw=rw22c_field},			-- 53 22c	iget-wide vA, vB, field@CCCC
-	[0x54] = {name='iget-object', rw=rw22c_field},			-- 54 22c	iget-object vA, vB, field@CCCC
-	[0x55] = {name='iget-boolean', rw=rw22c_field},			-- 55 22c	iget-boolean vA, vB, field@CCCC
-	[0x56] = {name='iget-byte', rw=rw22c_field},			-- 56 22c	iget-byte vA, vB, field@CCCC
-	[0x57] = {name='iget-char', rw=rw22c_field},			-- 57 22c	iget-char vA, vB, field@CCCC
-	[0x58] = {name='iget-short', rw=rw22c_field},			-- 58 22c	iget-short vA, vB, field@CCCC
-	[0x59] = {name='iput', rw=rw22c_field},			-- 59 22c	iput vA, vB, field@CCCC
-	[0x5a] = {name='iput-wide', rw=rw22c_field},			-- 5a 22c	iput-wide vA, vB, field@CCCC
-	[0x5b] = {name='iput-object', rw=rw22c_field},			-- 5b 22c	iput-object vA, vB, field@CCCC
-	[0x5c] = {name='iput-boolean', rw=rw22c_field},			-- 5c 22c	iput-boolean vA, vB, field@CCCC
-	[0x5d] = {name='iput-byte', rw=rw22c_field},			-- 5d 22c	iput-byte vA, vB, field@CCCC
-	[0x5e] = {name='iput-char', rw=rw22c_field},			-- 5e 22c	iput-char vA, vB, field@CCCC
-	[0x5f] = {name='iput-short', rw=rw22c_field},			-- 5f 22c	iput-short vA, vB, field@CCCC	A: value register or pair; may be source or dest (4 bits) B: object register (4 bits) C: instance field reference index (16 bits)	Perform the identified object instance field operation with the identified field, loading or storing into the value register. Note: These opcodes are reasonable candidates for static linking, altering the field argument to be a more direct offset.
-	[0x60] = {name='sget', rw=rw21c_field},			-- 60 21c	sget vAA, field@BBBB
-	[0x61] = {name='sget-wide', rw=rw21c_field},			-- 61 21c	sget-wide vAA, field@BBBB
-	[0x62] = {name='sget-object', rw=rw21c_field},			-- 62 21c	sget-object vAA, field@BBBB
-	[0x63] = {name='sget-boolean', rw=rw21c_field},			-- 63 21c	sget-boolean vAA, field@BBBB
-	[0x64] = {name='sget-byte', rw=rw21c_field},			-- 64 21c	sget-byte vAA, field@BBBB
-	[0x65] = {name='sget-char', rw=rw21c_field},			-- 65 21c	sget-char vAA, field@BBBB
-	[0x66] = {name='sget-short', rw=rw21c_field},			-- 66 21c	sget-short vAA, field@BBBB
-	[0x67] = {name='sput', rw=rw21c_field},			-- 67 21c	sput vAA, field@BBBB
-	[0x68] = {name='sput-wide', rw=rw21c_field},			-- 68 21c	sput-wide vAA, field@BBBB
-	[0x69] = {name='sput-object', rw=rw21c_field},			-- 69 21c	sput-object vAA, field@BBBB
-	[0x6a] = {name='sput-boolean', rw=rw21c_field},			-- 6a 21c	sput-boolean vAA, field@BBBB
-	[0x6b] = {name='sput-byte', rw=rw21c_field},			-- 6b 21c	sput-byte vAA, field@BBBB
-	[0x6c] = {name='sput-char', rw=rw21c_field},			-- 6c 21c	sput-char vAA, field@BBBB
-	[0x6d] = {name='sput-short', rw=rw21c_field},			-- 6d 21c	sput-short vAA, field@BBBB	A: value register or pair; may be source or dest (8 bits) B: static field reference index (16 bits)	Perform the identified object static field operation with the identified static field, loading or storing into the value register. Note: These opcodes are reasonable candidates for static linking, altering the field argument to be a more direct offset.
-	[0x6e] = {name='invoke-virtual', rw=rw35c_method},			-- 6e 35c	invoke-virtual {vC, vD, vE, vF, vG}, meth@BBBB
-	[0x6f] = {name='invoke-super', rw=rw35c_method},			-- 6f 35c	invoke-super {vC, vD, vE, vF, vG}, meth@BBBB
-	[0x70] = {name='invoke-direct', rw=rw35c_method},			-- 70 35c	invoke-direct {vC, vD, vE, vF, vG}, meth@BBBB
-	[0x71] = {name='invoke-static', rw=rw35c_method},			-- 71 35c	invoke-static {vC, vD, vE, vF, vG}, meth@BBBB
-	[0x72] = {name='invoke-interface', rw=rw35c_method},			-- 72 35c	invoke-interface {vC, vD, vE, vF, vG}, meth@BBBB	A: argument word count (4 bits) B: method reference index (16 bits) C..G: argument registers (4 bits each)	Call the indicated method. The result (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. invoke-virtual is used to invoke a normal virtual method which is a method that isn't static, private or a constructor. When the method_id references a method of a non-interface class, invoke-super is used to invoke the closest superclass's virtual method (as opposed to the one with the same method_id in the calling class). The same method restrictions hold as for invoke-virtual. In Dex files version 037 or later, if the method_id refers to an interface method, invoke-super is used to invoke the most specific, non-overridden version of that method defined on that interface. The same method restrictions hold as for invoke-virtual. In Dex files prior to version 037, having an interface method_id is illegal and undefined. invoke-direct is used to invoke a non-static direct method (that is, an instance method that is by its nature non-overridable, namely either a private instance method or a constructor). invoke-static is used to invoke a static method (which is always considered a direct method). invoke-interface is used to invoke an interface method, that is, on an object whose concrete class isn't known, using a method_id that refers to an interface. Note: These opcodes are reasonable candidates for static linking, altering the method argument to be a more direct offset (or pair thereof).
-	[0x73] = {name='unused', rw=rw10x},			-- 73 10x	unused		unused
-	[0x74] = {name='invoke-virtual/range', rw=rw3rc_method},			-- 74 3rc	invoke-virtual/range {vCCCC .. vNNNN}, meth@BBBB
-	[0x75] = {name='invoke-super/range', rw=rw3rc_method},			-- 75 3rc	invoke-super/range {vCCCC .. vNNNN}, meth@BBBB
-	[0x76] = {name='invoke-direct/range', rw=rw3rc_method},			-- 76 3rc	invoke-direct/range {vCCCC .. vNNNN}, meth@BBBB
-	[0x77] = {name='invoke-static/range', rw=rw3rc_method},			-- 77 3rc	invoke-static/range {vCCCC .. vNNNN}, meth@BBBB
-	[0x78] = {name='invoke-interface/range', rw=rw3rc_method},			-- 78 3rc	invoke-interface/range {vCCCC .. vNNNN}, meth@BBBB	A: argument word count (8 bits) B: method reference index (16 bits) C: first argument register (16 bits) N = A + C - 1	Call the indicated method. See first invoke-kind description above for details, caveats, and suggestions.
-	[0x79] = {name='unused', rw=rw10x},			-- 79 10x	unused		unused
-	[0x7a] = {name='unused', rw=rw10x},			-- 7a 10x	unused		unused
-	[0x7b] = {name='neg-int', rw=rw12x},			-- 7b 12x	neg-int vA, vB
-	[0x7c] = {name='not-int', rw=rw12x},			-- 7c 12x	not-int vA, vB
-	[0x7d] = {name='neg-long', rw=rw12x},			-- 7d 12x	neg-long vA, vB
-	[0x7e] = {name='not-long', rw=rw12x},			-- 7e 12x	not-long vA, vB
-	[0x7f] = {name='neg-float', rw=rw12x},			-- 7f 12x	neg-float vA, vB
-	[0x80] = {name='neg-double', rw=rw12x},			-- 80 12x	neg-double vA, vB
-	[0x81] = {name='int-to-long', rw=rw12x},			-- 81 12x	int-to-long vA, vB
-	[0x82] = {name='int-to-float', rw=rw12x},			-- 82 12x	int-to-float vA, vB
-	[0x83] = {name='int-to-double', rw=rw12x},			-- 83 12x	int-to-double vA, vB
-	[0x84] = {name='long-to-int', rw=rw12x},			-- 84 12x	long-to-int vA, vB
-	[0x85] = {name='long-to-float', rw=rw12x},			-- 85 12x	long-to-float vA, vB
-	[0x86] = {name='long-to-double', rw=rw12x},			-- 86 12x	long-to-double vA, vB
-	[0x87] = {name='float-to-int', rw=rw12x},			-- 87 12x	float-to-int vA, vB
-	[0x88] = {name='float-to-long', rw=rw12x},			-- 88 12x	float-to-long vA, vB
-	[0x89] = {name='float-to-double', rw=rw12x},			-- 89 12x	float-to-double vA, vB
-	[0x8a] = {name='double-to-int', rw=rw12x},			-- 8a 12x	double-to-int vA, vB
-	[0x8b] = {name='double-to-long', rw=rw12x},			-- 8b 12x	double-to-long vA, vB
-	[0x8c] = {name='double-to-float', rw=rw12x},			-- 8c 12x	double-to-float vA, vB
-	[0x8d] = {name='int-to-byte', rw=rw12x},			-- 8d 12x	int-to-byte vA, vB
-	[0x8e] = {name='int-to-char', rw=rw12x},			-- 8e 12x	int-to-char vA, vB
-	[0x8f] = {name='int-to-short', rw=rw12x},			-- 8f 12x	int-to-short vA, vB	A: destination register or pair (4 bits) B: source register or pair (4 bits)	Perform the identified unary operation on the source register, storing the result in the destination register.
-	[0x90] = {name='add-int', rw=rw23x},			-- 90 23x	add-int vAA, vBB, vCC
-	[0x91] = {name='sub-int', rw=rw23x},			-- 91 23x	sub-int vAA, vBB, vCC
-	[0x92] = {name='mul-int', rw=rw23x},			-- 92 23x	mul-int vAA, vBB, vCC
-	[0x93] = {name='div-int', rw=rw23x},			-- 93 23x	div-int vAA, vBB, vCC
-	[0x94] = {name='rem-int', rw=rw23x},			-- 94 23x	rem-int vAA, vBB, vCC
-	[0x95] = {name='and-int', rw=rw23x},			-- 95 23x	and-int vAA, vBB, vCC
-	[0x96] = {name='or-int', rw=rw23x},			-- 96 23x	or-int vAA, vBB, vCC
-	[0x97] = {name='xor-int', rw=rw23x},			-- 97 23x	xor-int vAA, vBB, vCC
-	[0x98] = {name='shl-int', rw=rw23x},			-- 98 23x	shl-int vAA, vBB, vCC
-	[0x99] = {name='shr-int', rw=rw23x},			-- 99 23x	shr-int vAA, vBB, vCC
-	[0x9a] = {name='ushr-int', rw=rw23x},			-- 9a 23x	ushr-int vAA, vBB, vCC
-	[0x9b] = {name='add-long', rw=rw23x},			-- 9b 23x	add-long vAA, vBB, vCC
-	[0x9c] = {name='sub-long', rw=rw23x},			-- 9c 23x	sub-long vAA, vBB, vCC
-	[0x9d] = {name='mul-long', rw=rw23x},			-- 9d 23x	mul-long vAA, vBB, vCC
-	[0x9e] = {name='div-long', rw=rw23x},			-- 9e 23x	div-long vAA, vBB, vCC
-	[0x9f] = {name='rem-long', rw=rw23x},			-- 9f 23x	rem-long vAA, vBB, vCC
-	[0xa0] = {name='and-long', rw=rw23x},			-- a0 23x	and-long vAA, vBB, vCC
-	[0xa1] = {name='or-long', rw=rw23x},			-- a1 23x	or-long vAA, vBB, vCC
-	[0xa2] = {name='xor-long', rw=rw23x},			-- a2 23x	xor-long vAA, vBB, vCC
-	[0xa3] = {name='shl-long', rw=rw23x},			-- a3 23x	shl-long vAA, vBB, vCC
-	[0xa4] = {name='shr-long', rw=rw23x},			-- a4 23x	shr-long vAA, vBB, vCC
-	[0xa5] = {name='ushr-long', rw=rw23x},			-- a5 23x	ushr-long vAA, vBB, vCC
-	[0xa6] = {name='add-float', rw=rw23x},			-- a6 23x	add-float vAA, vBB, vCC
-	[0xa7] = {name='sub-float', rw=rw23x},			-- a7 23x	sub-float vAA, vBB, vCC
-	[0xa8] = {name='mul-float', rw=rw23x},			-- a8 23x	mul-float vAA, vBB, vCC
-	[0xa9] = {name='div-float', rw=rw23x},			-- a9 23x	div-float vAA, vBB, vCC
-	[0xaa] = {name='rem-float', rw=rw23x},			-- aa 23x	rem-float vAA, vBB, vCC
-	[0xab] = {name='add-double', rw=rw23x},			-- ab 23x	add-double vAA, vBB, vCC
-	[0xac] = {name='sub-double', rw=rw23x},			-- ac 23x	sub-double vAA, vBB, vCC
-	[0xad] = {name='mul-double', rw=rw23x},			-- ad 23x	mul-double vAA, vBB, vCC
-	[0xae] = {name='div-double', rw=rw23x},			-- ae 23x	div-double vAA, vBB, vCC
-	[0xaf] = {name='rem-double', rw=rw23x},			-- af 23x	rem-double vAA, vBB, vCC	A: destination register or pair (8 bits) B: first source register or pair (8 bits) C: second source register or pair (8 bits)	Perform the identified binary operation on the two source registers, storing the result in the destination register. Note: Contrary to other -long mathematical operations (which take register pairs for both their first and their second source), shl-long, shr-long, and ushr-long take a register pair for their first source (the value to be shifted), but a single register for their second source (the shifting distance).
-	[0xb0] = {name='add-int/2addr', rw=rw12x},			-- b0 12x	add-int/2addr vA, vB
-	[0xb1] = {name='sub-int/2addr', rw=rw12x},			-- b1 12x	sub-int/2addr vA, vB
-	[0xb2] = {name='mul-int/2addr', rw=rw12x},			-- b2 12x	mul-int/2addr vA, vB
-	[0xb3] = {name='div-int/2addr', rw=rw12x},			-- b3 12x	div-int/2addr vA, vB
-	[0xb4] = {name='rem-int/2addr', rw=rw12x},			-- b4 12x	rem-int/2addr vA, vB
-	[0xb5] = {name='and-int/2addr', rw=rw12x},			-- b5 12x	and-int/2addr vA, vB
-	[0xb6] = {name='or-int/2addr', rw=rw12x},			-- b6 12x	or-int/2addr vA, vB
-	[0xb7] = {name='xor-int/2addr', rw=rw12x},			-- b7 12x	xor-int/2addr vA, vB
-	[0xb8] = {name='shl-int/2addr', rw=rw12x},			-- b8 12x	shl-int/2addr vA, vB
-	[0xb9] = {name='shr-int/2addr', rw=rw12x},			-- b9 12x	shr-int/2addr vA, vB
-	[0xba] = {name='ushr-int/2addr', rw=rw12x},			-- ba 12x	ushr-int/2addr vA, vB
-	[0xbb] = {name='add-long/2addr', rw=rw12x},			-- bb 12x	add-long/2addr vA, vB
-	[0xbc] = {name='sub-long/2addr', rw=rw12x},			-- bc 12x	sub-long/2addr vA, vB
-	[0xbd] = {name='mul-long/2addr', rw=rw12x},			-- bd 12x	mul-long/2addr vA, vB
-	[0xbe] = {name='div-long/2addr', rw=rw12x},			-- be 12x	div-long/2addr vA, vB
-	[0xbf] = {name='rem-long/2addr', rw=rw12x},			-- bf 12x	rem-long/2addr vA, vB
-	[0xc0] = {name='and-long/2addr', rw=rw12x},			-- c0 12x	and-long/2addr vA, vB
-	[0xc1] = {name='or-long/2addr', rw=rw12x},			-- c1 12x	or-long/2addr vA, vB
-	[0xc2] = {name='xor-long/2addr', rw=rw12x},			-- c2 12x	xor-long/2addr vA, vB
-	[0xc3] = {name='shl-long/2addr', rw=rw12x},			-- c3 12x	shl-long/2addr vA, vB
-	[0xc4] = {name='shr-long/2addr', rw=rw12x},			-- c4 12x	shr-long/2addr vA, vB
-	[0xc5] = {name='ushr-long/2addr', rw=rw12x},			-- c5 12x	ushr-long/2addr vA, vB
-	[0xc6] = {name='add-float/2addr', rw=rw12x},			-- c6 12x	add-float/2addr vA, vB
-	[0xc7] = {name='sub-float/2addr', rw=rw12x},			-- c7 12x	sub-float/2addr vA, vB
-	[0xc8] = {name='mul-float/2addr', rw=rw12x},			-- c8 12x	mul-float/2addr vA, vB
-	[0xc9] = {name='div-float/2addr', rw=rw12x},			-- c9 12x	div-float/2addr vA, vB
-	[0xca] = {name='rem-float/2addr', rw=rw12x},			-- ca 12x	rem-float/2addr vA, vB
-	[0xcb] = {name='add-double/2addr', rw=rw12x},			-- cb 12x	add-double/2addr vA, vB
-	[0xcc] = {name='sub-double/2addr', rw=rw12x},			-- cc 12x	sub-double/2addr vA, vB
-	[0xcd] = {name='mul-double/2addr', rw=rw12x},			-- cd 12x	mul-double/2addr vA, vB
-	[0xce] = {name='div-double/2addr', rw=rw12x},			-- ce 12x	div-double/2addr vA, vB
-	[0xcf] = {name='rem-double/2addr', rw=rw12x},			-- cf 12x	rem-double/2addr vA, vB	A: destination and first source register or pair (4 bits) B: second source register or pair (4 bits)	Perform the identified binary operation on the two source registers, storing the result in the first source register. Note: Contrary to other -long/2addr mathematical operations (which take register pairs for both their destination/first source and their second source), shl-long/2addr, shr-long/2addr, and ushr-long/2addr take a register pair for their destination/first source (the value to be shifted), but a single register for their second source (the shifting distance).
-	[0xd0] = {name='add-int/lit16', rw=rw22s},			-- d0 22s	add-int/lit16 vA, vB, #+CCCC
-	[0xd1] = {name='rsub-int', rw=rw22s},			-- d1 22s	rsub-int vA, vB, #+CCCC (reverse subtract)
-	[0xd2] = {name='mul-int/lit16', rw=rw22s},			-- d2 22s	mul-int/lit16 vA, vB, #+CCCC
-	[0xd3] = {name='div-int/lit16', rw=rw22s},			-- d3 22s	div-int/lit16 vA, vB, #+CCCC
-	[0xd4] = {name='rem-int/lit16', rw=rw22s},			-- d4 22s	rem-int/lit16 vA, vB, #+CCCC
-	[0xd5] = {name='and-int/lit16', rw=rw22s},			-- d5 22s	and-int/lit16 vA, vB, #+CCCC
-	[0xd6] = {name='or-int/lit16', rw=rw22s},			-- d6 22s	or-int/lit16 vA, vB, #+CCCC
-	[0xd7] = {name='xor-int/lit16', rw=rw22s},			-- d7 22s	xor-int/lit16 vA, vB, #+CCCC	A: destination register (4 bits) B: source register (4 bits) C: signed int constant (16 bits)	Perform the indicated binary op on the indicated register (first argument) and literal value (second argument), storing the result in the destination register. Note: rsub-int does not have a suffix since this version is the main opcode of its family. Also, see below for details on its semantics.
-	[0xd8] = {name='add-int/lit8', rw=rw22b},			-- d8 22b	add-int/lit8 vAA, vBB, #+CC
-	[0xd9] = {name='rsub-int/lit8', rw=rw22b},			-- d9 22b	rsub-int/lit8 vAA, vBB, #+CC
-	[0xda] = {name='mul-int/lit8', rw=rw22b},			-- da 22b	mul-int/lit8 vAA, vBB, #+CC
-	[0xdb] = {name='div-int/lit8', rw=rw22b},			-- db 22b	div-int/lit8 vAA, vBB, #+CC
-	[0xdc] = {name='rem-int/lit8', rw=rw22b},			-- dc 22b	rem-int/lit8 vAA, vBB, #+CC
-	[0xdd] = {name='and-int/lit8', rw=rw22b},			-- dd 22b	and-int/lit8 vAA, vBB, #+CC
-	[0xde] = {name='or-int/lit8', rw=rw22b},			-- de 22b	or-int/lit8 vAA, vBB, #+CC
-	[0xdf] = {name='xor-int/lit8', rw=rw22b},			-- df 22b	xor-int/lit8 vAA, vBB, #+CC
-	[0xe0] = {name='shl-int/lit8', rw=rw22b},			-- e0 22b	shl-int/lit8 vAA, vBB, #+CC
-	[0xe1] = {name='shr-int/lit8', rw=rw22b},			-- e1 22b	shr-int/lit8 vAA, vBB, #+CC
-	[0xe2] = {name='ushr-int/lit8', rw=rw22b},			-- e2 22b	ushr-int/lit8 vAA, vBB, #+CC	A: destination register (8 bits) B: source register (8 bits) C: signed int constant (8 bits)	Perform the indicated binary op on the indicated register (first argument) and literal value (second argument), storing the result in the destination register. Note: See below for details on the semantics of rsub-int.
-	[0xe3] = {name='unused', rw=rw10x},			-- e3 10x	unused	 	unused
-	[0xe4] = {name='unused', rw=rw10x},			-- e4 10x	unused	 	unused
-	[0xe5] = {name='unused', rw=rw10x},			-- e5 10x	unused	 	unused
-	[0xe6] = {name='unused', rw=rw10x},			-- e6 10x	unused	 	unused
-	[0xe7] = {name='unused', rw=rw10x},			-- e7 10x	unused	 	unused
-	[0xe8] = {name='unused', rw=rw10x},			-- e8 10x	unused	 	unused
-	[0xe9] = {name='unused', rw=rw10x},			-- e9 10x	unused	 	unused
-	[0xea] = {name='unused', rw=rw10x},			-- ea 10x	unused	 	unused
-	[0xeb] = {name='unused', rw=rw10x},			-- eb 10x	unused	 	unused
-	[0xec] = {name='unused', rw=rw10x},			-- ec 10x	unused	 	unused
-	[0xed] = {name='unused', rw=rw10x},			-- ed 10x	unused	 	unused
-	[0xee] = {name='unused', rw=rw10x},			-- ee 10x	unused	 	unused
-	[0xef] = {name='unused', rw=rw10x},			-- ef 10x	unused	 	unused
-	[0xf0] = {name='unused', rw=rw10x},			-- f0 10x	unused	 	unused
-	[0xf1] = {name='unused', rw=rw10x},			-- f1 10x	unused	 	unused
-	[0xf2] = {name='unused', rw=rw10x},			-- f2 10x	unused	 	unused
-	[0xf3] = {name='unused', rw=rw10x},			-- f3 10x	unused	 	unused
-	[0xf4] = {name='unused', rw=rw10x},			-- f4 10x	unused	 	unused
-	[0xf5] = {name='unused', rw=rw10x},			-- f5 10x	unused	 	unused
-	[0xf6] = {name='unused', rw=rw10x},			-- f6 10x	unused	 	unused
-	[0xf7] = {name='unused', rw=rw10x},			-- f7 10x	unused	 	unused
-	[0xf8] = {name='unused', rw=rw10x},			-- f8 10x	unused	 	unused
-	[0xf9] = {name='unused', rw=rw10x},			-- f9 10x	unused	 	unused
-	[0xfa] = {name='invoke-polymorphic', rw=rw45cc},			-- fa 45cc	invoke-polymorphic {vC, vD, vE, vF, vG}, meth@BBBB, proto@HHHH	A: argument word count (4 bits) B: method reference index (16 bits) C: receiver (4 bits) D..G: argument registers (4 bits each) H: prototype reference index (16 bits)	Invoke the indicated signature polymorphic method. The result (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. The method reference must be to a signature polymorphic method, such as java.lang.invoke.MethodHandle.invoke or java.lang.invoke.MethodHandle.invokeExact. The receiver must be an object supporting the signature polymorphic method being invoked. The prototype reference describes the argument types provided and the expected return type. The invoke-polymorphic bytecode may raise exceptions when it executes. The exceptions are described in the API documentation for the signature polymorphic method being invoked. Present in Dex files from version 038 onwards.
-	[0xfb] = {name='invoke-polymorphic/range', rw=rw4rcc},			-- fb 4rcc	invoke-polymorphic/range {vCCCC .. vNNNN}, meth@BBBB, proto@HHHH	A: argument word count (8 bits) B: method reference index (16 bits) C: receiver (16 bits) H: prototype reference index (16 bits) N = A + C - 1	Invoke the indicated method handle. See the invoke-polymorphic description above for details. Present in Dex files from version 038 onwards.
-	[0xfc] = {name='invoke-custom', rw=rw35c_callsite},			-- fc 35c	invoke-custom {vC, vD, vE, vF, vG}, call_site@BBBB	A: argument word count (4 bits) B: call site reference index (16 bits) C..G: argument registers (4 bits each)	Resolves and invokes the indicated call site. The result from the invocation (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. This instruction executes in two phases: call site resolution and call site invocation. Call site resolution checks whether the indicated call site has an associated java.lang.invoke.CallSite instance. If not, the bootstrap linker method for the indicated call site is invoked using arguments present in the DEX file (see call_site_item). The bootstrap linker method returns a java.lang.invoke.CallSite instance that will then be associated with the indicated call site if no association exists. Another thread may have already made the association first, and if so execution of the instruction continues with the first associated java.lang.invoke.CallSite instance. Call site invocation is made on the java.lang.invoke.MethodHandle target of the resolved java.lang.invoke.CallSite instance. The target is invoked as if executing invoke-polymorphic (described above) using the method handle and arguments to the invoke-custom instruction as the arguments to an exact method handle invocation. Exceptions raised by the bootstrap linker method are wrapped in a java.lang.BootstrapMethodError. A BootstrapMethodError is also raised if: the bootstrap linker method fails to return a java.lang.invoke.CallSite instance. the returned java.lang.invoke.CallSite has a null method handle target. the method handle target is not of the requested type. Present in Dex files from version 038 onwards.
-	[0xfd] = {name='invoke-custom/range', rw=rw3rc_callsite},			-- fd 3rc	invoke-custom/range {vCCCC .. vNNNN}, call_site@BBBB	A: argument word count (8 bits) B: call site reference index (16 bits) C: first argument register (16-bits) N = A + C - 1	Resolve and invoke a call site. See the invoke-custom description above for details. Present in Dex files from version 038 onwards.
-	[0xfe] = {name='const-method-handle', rw=rw21c_method},			-- fe 21c	const-method-handle vAA, method_handle@BBBB	A: destination register (8 bits) B: method handle index (16 bits)	Move a reference to the method handle specified by the given index into the specified register. Present in Dex files from version 039 onwards.
-	[0xff] = {name='const-method-type', rw=rw21c_proto},			-- ff 21c	const-method-type vAA, proto@BBBB	A: destination register (8 bits) B: method prototype reference (16 bits)	Move a reference to the method prototype specified by the given index into the specified register. Present in Dex files from version 039 onwards.
+	[0x00] = Instr10x:subclass{name='nop'},					-- 00 10x	nop	 	Waste cycles.	Note: Data-bearing pseudo-instructions are tagged with this opcode, in which case the high-order byte of the opcode unit indicates the nature of the data. See "packed-switch-payload Format", "sparse-switch-payload Format", and "fill-array-data-payload Format" below.
+	[0x01] = Instr12x:subclass{name='move'},					-- 01 12x	move vA, vB	A: destination register (4 bits) B: source register (4 bits)	Move the contents of one non-object register to another.
+	[0x02] = Instr22x:subclass{name='move/from16'},			-- 02 22x	move/from16 vAA, vBBBB	A: destination register (8 bits) B: source register (16 bits)	Move the contents of one non-object register to another.
+	[0x03] = Instr32x:subclass{name='move/16'},				-- 03 32x	move/16 vAAAA, vBBBB	A: destination register (16 bits) B: source register (16 bits)	Move the contents of one non-object register to another.
+	[0x04] = Instr12x:subclass{name='move-wide'},				-- 04 12x	move-wide vA, vB	A: destination register pair (4 bits) B: source register pair (4 bits)	Move the contents of one register-pair to another. Note: It is legal to move from vN to either vN-1 or vN+1, so implementations must arrange for both halves of a register pair to be read before anything is written.
+	[0x05] = Instr22x:subclass{name='move-wide/from16'},		-- 05 22x	move-wide/from16 vAA, vBBBB	A: destination register pair (8 bits) B: source register pair (16 bits)	Move the contents of one register-pair to another. Note: Implementation considerations are the same as move-wide, above.
+	[0x06] = Instr32x:subclass{name='move-wide/16'},			-- 06 32x	move-wide/16 vAAAA, vBBBB	A: destination register pair (16 bits) B: source register pair (16 bits)	Move the contents of one register-pair to another. Note: Implementation considerations are the same as move-wide, above.
+	[0x07] = Instr12x:subclass{name='move-object'},			-- 07 12x	move-object vA, vB	A: destination register (4 bits) B: source register (4 bits)	Move the contents of one object-bearing register to another.
+	[0x08] = Instr22x:subclass{name='move-object/from16'},		-- 08 22x	move-object/from16 vAA, vBBBB	A: destination register (8 bits) B: source register (16 bits)	Move the contents of one object-bearing register to another.
+	[0x09] = Instr32x:subclass{name='move-object/16'},			-- 09 32x	move-object/16 vAAAA, vBBBB	A: destination register (16 bits) B: source register (16 bits)	Move the contents of one object-bearing register to another.
+	[0x0a] = Instr11x:subclass{name='move-result'},			-- 0a 11x	move-result vAA	A: destination register (8 bits)	Move the single-word non-object result of the most recent invoke-kind into the indicated register. This must be done as the instruction immediately after an invoke-kind whose (single-word, non-object) result is not to be ignored; anywhere else is invalid.
+	[0x0b] = Instr11x:subclass{name='move-result-wide'},			-- 0b 11x	move-result-wide vAA	A: destination register pair (8 bits)	Move the double-word result of the most recent invoke-kind into the indicated register pair. This must be done as the instruction immediately after an invoke-kind whose (double-word) result is not to be ignored; anywhere else is invalid.
+	[0x0c] = Instr11x:subclass{name='move-result-object'},			-- 0c 11x	move-result-object vAA	A: destination register (8 bits)	Move the object result of the most recent invoke-kind into the indicated register. This must be done as the instruction immediately after an invoke-kind or filled-new-array whose (object) result is not to be ignored; anywhere else is invalid.
+	[0x0d] = Instr11x:subclass{name='move-exception'},			-- 0d 11x	move-exception vAA	A: destination register (8 bits)	Save a just-caught exception into the given register. This must be the first instruction of any exception handler whose caught exception is not to be ignored, and this instruction must only ever occur as the first instruction of an exception handler; anywhere else is invalid.
+	[0x0e] = Instr10x:subclass{name='return-void'},			-- 0e 10x	return-void	 	Return from a void method.
+	[0x0f] = Instr11x:subclass{name='return'},			-- 0f 11x	return vAA	A: return value register (8 bits)	Return from a single-width (32-bit) non-object value-returning method.
+	[0x10] = Instr11x:subclass{name='return-wide'},			-- 10 11x	return-wide vAA	A: return value register-pair (8 bits)	Return from a double-width (64-bit) value-returning method.
+	[0x11] = Instr11x:subclass{name='return-object'},			-- 11 11x	return-object vAA	A: return value register (8 bits)	Return from an object-returning method.
+	[0x12] = Instr11n:subclass{name='const/4'},			-- 12 11n	const/4 vA, #+B	A: destination register (4 bits) B: signed int (4 bits)	Move the given literal value (sign-extended to 32 bits) into the specified register.
+	[0x13] = Instr21s:subclass{name='const/16'},			-- 13 21s	const/16 vAA, #+BBBB	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (sign-extended to 32 bits) into the specified register.
+	[0x14] = Instr31i:subclass{name='const'},			-- 14 31i	const vAA, #+BBBBBBBB	A: destination register (8 bits) B: arbitrary 32-bit constant	Move the given literal value into the specified register.
+	[0x15] = Instr21h:subclass{name='const/high16'},			-- 15 21h	const/high16 vAA, #+BBBB0000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 32 bits) into the specified register.
+	[0x16] = Instr21s:subclass{name='const-wide/16'},			-- 16 21s	const-wide/16 vAA, #+BBBB	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
+	[0x17] = Instr31i:subclass{name='const-wide/32'},			-- 17 31i	const-wide/32 vAA, #+BBBBBBBB	A: destination register (8 bits) B: signed int (32 bits)	Move the given literal value (sign-extended to 64 bits) into the specified register-pair.
+	[0x18] = Instr51l_double:subclass{name='const-wide'},			-- 18 51l	const-wide vAA, #+BBBBBBBBBBBBBBBB	A: destination register (8 bits) B: arbitrary double-width (64-bit) constant	Move the given literal value into the specified register-pair.
+	[0x19] = Instr21h:subclass{name='const-wide/high16'},			-- 19 21h	const-wide/high16 vAA, #+BBBB000000000000	A: destination register (8 bits) B: signed int (16 bits)	Move the given literal value (right-zero-extended to 64 bits) into the specified register-pair.
+	[0x1a] = Instr21c_string:subclass{name='const-string'},			-- 1a 21c	const-string vAA, string@BBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
+	[0x1b] = Instr31c_string:subclass{name='const-string/jumbo'},			-- 1b 31c	const-string/jumbo vAA, string@BBBBBBBB	A: destination register (8 bits) B: string index	Move a reference to the string specified by the given index into the specified register.
+	[0x1c] = Instr21c_type:subclass{name='const-class'},			-- 1c 21c	const-class vAA, type@BBBB	A: destination register (8 bits) B: type index	Move a reference to the class specified by the given index into the specified register. In the case where the indicated type is primitive, this will store a reference to the primitive type's degenerate class.
+	[0x1d] = Instr11x:subclass{name='monitor-enter'},			-- 1d 11x	monitor-enter vAA	A: reference-bearing register (8 bits)	Acquire the monitor for the indicated object.
+	[0x1e] = Instr11x:subclass{name='monitor-exit'},			-- 1e 11x	monitor-exit vAA	A: reference-bearing register (8 bits)	Release the monitor for the indicated object. Note: If this instruction needs to throw an exception, it must do so as if the pc has already advanced past the instruction. It may be useful to think of this as the instruction successfully executing (in a sense), and the exception getting thrown after the instruction but before the next one gets a chance to run. This definition makes it possible for a method to use a monitor cleanup catch-all (e.g., finally) block as the monitor cleanup for that block itself, as a way to handle the arbitrary exceptions that might get thrown due to the historical implementation of Thread.stop(), while still managing to have proper monitor hygiene.
+	[0x1f] = Instr21c_type:subclass{name='check-cast'},			-- 1f 21c	check-cast vAA, type@BBBB	A: reference-bearing register (8 bits) B: type index (16 bits)	Throw a ClassCastException if the reference in the given register cannot be cast to the indicated type. Note: Since A must always be a reference (and not a primitive value), this will necessarily fail at runtime (that is, it will throw an exception) if B refers to a primitive type.
+	[0x20] = Instr22c_type:subclass{name='instance-of'},			-- 20 22c	instance-of vA, vB, type@CCCC	A: destination register (4 bits) B: reference-bearing register (4 bits) C: type index (16 bits)	Store in the given destination register 1 if the indicated reference is an instance of the given type, or 0 if not. Note: Since B must always be a reference (and not a primitive value), this will always result in 0 being stored if C refers to a primitive type.
+	[0x21] = Instr12x:subclass{name='array-length'},			-- 21 12x	array-length vA, vB	A: destination register (4 bits) B: array reference-bearing register (4 bits)	Store in the given destination register the length of the indicated array, in entries
+	[0x22] = Instr21c_type:subclass{name='new-instance'},			-- 22 21c	new-instance vAA, type@BBBB	A: destination register (8 bits) B: type index	Construct a new instance of the indicated type, storing a reference to it in the destination. The type must refer to a non-array class.
+	[0x23] = Instr22c_type:subclass{name='new-array'},			-- 23 22c	new-array vA, vB, type@CCCC	A: destination register (4 bits) B: size register C: type index	Construct a new array of the indicated type and size. The type must be an array type.
+	[0x24] = Instr35c_type:subclass{name='filled-new-array'},			-- 24 35c	filled-new-array {vC, vD, vE, vF, vG}, type@BBBB	A: array size and argument word count (4 bits) B: type index (16 bits) C..G: argument registers (4 bits each)	Construct an array of the given type and size, filling it with the supplied contents. The type must be an array type. The array's contents must be single-word (that is, no arrays of long or double, but reference types are acceptable). The constructed instance is stored as a "result" in the same way that the method invocation instructions store their results, so the constructed instance must be moved to a register with an immediately subsequent move-result-object instruction (if it is to be used).
+	[0x25] = Instr3rc_type:subclass{name='filled-new-array/range'},			-- 25 3rc	filled-new-array/range {vCCCC .. vNNNN}, type@BBBB	A: array size and argument word count (8 bits) B: type index (16 bits) C: first argument register (16 bits) N = A + C - 1	Construct an array of the given type and size, filling it with the supplied contents. Clarifications and restrictions are the same as filled-new-array, described above.
+	[0x26] = Instr31t:subclass{name='fill-array-data'},			-- 26 31t	fill-array-data vAA, +BBBBBBBB (with supplemental data as specified below in "fill-array-data-payload Format")	A: array reference (8 bits) B: signed "branch" offset to table data pseudo-instruction (32 bits)	Fill the given array with the indicated data. The reference must be to an array of primitives, and the data table must match it in type and must contain no more elements than will fit in the array. That is, the array may be larger than the table, and if so, only the initial elements of the array are set, leaving the remainder alone.
+	[0x27] = Instr11x:subclass{name='throw'},			-- 27 11x	throw vAA	A: exception-bearing register (8 bits) Throw the indicated exception.
+	[0x28] = Instr10t:subclass{name='goto'},			-- 28 10t	goto +AA	A: signed branch offset (8 bits)	Unconditionally jump to the indicated instruction. Note: The branch offset must not be 0. (A spin loop may be legally constructed either with goto/32 or by including a nop as a target before the branch.)
+	[0x29] = Instr20t:subclass{name='goto/16'},			-- 29 20t	goto/16 +AAAA	A: signed branch offset (16 bits) Unconditionally jump to the indicated instruction. Note: The branch offset must not be 0. (A spin loop may be legally constructed either with goto/32 or by including a nop as a target before the branch.)
+	[0x2a] = Instr30t:subclass{name='goto/32'},			-- 2a 30t	goto/32 +AAAAAAAA	A: signed branch offset (32 bits) Unconditionally jump to the indicated instruction.
+	[0x2b] = Instr31t:subclass{name='packed-switch'},			-- 2b 31t	packed-switch vAA, +BBBBBBBB (with supplemental data as specified below in "packed-switch-payload Format")	A: register to test B: signed "branch" offset to table data pseudo-instruction (32 bits)	Jump to a new instruction based on the value in the given register, using a table of offsets corresponding to each value in a particular integral range, or fall through to the next instruction if there is no match.
+	[0x2c] = Instr31t:subclass{name='sparse-switch'},			-- 2c 31t	sparse-switch vAA, +BBBBBBBB (with supplemental data as specified below in "sparse-switch-payload Format")	A: register to test B: signed "branch" offset to table data pseudo-instruction (32 bits)	Jump to a new instruction based on the value in the given register, using an ordered table of value-offset pairs, or fall through to the next instruction if there is no match.
+	[0x2d] = Instr23x:subclass{name='cmpl-float'},			-- 2d 23x	cmpl-float vAA, vBB, vCC
+	[0x2e] = Instr23x:subclass{name='cmpg-float'},			-- 2e 23x	cmpg-float vAA, vBB, vCC
+	[0x2f] = Instr23x:subclass{name='cmpl-double'},			-- 2f 23x	cmpl-double vAA, vBB, vCC
+	[0x30] = Instr23x:subclass{name='cmpg-double'},			-- 30 23x	cmpg-double vAA, vBB, vCC
+	[0x31] = Instr23x:subclass{name='cmp-long'},			-- 31 23x	cmp-long vAA, vBB, vCC		A: destination register (8 bits) B: first source register or pair C: second source register or pair	Perform the indicated floating point or long comparison, setting a to 0 if b == c, 1 if b > c, or -1 if b < c. The "bias" listed for the floating point operations indicates how NaN comparisons are treated: "gt bias" instructions return 1 for NaN comparisons, and "lt bias" instructions return -1. For example, to check to see if floating point x < y it is advisable to use cmpg-float; a result of -1 indicates that the test was true, and the other values indicate it was false either due to a valid comparison or because one of the values was NaN.
+	[0x32] = Instr22t:subclass{name='if-eq'},			-- 32 22t	if-eq vA, vB, +CCCC
+	[0x33] = Instr22t:subclass{name='if-ne'},			-- 33 22t	if-ne vA, vB, +CCCC
+	[0x34] = Instr22t:subclass{name='if-lt'},			-- 34 22t	if-lt vA, vB, +CCCC
+	[0x35] = Instr22t:subclass{name='if-ge'},			-- 35 22t	if-ge vA, vB, +CCCC
+	[0x36] = Instr22t:subclass{name='if-gt'},			-- 36 22t	if-gt vA, vB, +CCCC
+	[0x37] = Instr22t:subclass{name='if-le'},			-- 37 22t	if-le vA, vB, +CCCC A: first register to test (4 bits) B: second register to test (4 bits) C: signed branch offset (16 bits)	Branch to the given destination if the given two registers' values compare as specified. Note: The branch offset must not be 0. (A spin loop may be legally constructed either by branching around a backward goto or by including a nop as a target before the branch.)
+	[0x38] = Instr21t:subclass{name='if-eqz'},			-- 38 21t	if-eqz vAA, +BBBB
+	[0x39] = Instr21t:subclass{name='if-nez'},			-- 39 21t	if-nez vAA, +BBBB
+	[0x3a] = Instr21t:subclass{name='if-ltz'},			-- 3a 21t	if-ltz vAA, +BBBB
+	[0x3b] = Instr21t:subclass{name='if-gez'},			-- 3b 21t	if-gez vAA, +BBBB
+	[0x3c] = Instr21t:subclass{name='if-gtz'},			-- 3c 21t	if-gtz vAA, +BBBB
+	[0x3d] = Instr21t:subclass{name='if-lez'},			-- 3d 21t	if-lez vAA, +BBBB A: register to test (8 bits) B: signed branch offset (16 bits)	Branch to the given destination if the given register's value compares with 0 as specified. Note: The branch offset must not be 0. (A spin loop may be legally constructed either by branching around a backward goto or by including a nop as a target before the branch.)
+	[0x3e] = Instr10x:subclass{name='unused'},			-- 3e 10x	unused	 	unused
+	[0x3f] = Instr10x:subclass{name='unused'},			-- 3f 10x	unused	 	unused
+	[0x40] = Instr10x:subclass{name='unused'},			-- 40 10x	unused	 	unused
+	[0x41] = Instr10x:subclass{name='unused'},			-- 41 10x	unused	 	unused
+	[0x42] = Instr10x:subclass{name='unused'},			-- 42 10x	unused	 	unused
+	[0x43] = Instr10x:subclass{name='unused'},			-- 43 10x	unused	 	unused
+	[0x44] = Instr23x:subclass{name='aget'},			-- 44 23x	aget vAA, vBB, vCC
+	[0x45] = Instr23x:subclass{name='aget-wide'},			-- 45 23x	aget-wide vAA, vBB, vCC
+	[0x46] = Instr23x:subclass{name='aget-object'},			-- 46 23x	aget-object vAA, vBB, vCC
+	[0x47] = Instr23x:subclass{name='aget-boolean'},			-- 47 23x	aget-boolean vAA, vBB, vCC
+	[0x48] = Instr23x:subclass{name='aget-byte'},			-- 48 23x	aget-byte vAA, vBB, vCC
+	[0x49] = Instr23x:subclass{name='aget-char'},			-- 49 23x	aget-char vAA, vBB, vCC
+	[0x4a] = Instr23x:subclass{name='aget-short'},			-- 4a 23x	aget-short vAA, vBB, vCC
+	[0x4b] = Instr23x:subclass{name='aput'},			-- 4b 23x	aput vAA, vBB, vCC
+	[0x4c] = Instr23x:subclass{name='aput-wide'},			-- 4c 23x	aput-wide vAA, vBB, vCC
+	[0x4d] = Instr23x:subclass{name='aput-object'},			-- 4d 23x	aput-object vAA, vBB, vCC
+	[0x4e] = Instr23x:subclass{name='aput-boolean'},			-- 4e 23x	aput-boolean vAA, vBB, vCC
+	[0x4f] = Instr23x:subclass{name='aput-byte'},			-- 4f 23x	aput-byte vAA, vBB, vCC
+	[0x50] = Instr23x:subclass{name='aput-char'},			-- 50 23x	aput-char vAA, vBB, vCC
+	[0x51] = Instr23x:subclass{name='aput-short'},			-- 51 23x	aput-short vAA, vBB, vCC	A: value register or pair; may be source or dest (8 bits) B: array register (8 bits) C: index register (8 bits)	Perform the identified array operation at the identified index of the given array, loading or storing into the value register.
+	[0x52] = Instr22c_field:subclass{name='iget'},			-- 52 22c	iget vA, vB, field@CCCC
+	[0x53] = Instr22c_field:subclass{name='iget-wide'},			-- 53 22c	iget-wide vA, vB, field@CCCC
+	[0x54] = Instr22c_field:subclass{name='iget-object'},			-- 54 22c	iget-object vA, vB, field@CCCC
+	[0x55] = Instr22c_field:subclass{name='iget-boolean'},			-- 55 22c	iget-boolean vA, vB, field@CCCC
+	[0x56] = Instr22c_field:subclass{name='iget-byte'},			-- 56 22c	iget-byte vA, vB, field@CCCC
+	[0x57] = Instr22c_field:subclass{name='iget-char'},			-- 57 22c	iget-char vA, vB, field@CCCC
+	[0x58] = Instr22c_field:subclass{name='iget-short'},			-- 58 22c	iget-short vA, vB, field@CCCC
+	[0x59] = Instr22c_field:subclass{name='iput'},			-- 59 22c	iput vA, vB, field@CCCC
+	[0x5a] = Instr22c_field:subclass{name='iput-wide'},			-- 5a 22c	iput-wide vA, vB, field@CCCC
+	[0x5b] = Instr22c_field:subclass{name='iput-object'},			-- 5b 22c	iput-object vA, vB, field@CCCC
+	[0x5c] = Instr22c_field:subclass{name='iput-boolean'},			-- 5c 22c	iput-boolean vA, vB, field@CCCC
+	[0x5d] = Instr22c_field:subclass{name='iput-byte'},			-- 5d 22c	iput-byte vA, vB, field@CCCC
+	[0x5e] = Instr22c_field:subclass{name='iput-char'},			-- 5e 22c	iput-char vA, vB, field@CCCC
+	[0x5f] = Instr22c_field:subclass{name='iput-short'},			-- 5f 22c	iput-short vA, vB, field@CCCC	A: value register or pair; may be source or dest (4 bits) B: object register (4 bits) C: instance field reference index (16 bits)	Perform the identified object instance field operation with the identified field, loading or storing into the value register. Note: These opcodes are reasonable candidates for static linking, altering the field argument to be a more direct offset.
+	[0x60] = Instr21c_field:subclass{name='sget'},			-- 60 21c	sget vAA, field@BBBB
+	[0x61] = Instr21c_field:subclass{name='sget-wide'},			-- 61 21c	sget-wide vAA, field@BBBB
+	[0x62] = Instr21c_field:subclass{name='sget-object'},			-- 62 21c	sget-object vAA, field@BBBB
+	[0x63] = Instr21c_field:subclass{name='sget-boolean'},			-- 63 21c	sget-boolean vAA, field@BBBB
+	[0x64] = Instr21c_field:subclass{name='sget-byte'},			-- 64 21c	sget-byte vAA, field@BBBB
+	[0x65] = Instr21c_field:subclass{name='sget-char'},			-- 65 21c	sget-char vAA, field@BBBB
+	[0x66] = Instr21c_field:subclass{name='sget-short'},			-- 66 21c	sget-short vAA, field@BBBB
+	[0x67] = Instr21c_field:subclass{name='sput'},			-- 67 21c	sput vAA, field@BBBB
+	[0x68] = Instr21c_field:subclass{name='sput-wide'},			-- 68 21c	sput-wide vAA, field@BBBB
+	[0x69] = Instr21c_field:subclass{name='sput-object'},			-- 69 21c	sput-object vAA, field@BBBB
+	[0x6a] = Instr21c_field:subclass{name='sput-boolean'},			-- 6a 21c	sput-boolean vAA, field@BBBB
+	[0x6b] = Instr21c_field:subclass{name='sput-byte'},			-- 6b 21c	sput-byte vAA, field@BBBB
+	[0x6c] = Instr21c_field:subclass{name='sput-char'},			-- 6c 21c	sput-char vAA, field@BBBB
+	[0x6d] = Instr21c_field:subclass{name='sput-short'},			-- 6d 21c	sput-short vAA, field@BBBB	A: value register or pair; may be source or dest (8 bits) B: static field reference index (16 bits)	Perform the identified object static field operation with the identified static field, loading or storing into the value register. Note: These opcodes are reasonable candidates for static linking, altering the field argument to be a more direct offset.
+	[0x6e] = Instr35c_method:subclass{name='invoke-virtual'},			-- 6e 35c	invoke-virtual {vC, vD, vE, vF, vG}, meth@BBBB
+	[0x6f] = Instr35c_method:subclass{name='invoke-super'},			-- 6f 35c	invoke-super {vC, vD, vE, vF, vG}, meth@BBBB
+	[0x70] = Instr35c_method:subclass{name='invoke-direct'},			-- 70 35c	invoke-direct {vC, vD, vE, vF, vG}, meth@BBBB
+	[0x71] = Instr35c_method:subclass{name='invoke-static'},			-- 71 35c	invoke-static {vC, vD, vE, vF, vG}, meth@BBBB
+	[0x72] = Instr35c_method:subclass{name='invoke-interface'},			-- 72 35c	invoke-interface {vC, vD, vE, vF, vG}, meth@BBBB	A: argument word count (4 bits) B: method reference index (16 bits) C..G: argument registers (4 bits each)	Call the indicated method. The result (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. invoke-virtual is used to invoke a normal virtual method which is a method that isn't static, private or a constructor. When the method_id references a method of a non-interface class, invoke-super is used to invoke the closest superclass's virtual method (as opposed to the one with the same method_id in the calling class). The same method restrictions hold as for invoke-virtual. In Dex files version 037 or later, if the method_id refers to an interface method, invoke-super is used to invoke the most specific, non-overridden version of that method defined on that interface. The same method restrictions hold as for invoke-virtual. In Dex files prior to version 037, having an interface method_id is illegal and undefined. invoke-direct is used to invoke a non-static direct method (that is, an instance method that is by its nature non-overridable, namely either a private instance method or a constructor). invoke-static is used to invoke a static method (which is always considered a direct method). invoke-interface is used to invoke an interface method, that is, on an object whose concrete class isn't known, using a method_id that refers to an interface. Note: These opcodes are reasonable candidates for static linking, altering the method argument to be a more direct offset (or pair thereof).
+	[0x73] = Instr10x:subclass{name='unused'},			-- 73 10x	unused		unused
+	[0x74] = Instr3rc_method:subclass{name='invoke-virtual/range'},			-- 74 3rc	invoke-virtual/range {vCCCC .. vNNNN}, meth@BBBB
+	[0x75] = Instr3rc_method:subclass{name='invoke-super/range'},			-- 75 3rc	invoke-super/range {vCCCC .. vNNNN}, meth@BBBB
+	[0x76] = Instr3rc_method:subclass{name='invoke-direct/range'},			-- 76 3rc	invoke-direct/range {vCCCC .. vNNNN}, meth@BBBB
+	[0x77] = Instr3rc_method:subclass{name='invoke-static/range'},			-- 77 3rc	invoke-static/range {vCCCC .. vNNNN}, meth@BBBB
+	[0x78] = Instr3rc_method:subclass{name='invoke-interface/range'},			-- 78 3rc	invoke-interface/range {vCCCC .. vNNNN}, meth@BBBB	A: argument word count (8 bits) B: method reference index (16 bits) C: first argument register (16 bits) N = A + C - 1	Call the indicated method. See first invoke-kind description above for details, caveats, and suggestions.
+	[0x79] = Instr10x:subclass{name='unused'},			-- 79 10x	unused		unused
+	[0x7a] = Instr10x:subclass{name='unused'},			-- 7a 10x	unused		unused
+	[0x7b] = Instr12x:subclass{name='neg-int'},			-- 7b 12x	neg-int vA, vB
+	[0x7c] = Instr12x:subclass{name='not-int'},			-- 7c 12x	not-int vA, vB
+	[0x7d] = Instr12x:subclass{name='neg-long'},			-- 7d 12x	neg-long vA, vB
+	[0x7e] = Instr12x:subclass{name='not-long'},			-- 7e 12x	not-long vA, vB
+	[0x7f] = Instr12x:subclass{name='neg-float'},			-- 7f 12x	neg-float vA, vB
+	[0x80] = Instr12x:subclass{name='neg-double'},			-- 80 12x	neg-double vA, vB
+	[0x81] = Instr12x:subclass{name='int-to-long'},			-- 81 12x	int-to-long vA, vB
+	[0x82] = Instr12x:subclass{name='int-to-float'},			-- 82 12x	int-to-float vA, vB
+	[0x83] = Instr12x:subclass{name='int-to-double'},			-- 83 12x	int-to-double vA, vB
+	[0x84] = Instr12x:subclass{name='long-to-int'},			-- 84 12x	long-to-int vA, vB
+	[0x85] = Instr12x:subclass{name='long-to-float'},			-- 85 12x	long-to-float vA, vB
+	[0x86] = Instr12x:subclass{name='long-to-double'},			-- 86 12x	long-to-double vA, vB
+	[0x87] = Instr12x:subclass{name='float-to-int'},			-- 87 12x	float-to-int vA, vB
+	[0x88] = Instr12x:subclass{name='float-to-long'},			-- 88 12x	float-to-long vA, vB
+	[0x89] = Instr12x:subclass{name='float-to-double'},			-- 89 12x	float-to-double vA, vB
+	[0x8a] = Instr12x:subclass{name='double-to-int'},			-- 8a 12x	double-to-int vA, vB
+	[0x8b] = Instr12x:subclass{name='double-to-long'},			-- 8b 12x	double-to-long vA, vB
+	[0x8c] = Instr12x:subclass{name='double-to-float'},			-- 8c 12x	double-to-float vA, vB
+	[0x8d] = Instr12x:subclass{name='int-to-byte'},			-- 8d 12x	int-to-byte vA, vB
+	[0x8e] = Instr12x:subclass{name='int-to-char'},			-- 8e 12x	int-to-char vA, vB
+	[0x8f] = Instr12x:subclass{name='int-to-short'},			-- 8f 12x	int-to-short vA, vB	A: destination register or pair (4 bits) B: source register or pair (4 bits)	Perform the identified unary operation on the source register, storing the result in the destination register.
+	[0x90] = Instr23x:subclass{name='add-int'},			-- 90 23x	add-int vAA, vBB, vCC
+	[0x91] = Instr23x:subclass{name='sub-int'},			-- 91 23x	sub-int vAA, vBB, vCC
+	[0x92] = Instr23x:subclass{name='mul-int'},			-- 92 23x	mul-int vAA, vBB, vCC
+	[0x93] = Instr23x:subclass{name='div-int'},			-- 93 23x	div-int vAA, vBB, vCC
+	[0x94] = Instr23x:subclass{name='rem-int'},			-- 94 23x	rem-int vAA, vBB, vCC
+	[0x95] = Instr23x:subclass{name='and-int'},			-- 95 23x	and-int vAA, vBB, vCC
+	[0x96] = Instr23x:subclass{name='or-int'},			-- 96 23x	or-int vAA, vBB, vCC
+	[0x97] = Instr23x:subclass{name='xor-int'},			-- 97 23x	xor-int vAA, vBB, vCC
+	[0x98] = Instr23x:subclass{name='shl-int'},			-- 98 23x	shl-int vAA, vBB, vCC
+	[0x99] = Instr23x:subclass{name='shr-int'},			-- 99 23x	shr-int vAA, vBB, vCC
+	[0x9a] = Instr23x:subclass{name='ushr-int'},			-- 9a 23x	ushr-int vAA, vBB, vCC
+	[0x9b] = Instr23x:subclass{name='add-long'},			-- 9b 23x	add-long vAA, vBB, vCC
+	[0x9c] = Instr23x:subclass{name='sub-long'},			-- 9c 23x	sub-long vAA, vBB, vCC
+	[0x9d] = Instr23x:subclass{name='mul-long'},			-- 9d 23x	mul-long vAA, vBB, vCC
+	[0x9e] = Instr23x:subclass{name='div-long'},			-- 9e 23x	div-long vAA, vBB, vCC
+	[0x9f] = Instr23x:subclass{name='rem-long'},			-- 9f 23x	rem-long vAA, vBB, vCC
+	[0xa0] = Instr23x:subclass{name='and-long'},			-- a0 23x	and-long vAA, vBB, vCC
+	[0xa1] = Instr23x:subclass{name='or-long'},			-- a1 23x	or-long vAA, vBB, vCC
+	[0xa2] = Instr23x:subclass{name='xor-long'},			-- a2 23x	xor-long vAA, vBB, vCC
+	[0xa3] = Instr23x:subclass{name='shl-long'},			-- a3 23x	shl-long vAA, vBB, vCC
+	[0xa4] = Instr23x:subclass{name='shr-long'},			-- a4 23x	shr-long vAA, vBB, vCC
+	[0xa5] = Instr23x:subclass{name='ushr-long'},			-- a5 23x	ushr-long vAA, vBB, vCC
+	[0xa6] = Instr23x:subclass{name='add-float'},			-- a6 23x	add-float vAA, vBB, vCC
+	[0xa7] = Instr23x:subclass{name='sub-float'},			-- a7 23x	sub-float vAA, vBB, vCC
+	[0xa8] = Instr23x:subclass{name='mul-float'},			-- a8 23x	mul-float vAA, vBB, vCC
+	[0xa9] = Instr23x:subclass{name='div-float'},			-- a9 23x	div-float vAA, vBB, vCC
+	[0xaa] = Instr23x:subclass{name='rem-float'},			-- aa 23x	rem-float vAA, vBB, vCC
+	[0xab] = Instr23x:subclass{name='add-double'},			-- ab 23x	add-double vAA, vBB, vCC
+	[0xac] = Instr23x:subclass{name='sub-double'},			-- ac 23x	sub-double vAA, vBB, vCC
+	[0xad] = Instr23x:subclass{name='mul-double'},			-- ad 23x	mul-double vAA, vBB, vCC
+	[0xae] = Instr23x:subclass{name='div-double'},			-- ae 23x	div-double vAA, vBB, vCC
+	[0xaf] = Instr23x:subclass{name='rem-double'},			-- af 23x	rem-double vAA, vBB, vCC	A: destination register or pair (8 bits) B: first source register or pair (8 bits) C: second source register or pair (8 bits)	Perform the identified binary operation on the two source registers, storing the result in the destination register. Note: Contrary to other -long mathematical operations (which take register pairs for both their first and their second source), shl-long, shr-long, and ushr-long take a register pair for their first source (the value to be shifted), but a single register for their second source (the shifting distance).
+	[0xb0] = Instr12x:subclass{name='add-int/2addr'},			-- b0 12x	add-int/2addr vA, vB
+	[0xb1] = Instr12x:subclass{name='sub-int/2addr'},			-- b1 12x	sub-int/2addr vA, vB
+	[0xb2] = Instr12x:subclass{name='mul-int/2addr'},			-- b2 12x	mul-int/2addr vA, vB
+	[0xb3] = Instr12x:subclass{name='div-int/2addr'},			-- b3 12x	div-int/2addr vA, vB
+	[0xb4] = Instr12x:subclass{name='rem-int/2addr'},			-- b4 12x	rem-int/2addr vA, vB
+	[0xb5] = Instr12x:subclass{name='and-int/2addr'},			-- b5 12x	and-int/2addr vA, vB
+	[0xb6] = Instr12x:subclass{name='or-int/2addr'},			-- b6 12x	or-int/2addr vA, vB
+	[0xb7] = Instr12x:subclass{name='xor-int/2addr'},			-- b7 12x	xor-int/2addr vA, vB
+	[0xb8] = Instr12x:subclass{name='shl-int/2addr'},			-- b8 12x	shl-int/2addr vA, vB
+	[0xb9] = Instr12x:subclass{name='shr-int/2addr'},			-- b9 12x	shr-int/2addr vA, vB
+	[0xba] = Instr12x:subclass{name='ushr-int/2addr'},			-- ba 12x	ushr-int/2addr vA, vB
+	[0xbb] = Instr12x:subclass{name='add-long/2addr'},			-- bb 12x	add-long/2addr vA, vB
+	[0xbc] = Instr12x:subclass{name='sub-long/2addr'},			-- bc 12x	sub-long/2addr vA, vB
+	[0xbd] = Instr12x:subclass{name='mul-long/2addr'},			-- bd 12x	mul-long/2addr vA, vB
+	[0xbe] = Instr12x:subclass{name='div-long/2addr'},			-- be 12x	div-long/2addr vA, vB
+	[0xbf] = Instr12x:subclass{name='rem-long/2addr'},			-- bf 12x	rem-long/2addr vA, vB
+	[0xc0] = Instr12x:subclass{name='and-long/2addr'},			-- c0 12x	and-long/2addr vA, vB
+	[0xc1] = Instr12x:subclass{name='or-long/2addr'},			-- c1 12x	or-long/2addr vA, vB
+	[0xc2] = Instr12x:subclass{name='xor-long/2addr'},			-- c2 12x	xor-long/2addr vA, vB
+	[0xc3] = Instr12x:subclass{name='shl-long/2addr'},			-- c3 12x	shl-long/2addr vA, vB
+	[0xc4] = Instr12x:subclass{name='shr-long/2addr'},			-- c4 12x	shr-long/2addr vA, vB
+	[0xc5] = Instr12x:subclass{name='ushr-long/2addr'},			-- c5 12x	ushr-long/2addr vA, vB
+	[0xc6] = Instr12x:subclass{name='add-float/2addr'},			-- c6 12x	add-float/2addr vA, vB
+	[0xc7] = Instr12x:subclass{name='sub-float/2addr'},			-- c7 12x	sub-float/2addr vA, vB
+	[0xc8] = Instr12x:subclass{name='mul-float/2addr'},			-- c8 12x	mul-float/2addr vA, vB
+	[0xc9] = Instr12x:subclass{name='div-float/2addr'},			-- c9 12x	div-float/2addr vA, vB
+	[0xca] = Instr12x:subclass{name='rem-float/2addr'},			-- ca 12x	rem-float/2addr vA, vB
+	[0xcb] = Instr12x:subclass{name='add-double/2addr'},			-- cb 12x	add-double/2addr vA, vB
+	[0xcc] = Instr12x:subclass{name='sub-double/2addr'},			-- cc 12x	sub-double/2addr vA, vB
+	[0xcd] = Instr12x:subclass{name='mul-double/2addr'},			-- cd 12x	mul-double/2addr vA, vB
+	[0xce] = Instr12x:subclass{name='div-double/2addr'},			-- ce 12x	div-double/2addr vA, vB
+	[0xcf] = Instr12x:subclass{name='rem-double/2addr'},			-- cf 12x	rem-double/2addr vA, vB	A: destination and first source register or pair (4 bits) B: second source register or pair (4 bits)	Perform the identified binary operation on the two source registers, storing the result in the first source register. Note: Contrary to other -long/2addr mathematical operations (which take register pairs for both their destination/first source and their second source), shl-long/2addr, shr-long/2addr, and ushr-long/2addr take a register pair for their destination/first source (the value to be shifted), but a single register for their second source (the shifting distance).
+	[0xd0] = Instr22s:subclass{name='add-int/lit16'},			-- d0 22s	add-int/lit16 vA, vB, #+CCCC
+	[0xd1] = Instr22s:subclass{name='rsub-int'},			-- d1 22s	rsub-int vA, vB, #+CCCC (reverse subtract)
+	[0xd2] = Instr22s:subclass{name='mul-int/lit16'},			-- d2 22s	mul-int/lit16 vA, vB, #+CCCC
+	[0xd3] = Instr22s:subclass{name='div-int/lit16'},			-- d3 22s	div-int/lit16 vA, vB, #+CCCC
+	[0xd4] = Instr22s:subclass{name='rem-int/lit16'},			-- d4 22s	rem-int/lit16 vA, vB, #+CCCC
+	[0xd5] = Instr22s:subclass{name='and-int/lit16'},			-- d5 22s	and-int/lit16 vA, vB, #+CCCC
+	[0xd6] = Instr22s:subclass{name='or-int/lit16'},			-- d6 22s	or-int/lit16 vA, vB, #+CCCC
+	[0xd7] = Instr22s:subclass{name='xor-int/lit16'},			-- d7 22s	xor-int/lit16 vA, vB, #+CCCC	A: destination register (4 bits) B: source register (4 bits) C: signed int constant (16 bits)	Perform the indicated binary op on the indicated register (first argument) and literal value (second argument), storing the result in the destination register. Note: rsub-int does not have a suffix since this version is the main opcode of its family. Also, see below for details on its semantics.
+	[0xd8] = Instr22b:subclass{name='add-int/lit8'},			-- d8 22b	add-int/lit8 vAA, vBB, #+CC
+	[0xd9] = Instr22b:subclass{name='rsub-int/lit8'},			-- d9 22b	rsub-int/lit8 vAA, vBB, #+CC
+	[0xda] = Instr22b:subclass{name='mul-int/lit8'},			-- da 22b	mul-int/lit8 vAA, vBB, #+CC
+	[0xdb] = Instr22b:subclass{name='div-int/lit8'},			-- db 22b	div-int/lit8 vAA, vBB, #+CC
+	[0xdc] = Instr22b:subclass{name='rem-int/lit8'},			-- dc 22b	rem-int/lit8 vAA, vBB, #+CC
+	[0xdd] = Instr22b:subclass{name='and-int/lit8'},			-- dd 22b	and-int/lit8 vAA, vBB, #+CC
+	[0xde] = Instr22b:subclass{name='or-int/lit8'},			-- de 22b	or-int/lit8 vAA, vBB, #+CC
+	[0xdf] = Instr22b:subclass{name='xor-int/lit8'},			-- df 22b	xor-int/lit8 vAA, vBB, #+CC
+	[0xe0] = Instr22b:subclass{name='shl-int/lit8'},			-- e0 22b	shl-int/lit8 vAA, vBB, #+CC
+	[0xe1] = Instr22b:subclass{name='shr-int/lit8'},			-- e1 22b	shr-int/lit8 vAA, vBB, #+CC
+	[0xe2] = Instr22b:subclass{name='ushr-int/lit8'},			-- e2 22b	ushr-int/lit8 vAA, vBB, #+CC	A: destination register (8 bits) B: source register (8 bits) C: signed int constant (8 bits)	Perform the indicated binary op on the indicated register (first argument) and literal value (second argument), storing the result in the destination register. Note: See below for details on the semantics of rsub-int.
+	[0xe3] = Instr10x:subclass{name='unused'},			-- e3 10x	unused	 	unused
+	[0xe4] = Instr10x:subclass{name='unused'},			-- e4 10x	unused	 	unused
+	[0xe5] = Instr10x:subclass{name='unused'},			-- e5 10x	unused	 	unused
+	[0xe6] = Instr10x:subclass{name='unused'},			-- e6 10x	unused	 	unused
+	[0xe7] = Instr10x:subclass{name='unused'},			-- e7 10x	unused	 	unused
+	[0xe8] = Instr10x:subclass{name='unused'},			-- e8 10x	unused	 	unused
+	[0xe9] = Instr10x:subclass{name='unused'},			-- e9 10x	unused	 	unused
+	[0xea] = Instr10x:subclass{name='unused'},			-- ea 10x	unused	 	unused
+	[0xeb] = Instr10x:subclass{name='unused'},			-- eb 10x	unused	 	unused
+	[0xec] = Instr10x:subclass{name='unused'},			-- ec 10x	unused	 	unused
+	[0xed] = Instr10x:subclass{name='unused'},			-- ed 10x	unused	 	unused
+	[0xee] = Instr10x:subclass{name='unused'},			-- ee 10x	unused	 	unused
+	[0xef] = Instr10x:subclass{name='unused'},			-- ef 10x	unused	 	unused
+	[0xf0] = Instr10x:subclass{name='unused'},			-- f0 10x	unused	 	unused
+	[0xf1] = Instr10x:subclass{name='unused'},			-- f1 10x	unused	 	unused
+	[0xf2] = Instr10x:subclass{name='unused'},			-- f2 10x	unused	 	unused
+	[0xf3] = Instr10x:subclass{name='unused'},			-- f3 10x	unused	 	unused
+	[0xf4] = Instr10x:subclass{name='unused'},			-- f4 10x	unused	 	unused
+	[0xf5] = Instr10x:subclass{name='unused'},			-- f5 10x	unused	 	unused
+	[0xf6] = Instr10x:subclass{name='unused'},			-- f6 10x	unused	 	unused
+	[0xf7] = Instr10x:subclass{name='unused'},			-- f7 10x	unused	 	unused
+	[0xf8] = Instr10x:subclass{name='unused'},			-- f8 10x	unused	 	unused
+	[0xf9] = Instr10x:subclass{name='unused'},			-- f9 10x	unused	 	unused
+	[0xfa] = Instr45cc:subclass{name='invoke-polymorphic'},			-- fa 45cc	invoke-polymorphic {vC, vD, vE, vF, vG}, meth@BBBB, proto@HHHH	A: argument word count (4 bits) B: method reference index (16 bits) C: receiver (4 bits) D..G: argument registers (4 bits each) H: prototype reference index (16 bits)	Invoke the indicated signature polymorphic method. The result (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. The method reference must be to a signature polymorphic method, such as java.lang.invoke.MethodHandle.invoke or java.lang.invoke.MethodHandle.invokeExact. The receiver must be an object supporting the signature polymorphic method being invoked. The prototype reference describes the argument types provided and the expected return type. The invoke-polymorphic bytecode may raise exceptions when it executes. The exceptions are described in the API documentation for the signature polymorphic method being invoked. Present in Dex files from version 038 onwards.
+	[0xfb] = Instr4rcc:subclass{name='invoke-polymorphic/range'},			-- fb 4rcc	invoke-polymorphic/range {vCCCC .. vNNNN}, meth@BBBB, proto@HHHH	A: argument word count (8 bits) B: method reference index (16 bits) C: receiver (16 bits) H: prototype reference index (16 bits) N = A + C - 1	Invoke the indicated method handle. See the invoke-polymorphic description above for details. Present in Dex files from version 038 onwards.
+	[0xfc] = Instr35c_callsite:subclass{name='invoke-custom'},			-- fc 35c	invoke-custom {vC, vD, vE, vF, vG}, call_site@BBBB	A: argument word count (4 bits) B: call site reference index (16 bits) C..G: argument registers (4 bits each)	Resolves and invokes the indicated call site. The result from the invocation (if any) may be stored with an appropriate move-result* variant as the immediately subsequent instruction. This instruction executes in two phases: call site resolution and call site invocation. Call site resolution checks whether the indicated call site has an associated java.lang.invoke.CallSite instance. If not, the bootstrap linker method for the indicated call site is invoked using arguments present in the DEX file (see call_site_item). The bootstrap linker method returns a java.lang.invoke.CallSite instance that will then be associated with the indicated call site if no association exists. Another thread may have already made the association first, and if so execution of the instruction continues with the first associated java.lang.invoke.CallSite instance. Call site invocation is made on the java.lang.invoke.MethodHandle target of the resolved java.lang.invoke.CallSite instance. The target is invoked as if executing invoke-polymorphic (described above) using the method handle and arguments to the invoke-custom instruction as the arguments to an exact method handle invocation. Exceptions raised by the bootstrap linker method are wrapped in a java.lang.BootstrapMethodError. A BootstrapMethodError is also raised if: the bootstrap linker method fails to return a java.lang.invoke.CallSite instance. the returned java.lang.invoke.CallSite has a null method handle target. the method handle target is not of the requested type. Present in Dex files from version 038 onwards.
+	[0xfd] = Instr3rc_callsite:subclass{name='invoke-custom/range'},			-- fd 3rc	invoke-custom/range {vCCCC .. vNNNN}, call_site@BBBB	A: argument word count (8 bits) B: call site reference index (16 bits) C: first argument register (16-bits) N = A + C - 1	Resolve and invoke a call site. See the invoke-custom description above for details. Present in Dex files from version 038 onwards.
+	[0xfe] = Instr21c_method:subclass{name='const-method-handle'},			-- fe 21c	const-method-handle vAA, method_handle@BBBB	A: destination register (8 bits) B: method handle index (16 bits)	Move a reference to the method handle specified by the given index into the specified register. Present in Dex files from version 039 onwards.
+	[0xff] = Instr21c_proto:subclass{name='const-method-type'},			-- ff 21c	const-method-type vAA, proto@BBBB	A: destination register (8 bits) B: method prototype reference (16 bits)	Move a reference to the method prototype specified by the given index into the specified register. Present in Dex files from version 039 onwards.
 }
 local opForInstName = table.map(instDescForOp, function(inst,op)
 	return op, inst.name
@@ -1198,7 +1201,7 @@ io.stderr:write('TODO support numDatas/datasOfs\n')
 							local instDesc = assert.index(instDescForOp, lo)
 							local inst = table()
 							inst:insert(instDesc.name)
-							instDesc.rw.read(inst, hi, blob, self)
+							instDesc.read(inst, hi, blob, self)
 --DEBUG:print(table.mapi(inst, function(s) return tostring(s) end):concat' ')
 							code:insert(inst)
 						end
@@ -1494,7 +1497,7 @@ function JavaASMDex:compile()
 				local lo = assert.index(opForInstName, inst[1])
 				local instDesc = assert.index(instDescForOp, lo)
 				cblob:writeu1(lo)
-				instDesc.rw.write(inst, cblob, self)
+				instDesc.write(inst, cblob, self)
 			end
 			method.codeData = cblob:compile()
 		end
