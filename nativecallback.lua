@@ -3,7 +3,6 @@ Here's the fake-class used for the solve purpose of its one native function that
 I guess with JavaASMClass and JavaLuaClass, the need for this is getting slimmer and slimmer...
 --]]
 local ffi = require 'ffi'
-local JavaASMClass = require 'java.asmclass'
 
 local M = {}
 
@@ -41,34 +40,43 @@ function M:run(env)
 		return cl
 	end
 
-	local asmClass = JavaASMClass{
-		version = 0x41,
-		isPublic = true,
-		isSuper = true,
-		thisClass = newClassNameSlashSep,
-		superClass = 'java/lang/Object',
-		methods = {
-			{	-- needs a ctor? even though it's never used?
-				isPublic = true,
-				name = '<init>',
-				sig = '()V',
-				code = [[
+	local asmClass
+	-- you will have to set this,
+	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
+	if M.isDalvik then
+
+
+	else
+		local JavaASMClass = require 'java.asmclass'
+		asmClass = JavaASMClass{
+			version = 0x41,
+			isPublic = true,
+			isSuper = true,
+			thisClass = newClassNameSlashSep,
+			superClass = 'java/lang/Object',
+			methods = {
+				{	-- needs a ctor? even though it's never used?
+					isPublic = true,
+					name = '<init>',
+					sig = '()V',
+					code = [[
 aload_0
 invokespecial java/lang/Object <init> ()V
 return
 ]],
-				maxStack = 1,
-				maxLocals = 1,
+					maxStack = 1,
+					maxLocals = 1,
+				},
+				{
+					isNative = true,
+					isPublic = true,
+					isStatic = true,
+					name = M.runMethodName,
+					sig = M.runMethodSig,
+				},
 			},
-			{
-				isNative = true,
-				isPublic = true,
-				isStatic = true,
-				name = M.runMethodName,
-				sig = M.runMethodSig,
-			},
-		},
-	}
+		}
+	end
 
 	local cl = env:_defineClass(asmClass)
 

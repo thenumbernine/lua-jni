@@ -1786,24 +1786,29 @@ assert.type(const.name, 'string')
 					end
 				end
 
+				-- if you get a vm segfault from bad max stack/locals then read from these fields to find what my algo deduces they shoudl be
+				method.inferredMaxStack = maxStack
+				method.inferredMaxLocals = maxLocals
+
 				if not method.maxStack then
 					method.maxStack = maxStack
-io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxStack='..maxStack..'\n')
+--DEBUG:io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxStack='..maxStack..'\n')
 				else
 					-- NOTICE this can't handle labels so ...
-					if method.maxStack ~= maxStack then
-						io.stderr:write('!!! WARNING !!! '..method.name..' you set maxStack to '..method.maxStack..' but I calculated it as '..maxStack..'\n')
-					end
+						-- should this be an error? no, because the detection might be wrong.
+--DEUBG:if method.maxStack ~= maxStack then
+--DEBUG:	io.stderr:write('!!! WARNING !!! '..method.name..' you set maxStack to '..method.maxStack..' but I calculated it as '..maxStack..'\n')
+--DEBUG:end
 				end
 
 				if not method.maxLocals then
 					method.maxLocals = maxLocals
-io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxLocals='..maxLocals..'\n')
+--DEBUG:io.stderr:write('determined class '..self.thisClass..' method '..method.name..' sig '..method.sig..' has maxLocals='..maxLocals..'\n')
 				else
 					-- NOTICE this can't handle labels so ...
-					if method.maxLocals ~= maxLocals then
-						io.stderr:write('!!! WARNING !!! '..method.name..' you set maxLocals to '..method.maxLocals..' but I calculated it as '..maxLocals..'\n')
-					end
+--DEBUG:if method.maxLocals ~= maxLocals then
+--DEBUG:	io.stderr:write('!!! WARNING !!! '..method.name..' you set maxLocals to '..method.maxLocals..' but I calculated it as '..maxLocals..'\n')
+--DEBUG:end
 				end
 
 				local cblob = WriteBlob()

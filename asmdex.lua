@@ -18,6 +18,7 @@ local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's 
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 
+local sizeOfProto = 3 * ffi.sizeof'uint32_t'
 local sizeOfClass = 8 * ffi.sizeof'uint32_t'
 
 local mapListTypes = table{
@@ -1016,10 +1017,13 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		if ofs == 0 then return end
 		blob.ofs = ofs
 		local numArgs = blob:readu4()
+--DEBUG:print('read type list #args', numArgs)		
 		if numArgs == 0 then return end
 		local args = table()
 		for i=0,numArgs-1 do
-			args[i+1] = assert.index(types, 1+blob:readu2())
+			local typeIndex = blob:readu2()
+			args[i+1] = assert.index(types, 1+typeIndex)
+--DEBUG:print('read type list arg['..i..'] = '..typeIndex, args[i+1])			
 		end
 		return args
 	end
@@ -1070,19 +1074,23 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	end
 
 	assert.le(0, protoOfs)
-	local sizeofProto = 3*ffi.sizeof'uint32_t'
-	assert.le(protoOfs + sizeofProto * numProtos, fileSize)
+	assert.le(protoOfs + sizeOfProto * numProtos, fileSize)
 	local protos = table()
 	self.protos = protos
 	for i=0,numProtos-1 do
-		blob.ofs = protoOfs + i * sizeofProto
+		blob.ofs = protoOfs + i * sizeOfProto
 		local proto = {}
 		-- I don't get ShortyDescritpor ... is it redundant to returnType + args?
-		local shorty = assert.index(strings, 1 + blob:readu4())
-		local returnType = assert.index(types, 1 + blob:readu4())
+		local shortyIndex = blob:readu4()
+--DEBUG:print('read proto shortyIndex', shortyIndex)		
+		local shorty = assert.index(strings, 1 + shortyIndex)
+		local returnTypeIndex = blob:readu4()
+--DEBUG:print('read proto returnTypeIndex', returnTypeIndex)		
+		local returnType = assert.index(types, 1 + returnTypeIndex)
 
-		local argsOfs = blob:readu4()
-		local argTypes = readTypeList(argsOfs)
+		local argTypeListOfs = blob:readu4()
+--DEBUG:print('read proto argTypeListOfs', argTypeListOfs)		
+		local argTypes = readTypeList(argTypeListOfs)
 
 		-- sig but in .class format:
 		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
@@ -1111,9 +1119,15 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	for i=0,numMethods-1 do
 		local method = {}
 		self.methods[i+1] = method
-		method.class = assert.index(types, 1 + blob:readu2())
-		method.sig = deepCopy(assert.index(protos, 1 + blob:readu2()))
-		method.name = assert.index(strings, 1 + blob:readu4())
+		local classIndex = blob:readu2()
+--DEBUG:print('read method class index', classIndex)		
+		method.class = assert.index(types, 1 + classIndex)
+		local protoIndex = blob:readu2()
+--DEBUG:print('read method proto index', protoIndex)		
+		method.sig = deepCopy(assert.index(protos, 1 + protoIndex))
+		local nameIndex = blob:readu4()
+--DEBUG:print('read method name index', nameIndex)	
+		method.name = assert.index(strings, 1 + nameIndex)
 --DEBUG:print('read method['..i..'] = '..require 'ext.tolua'(method))
 	end
 
@@ -1440,10 +1454,13 @@ function JavaASMDex:compile()
 		local w = WriteBlobLE()
 		w:writeu4(#typeStrs)
 		for _,typeStr in ipairs(typeStrs) do
-			w:writeu4(addType(typeStr))
+			w:writeu2(addType(typeStr))
 		end
 		-- return 1-based index to-be-replaced later
-		return 1+addUnique(self.typeLists, w:compile())
+		local b = w:compile()
+		local typeListIndex = addUnique(self.typeLists, b)
+--DEBUG:print('adding type list index '..typeListIndex..' '..string.hex(b)..' from '..require 'ext.tolua'(typeStrs))		
+		return 1+typeListIndex 
 	end
 
 	-- return 0-based index into protos
@@ -1460,17 +1477,27 @@ function JavaASMDex:compile()
 		end)
 
 		local w = WriteBlobLE()
-		w:writeu4(addString(shorts:concat()))
+		local shorty = shorts:concat()
+		local shortyIndex = addString(shorty)
+--DEBUG:print('adding proto shorty', shorty, 'index', shortyIndex)
+		w:writeu4(shortyIndex)
 
 		local returnType = table.remove(sig, 1)
-		w:writeu4(addType(returnType))
+		local returnTypeIndex = addType(returnType)
+--DEBUG:print('adding proto returnType', returnType, 'index', returnTypeIndex)		
+		w:writeu4(returnTypeIndex)
 
+		local argTypeListIndex = addTypeList(sig)
+--DEBUG:print('adding proto argTypeListIndex', argTypeListIndex, require 'ext.tolua'(sig))
 		-- notice, the args get stoerd in a a separate list later
 		-- so i'll save them in another list
 		-- and in place of an offset, i'll just save that list's index for now...
-		w:writeu4(addTypeList(sig))
+		w:writeu4(argTypeListIndex)
 
-		return addUnique(self.protos, w:compile())
+		local b = w:compile()
+		local protoIndex = addUnique(self.protos, b)
+--DEBUG:print('adding proto', protoIndex, string.hex(b), 'for sig', sigstr)
+		return protoIndex
 	end
 	self.addProto = addProto
 
@@ -1494,13 +1521,16 @@ function JavaASMDex:compile()
 	self.methodBlobs = table()
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
-		w:writeu2(addType(class))
+		local classIndex = addType(class)
+		w:writeu2(classIndex)
 --DEBUG:print('adding method with sig', sig)
-		w:writeu2(addProto(sig))
-		w:writeu4(addString(name))
+		local protoIndex = addProto(sig)
+		w:writeu2(protoIndex)
+		local nameIndex = addString(name)
+		w:writeu4(nameIndex)
 		local b = w:compile()
 		local methodIndex = addUnique(self.methodBlobs, b)
---DEBUG:print('adding method '..methodIndex..' = '..string.hex(b))
+--DEBUG:print('adding method '..methodIndex..' = '..string.hex(b), class, classIndex, sig, protoIndex, name, nameIndex)
 		return methodIndex
 	end
 	self.addMethod = addMethod
@@ -1734,8 +1764,10 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 	if #self.strings > 0 then
 		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
 		for i,s in ipairs(self.strings) do
---DEBUG:print('setting string data item to', #blob)
-			ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))[0] = #blob
+			local ptr = ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))
+--DEBUG:local from = ptr[0]
+			ptr[0] = #blob
+--DEBUG:print('changing string data item from', from, 'to', #blob)
 			blob:writeUleb128(#s)
 			blob:writeString(s)
 		end
@@ -1747,23 +1779,26 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		self.map:insert{type='type_list', offset=#blob, count=#self.typeLists}
 		local typeListOfs = table()
 		for i,typeList in ipairs(self.typeLists) do
+--DEBUG:print('writing typeList ofs', #blob, 'data', string.hex(typeList))
 			typeListOfs[i] = #blob
 			blob:writeString(typeList)
 		end
 		-- now replace all proto type list indexes with offsets
-		for i=1,#self.protos do
-			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
+		for i=0,#self.protos-1 do
+			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 8 + sizeOfProto * i)
 			if protoArgTypeListPtr[0] ~= 0 then
+--DEBUG:local from = protoArgTypeListPtr[0]
 				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
---DEBUG:print('setting protoArgTypeListPtr to', protoArgTypeListPtr[0])
+--DEBUG:print('changing protoArgTypeListPtr from', from, 'to', protoArgTypeListPtr[0])
 			end
 		end
 		-- now replace all class interfaceIndexes
-		for i=1,#self.classes do
-			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 12 + (i-1) * sizeOfClass)
+		for i=0,#self.classes-1 do
+			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 12 + sizeOfClass * i)
 			if classInterfaceTypeListPtr[0] ~= 0 then
+--DEBUG:local from = classInterfaceTypeListPtr[0]
 				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
---DEBUG:print('setting classInterfaceTypeListPtr to', classInterfaceTypeListPtr[0])
+--DEBUG:print('changing classInterfaceTypeListPtr from', from, 'to', classInterfaceTypeListPtr[0])
 			end
 		end
 	end
@@ -1799,8 +1834,10 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 				local encodedCatchHandlerListOfs = #blob
 				for _,try in ipairs(method.tries) do
 					-- fill in try.handlerOfs
-					ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)[0] = #blob - encodedCatchHandlerListOfs
---DEBUG:print('setting try.handlerOfsOfs to',#blob - encodedCatchHandlerListOfs)
+					local ptr = ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)
+--DEBUG:local from = ptr[0]
+					ptr[0] = #blob - encodedCatchHandlerListOfs
+--DEBUG:print('changing try.handlerOfsOfs from', from, 'to',ptr[0])
 					blob:writeSleb128(try.catchAllAddr and -#try or #try)
 					for i,addrPair in ipairs(try) do
 						blob:writeUleb128(addrPair.typeIndex)
@@ -1872,8 +1909,9 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 			classDataCount = classDataCount + 1
 			-- change the class data offset to here
 			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 + (classIndex-1) * sizeOfClass)
+--DEBUG:local from = classDataPtr[0]
 			classDataPtr[0] = #blob
---DEBUG:print('setting classDataPtr to', #blob)
+--DEBUG:print('changing classDataPtr from', from, 'to', #blob)
 
 			blob:writeUleb128(#staticFieldIndexes)
 			blob:writeUleb128(#instanceFieldIndexes)
@@ -1917,7 +1955,10 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 	if #self.map > 0 then	-- should always be true
 		align(4)
 		self.map:insert{type='map_list', offset=#blob, count=1}
-		ffi.cast('uint32_t*', blob.data.v + mapOfsOfs)[0] = #blob
+		local ptr = ffi.cast('uint32_t*', blob.data.v + mapOfsOfs)
+--DEBUG:local from = ptr[0]
+		ptr[0] = #blob
+--DEBUG:print('changing mapOfs from', from, 'to', #blob)		
 		blob:writeu4(#self.map)
 		for _,entry in ipairs(self.map) do
 			blob:writeu2((assert.index(mapListTypeForName, entry.type)))
@@ -1929,11 +1970,18 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 
 	-- finally write the data section,
 	-- which starts after the header's tables and ends here
-	ffi.cast('uint32_t*', blob.data.v + datasOfs)[0] = datasStartOfs
-	ffi.cast('uint32_t*', blob.data.v + datasOfs + 4)[0] = #blob - datasStartOfs
-
-	ffi.cast('uint32_t*', blob.data.v + fileSizeOfs)[0] = #blob
-
+	local ptr = ffi.cast('uint32_t*', blob.data.v + datasOfs)
+--DEBUG:local from = ptr[0]
+	ptr[0] = datasStartOfs
+--DEBUG:print('changing datasStart from', from, 'to', ptr[0])
+	local ptr = ffi.cast('uint32_t*', blob.data.v + datasOfs + 4)
+--DEBUG:local from = ptr[0]
+	ptr[0] = #blob - datasStartOfs
+--DEBUG:print('changing datasOfs from', from, 'to', ptr[0])
+	local ptr = ffi.cast('uint32_t*', blob.data.v + fileSizeOfs)
+--DEBUG:local from = ptr[0]
+	ptr[0] = #blob
+--DEBUG:print('changing fileSize from', from, 'to', ptr[0])
 	-- TODO done?
 
 	-- TODO remove temp write fields?
