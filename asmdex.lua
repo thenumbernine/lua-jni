@@ -8,10 +8,8 @@ local class = require 'ext.class'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
 local string = require 'ext.string'
-
 local ReadBlobLE = require 'java.blob'.ReadBlobLE
 local WriteBlobLE = require 'java.blob'.WriteBlobLE
-
 local deepCopy = require 'java.util'.deepCopy
 local sigStrToObj = require 'java.util'.sigStrToObj
 local primSigStrForName = require 'java.util'.primSigStrForName
@@ -20,6 +18,34 @@ local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
+
+
+local mapListTypes = table{
+	[0] = 'header_item',
+	[1] = 'string_id_item',
+	[2] = 'type_id_item',
+	[3] = 'proto_id_item',
+	[4] = 'field_id_item',
+	[5] = 'method_id_item',
+	[6] = 'class_def_item',
+	[7] = 'call_site_id_item',
+	[8] = 'method_handle_item',
+	[0x1000] = 'map_list',
+	[0x1001] = 'type_list',
+	[0x1002] = 'annotation_set_ref_list',
+	[0x1003] = 'annotation_set_item',
+	[0x2000] = 'class_data_item',
+	[0x2001] = 'code_item',
+	[0x2002] = 'string_data_item',
+	[0x2003] = 'debug_info_item',
+	[0x2004] = 'annotation_item',
+	[0x2005] = 'encoded_array_item',
+	[0x2006] = 'annotations_directory_item',
+	[0xF000] = 'hiddenapi_class_data_item',
+}
+local mapListTypeForName = mapListTypes:map(function(v,k)
+	return k,v
+end):setmetatable(nil)
 
 local function instPushString(inst, stringIndex, asm)
 	local str = asm.strings[1+stringIndex]
@@ -177,7 +203,7 @@ function Instr21c_string.read(inst, hi, blob, asm)
 end
 function Instr21c_string.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu2(instReadString(inst, 3, blob))
+	blob:writeu2(instReadString(inst, 3, asm))
 end
 
 local Instr21c_type = Instr:subclass()
@@ -187,7 +213,7 @@ function Instr21c_type.read(inst, hi, blob, asm)
 end
 function Instr21c_type.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu2(instReadType(inst, 3, blob))
+	blob:writeu2(instReadType(inst, 3, asm))
 end
 
 local Instr21c_field = Instr:subclass()
@@ -914,17 +940,17 @@ function JavaASMDex:readData(data)
 	local blob = ReadBlobLE(data)
 	assert.eq(blob:readString(4), 'dex\n')
 	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
---DEBUG:print('version', string.hex(version))
+print('version', string.hex(version))
 	local checksum = blob:readu4()
---DEBUG:print('checksum = 0x'..bit.tohex(checksum, 8))
+print('checksum = 0x'..bit.tohex(checksum, 8))
 	local sha1sig = blob:readString(20)
---DEBUG:print('sha1sig', string.hex(sha1sig))
+print('sha1sig', string.hex(sha1sig))
 	local fileSize = blob:readu4()
---DEBUG:print('fileSize', fileSize)
+print('fileSize', fileSize)
 	local headerSize = blob:readu4()
---DEBUG:print('headerSize', headerSize)
+print('headerSize', headerSize)
 	local endianTag = blob:readu4()
---DEBUG:print('endianTag = 0x'..bit.tohex(endianTag, 8))
+print('endianTag = 0x'..bit.tohex(endianTag, 8))
 	if endianTag == 0x78563412 then
 		-- then do I flip size and checksum as well?
 		blob.littleEndian = false
@@ -937,44 +963,42 @@ function JavaASMDex:readData(data)
 
 	local numLinks = blob:readu4()
 	local linkOfs = blob:readu4()
---DEBUG:print('link count', numLinks,'ofs', linkOfs)
+print('link count', numLinks,'ofs', linkOfs)
 	if numLinks ~= 0 then
 io.stderr:write('TODO support dynamically-linked .dex files\n')
 	end
 
 	local mapOfs = blob:readu4()
---DEBUG:print('map ofs', mapOfs)
+print('map ofs', mapOfs)
 
 	local numStrings = blob:readu4()
 	local stringOfsOfs = blob:readu4()
---DEBUG:print('stringId count', numStrings, 'ofs', stringOfsOfs)
+print('stringId count', numStrings, 'ofs', stringOfsOfs)
 
 	local numTypes = blob:readu4()
 	local typeOfs = blob:readu4()
---DEBUG:print('typeId count', numTypes,'ofs', typeOfs)
+print('typeId count', numTypes,'ofs', typeOfs)
 
 	local numProtos = blob:readu4()
 	local protoOfs = blob:readu4()
---DEBUG:print('protoId count', numProtos,'ofs', protoOfs)
+print('protoId count', numProtos,'ofs', protoOfs)
 
 	local numFields = blob:readu4()
 	local fieldOfs = blob:readu4()
---DEBUG:print('fieldId count', numFields,'ofs', fieldOfs)
+print('fieldId count', numFields,'ofs', fieldOfs)
 
 	local numMethods = blob:readu4()
 	local methodOfs = blob:readu4()
---DEBUG:print('methodId count', numMethods,'ofs', methodOfs)
+print('methodId count', numMethods,'ofs', methodOfs)
 
 	local numClasses = blob:readu4()
 	local classOfs = blob:readu4()
---DEBUG:print('classDef count', numClasses,'ofs', classOfs)
+print('classDef count', numClasses,'ofs', classOfs)
 
+	-- wait is this used for anything, or just annotation as to where the 'extra' data of other header fields puts stuff?
 	local numDatas = blob:readu4()
 	local datasOfs = blob:readu4()
---DEBUG:print('data count', numDatas,'ofs', datasOfs)
-	if numDatas > 0 then
-io.stderr:write('TODO support numDatas/datasOfs\n')
-	end
+print('data count', numDatas,'ofs', datasOfs)
 
 	-- header is done, read structures
 
@@ -997,38 +1021,17 @@ io.stderr:write('TODO support numDatas/datasOfs\n')
 
 	-- wait is this redundant to the subsequent structures?
 	-- or is this the equivalent of the old "constants" table in .class files?
+	-- it's redundant.  and stupid.
 	if mapOfs ~= 0 then
 		blob.ofs = mapOfs
 		local count = blob:readu4()
 		for i=0,count-1 do
 			local map = {}
-			map.type = assert.index({
-				[0] = 'header_item',
-				[1] = 'string_id_item',
-				[2] = 'type_id_item',
-				[3] = 'proto_id_item',
-				[4] = 'field_id_item',
-				[5] = 'method_id_item',
-				[6] = 'class_def_item',
-				[7] = 'call_site_id_item',
-				[8] = 'method_handle_item',
-				[0x1000] = 'map_list',
-				[0x1001] = 'type_list',
-				[0x1002] = 'annotation_set_ref_list',
-				[0x1003] = 'annotation_set_item',
-				[0x2000] = 'class_data_item',
-				[0x2001] = 'code_item',
-				[0x2002] = 'string_data_item',
-				[0x2003] = 'debug_info_item',
-				[0x2004] = 'annotation_item',
-				[0x2005] = 'encoded_array_item',
-				[0x2006] = 'annotations_directory_item',
-				[0xF000] = 'hiddenapi_class_data_item',
-			}, blob:readu2())
+			map.type = assert.index(mapListTypes, blob:readu2())
 			blob:readu2()	-- unused
 			map.count = blob:readu4()
 			map.offset = blob:readu4()
---DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
+print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -1040,9 +1043,9 @@ io.stderr:write('TODO support numDatas/datasOfs\n')
 	self.strings = strings
 	for i=0,numStrings-1 do
 		blob.ofs = stringOfsOfs + ffi.sizeof'uint32_t' * i
---DEBUG:print('stringOfsOfs', blob.ofs)		
+print('stringOfsOfs', blob.ofs)
 		blob.ofs = blob:readu4()
---DEBUG:print('stringOfs', blob.ofs)		
+print('stringOfs', blob.ofs)
 		if blob.ofs < 0 or blob.ofs >= fileSize then
 			error("string has bad ofs: 0x"..string.hex(blob.ofs))
 		end
@@ -1380,6 +1383,7 @@ function JavaASMDex:compile()
 	self.fieldBlobs = table()
 	self.methodBlobs = table()
 
+	-- return 0-based index into our list of unique values
 	local function addUnique(arr, data)
 		for i=1,#arr do
 			if arr[i] == data then return i-1 end
@@ -1388,6 +1392,7 @@ function JavaASMDex:compile()
 		return #arr-1
 	end
 
+	-- return 0-based index into strings
 	local function addString(str)
 		-- ultimately strings will be preceded by a uleb128 of the length
 		-- but equality is the same with the original so dont convert just yet
@@ -1395,6 +1400,7 @@ function JavaASMDex:compile()
 	end
 	self.addString = addString
 
+	-- return 0-based index into types
 	local function addType(str)
 		local w = WriteBlobLE()
 		w:writeu4(addString(str))
@@ -1402,7 +1408,10 @@ function JavaASMDex:compile()
 	end
 	self.addType = addType
 
+	-- returns 0 when the offset should be 0,
+	-- otherwise returns a 1-based index into the type lists
 	local function addTypeList(typeStrs)
+		if not typeStrs then return 0 end
 		if #typeStrs == 0 then return 0 end	-- 0 means 0
 		local w = WriteBlobLE()
 		w:writeu4(#typeStrs)
@@ -1413,6 +1422,7 @@ function JavaASMDex:compile()
 		return 1+addUnique(self.typeLists, w:compile())
 	end
 
+	-- return 0-based index into protos
 	local function addProto(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
 		local sig = sigStrToObj(sigstr)
@@ -1446,7 +1456,7 @@ function JavaASMDex:compile()
 		-- so i'll save them in another list
 		-- and in place of an offset, i'll just save that list's index for now...
 		w:writeu4(addTypeList(sig))
-		
+
 		return addUnique(self.protos, w:compile())
 	end
 	self.addProto = addProto
@@ -1511,105 +1521,141 @@ function JavaASMDex:compile()
 		end
 	end
 
+
+	self.map = table()
+	self.map:insert{type='header_item', count=1, offset=0}
+
 	-- ok now all constants are accounted for ... start writing
 	local blob = WriteBlobLE()
+	
+	local function align(n)
+		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
+	end
+
 	blob:writeString('dex\n')
 	blob:writeString('\30\33\39\0')
-	
-	local checksumOfs = blob.ofs
+
+	local checksumOfs = #blob
 	blob:writeu4(0)	-- space for checksum, write it once we're finished
-	
-	local sha1Ofs = blob.ofs
+
+	local sha1Ofs = #blob
 	blob:writeString(('\0'):rep(20))	-- space for sha1, write it once we're finished
-	
+
 	-- ... or not, or make a blob for everything but the header.  would that work or would i have to factor in offsets to every struct's offsets i wrote?
-	local fileSizeOfs = blob.ofs
+	local fileSizeOfs = #blob
 	blob:writeu4(0)	-- space for file size, write it once we're finished
-	
-	local headerSizeOfs = blob.ofs
+
+	local headerSizeOfs = #blob
 	blob:writeu4(0)	-- space for header size
-	
+
 	blob:writeu1(0x12345678)	-- endian tag
 	blob:writeu4(0)		-- num links
 	blob:writeu4(0)		-- link ofs
-	
-	local mapOfsOfs = blob.ofs
+
+	local mapOfsOfs = #blob
 	blob:writeu4(0)
-	
+
 	blob:writeu4(#self.strings)
-	local stringOfsOfs = blob.ofs
+	local stringOfsOfs = #blob
 	blob:writeu4(0)
 
 	blob:writeu4(#self.types)
-	local typeOfs = blob.ofs
+	local typeOfs = #blob
 	blob:writeu4(0)
 
 	blob:writeu4(#self.protos)
-	local protoOfs = blob.ofs
+	local protoOfs = #blob
 	blob:writeu4(0)
 
 	blob:writeu4(#self.fieldBlobs)
-	local fieldOfs = blob.ofs
+	local fieldOfs = #blob
 	blob:writeu4(0)
 
 	blob:writeu4(#self.methodBlobs)
-	local methodOfs = blob.ofs
+	local methodOfs = #blob
 	blob:writeu4(0)
 
 	blob:writeu4(#self.classes)
-	local classOfs = blob.ofs
+	local classOfs = #blob
 	blob:writeu4(0)
 
+	local datasOfs = #blob
 	blob:writeu4(0)	-- numDatas
 	blob:writeu4(0)	-- datasOfs
 
 	-- fill in header size
-	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = blob.ofs	
+	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = #blob
 
-	-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
-	ffi.cast('uint32_t*', blob.data.v + stringOfsOfs)[0] = blob.ofs	
-	-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
-	-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
-	--  then the offsets to string data comes much much later in the file.
-	--  maybe in the "support data" section?
-	local stringOfs = blob.ofs
-	-- write placeholders for offsets
-	for i=0,#self.strings-1 do
-		blob:writeu4(0)
+	local stringOfs
+	if #self.strings > 0 then
+		align(4)
+		-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
+		ffi.cast('uint32_t*', blob.data.v + stringOfsOfs)[0] = #blob
+		self.map:insert{type='string_id_item', offset=#blob, count=#self.strings}
+		-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
+		-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
+		--  then the offsets to string data comes much much later in the file.
+		--  maybe in the "support data" section?
+		stringOfs = #blob
+		-- write placeholders for offsets
+		for i=0,#self.strings-1 do
+			blob:writeu4(0)
+		end
 	end
 
 	-- fill in the type offsets
-	ffi.cast('uint32_t*', blob.data.v + typeOfs)[0] = blob.ofs
-	for i,typeIndex in ipairs(self.types) do
-		blob:writeu4(typeIndex)
+	if #self.types > 0 then
+		align(4)
+		ffi.cast('uint32_t*', blob.data.v + typeOfs)[0] = #blob
+		self.map:insert{type='type_id_item', offset=#blob, count=#self.types}
+		for i,typeData in ipairs(self.types) do
+			assert.len(typeData, 4)	-- should be already serialized
+			blob:writeString(typeData)
+		end
 	end
 
 	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
-	ffi.cast('uint32_t*', blob.data.v + protoOfs)[0] = blob.ofs
-	local protoDefOfs = blob.ofs
-	for i,proto in ipairs(self.protos) do
-		-- proto+8 is the args offset, which will need to be replaced later
-		assert.len(proto, 12)
-		blob:writeString(proto)
+	local protoDefOfs 
+	if #self.protos > 0 then
+		align(4)
+		ffi.cast('uint32_t*', blob.data.v + protoOfs)[0] = #blob
+		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
+		protoDefOfs = #blob
+		for i,proto in ipairs(self.protos) do
+			-- proto+8 is the args offset, which will need to be replaced later
+			assert.len(proto, 12)
+			blob:writeString(proto)
+		end
 	end
 
 	-- fill in fields
-	ffi.cast('uint32_t*', blob.data.v + fieldOfs)[0] = blob.ofs
-	for i,field in ipairs(self.fieldBlobs) do
-		assert.len(field, 8)
-		blob:writeString(field)
+	if #self.fieldBlobs > 0 then
+		align(4)
+		ffi.cast('uint32_t*', blob.data.v + fieldOfs)[0] = #blob
+		self.map:insert{type='field_id_item', offset=#blob, count=#self.fieldBlobs}
+		for i,field in ipairs(self.fieldBlobs) do
+			assert.len(field, 8)
+			blob:writeString(field)
+		end
 	end
 
 	-- fill in methods
-	ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = blob.ofs
-	for i,method in ipairs(self.methodBlobs) do
-		assert.len(method, 8)
-		blob:writeString(method)
+	if #self.methodBlobs > 0 then
+		align(4)
+		ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = #blob
+		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodBlobs}
+		for i,method in ipairs(self.methodBlobs) do
+			assert.len(method, 8)
+			blob:writeString(method)
+		end
 	end
 
 	-- fill in classdata
-	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = blob.ofs
-	local classDefOfs = blob.ofs
+	assert.gt(#self.classes, 0) 	-- otherwise why are we here...
+	align(4)
+	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = #blob
+	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
+	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
 		blob:writeu4(class.thisClassIndex)
 		blob:writeu4(class.superClassIndex)
@@ -1619,65 +1665,81 @@ function JavaASMDex:compile()
 		blob:writeu4(0)	-- fill in static-value-offset later
 	end
 
-	-- fill in call sites here
+	-- keep track of where the headers structures end
+	local datasStartOfs = #blob
 
-	-- fill in method handles here
+	-- TODO fill in call sites here
+	-- align(4)
+
+	-- TODO fill in method handles here
+	-- align(4)
 
 	-- now fill in extra data ...
 
 	-- after writing everything else, cirrrrcle back and fill in 'stringOfs' and write the string data into 'stringOfs'
-	for i,s in ipairs(self.strings) do
-		ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))[0] = blob.ofs
-		blob:writeUleb128(#s)
-		blob:writeString(s)
+	if #self.strings > 0 then
+		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
+		for i,s in ipairs(self.strings) do
+			ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))[0] = #blob
+			blob:writeUleb128(#s)
+			blob:writeString(s)
+		end
 	end
 
 	-- now fill in proto def type lists
-	local typeListOfs = table()
-	for i,typeList in ipairs(self.typeLists) do
-		typeListOfs[i] = blob.ofs
-		blob:writeString(typeList)
-	end
-	-- now replace all proto type list indexes with offsets
-	for i=1,#self.protos do
-		local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
-		if protoArgTypeListPtr[0] ~= 0 then
-			protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
+	if #self.typeLists > 0 then
+		align(4)
+		self.map:insert{type='type_list', offset=#blob, count=#self.typeLists}
+		local typeListOfs = table()
+		for i,typeList in ipairs(self.typeLists) do
+			typeListOfs[i] = #blob
+			blob:writeString(typeList)
 		end
-	end
-	-- now replace all class interfaceIndexes
-	for i=1,#self.classes do
-		local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 * (i-1) + 8)
-		if classInterfaceTypeListPtr[0] ~= 0 then
-			classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])  
+		-- now replace all proto type list indexes with offsets
+		for i=1,#self.protos do
+			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
+			if protoArgTypeListPtr[0] ~= 0 then
+				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
+			end
+		end
+		-- now replace all class interfaceIndexes
+		for i=1,#self.classes do
+			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 * (i-1) + 8)
+			if classInterfaceTypeListPtr[0] ~= 0 then
+				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
+			end
 		end
 	end
 
 	-- now fill in the class data's method data's instruction data ... before I fill in the method data's code offset as a uleb128 which is going to vary based on its size...
+	align(4)
+	local codeItemOfs = #blob
+	local codeItemCount = 0
 	for _,method in ipairs(self.methods) do
 		if method.codeData then
+			codeItemCount = codeItemCount + 1
 			-- save for later for class data
-			method.codeOfs = blob.ofs
+			method.codeOfs = #blob
 			blob:writeu2(method.maxRegs or 0)
 			blob:writeu2(method.regsIn or 0)
 			blob:writeu2(method.regsOut or 0)
 			blob:writeu2(method.tries and #method.tries or 0)
 			blob:writeString(method.codeData)
 
-			if bit.band(3, blob.ofs) == 2 then blob:writeu2(0) end
-			assert.eq(bit.band(3, blob.ofs), 0, "blob ofs supposed to be 4-byte aligned")
+			if bit.band(3, #blob) == 2 then blob:writeu2(0) end
+			assert.eq(bit.band(3, #blob), 0, "#blob supposed to be 4-byte aligned")
 
 			if method.tries then
 				for _,try in ipairs(method.tries) do
 					blob:writeu4(try.startAddr or 0)
 					blob:writeu2(try.numInsts or 0)
-					try.handlerOfsOfs = blob.ofs	-- circle back
+					try.handlerOfsOfs = #blob	-- circle back
 					blob:writeu2(try.handlerOfs or 0)
 				end
-				local encodedCatchHandlerListOfs = blob.ofs
+				local encodedCatchHandlerListOfs = #blob
 				for _,try in ipairs(method.tries) do
 					-- fill in try.handlerOfs
-					ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)[0] = blob.ofs - encodedCatchHandlerListOfs 
+					ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)[0] = #blob - encodedCatchHandlerListOfs
 					blob:writeSleb128(try.catchAllAddr and -#try or #try)
 					for i,addrPair in ipairs(try) do
 						blob:writeUleb128(addrPair.typeIndex)
@@ -1690,15 +1752,23 @@ function JavaASMDex:compile()
 			end
 		end
 	end
-
+	
+	align(4)
+	-- if we wrote anything, insert a map entry
+	if codeItemCount > 0 then
+		self.map:insert{type='code_item', offset=codeItemOfs, count=codeItemCount }
+	end
+	
 	-- now fill in class data
+	local classDataOfs = #blob
+	local classDataCount = 0
 	for classIndex,class in ipairs(self.classes) do
-		-- per-class 
+		-- per-class
 		-- collect all fields that are static vs instance
 		local staticFieldIndexes = table()	-- 1-based
 		local instanceFieldIndexes = table()	-- 1-based
-		for i,field in ipairs(self.fields) do 
-			if field.class == class.thisClass 
+		for i,field in ipairs(self.fields) do
+			if field.class == class.thisClass
 			and field.accessFlags
 			and field.accessFlags ~= 0
 			then
@@ -1709,7 +1779,7 @@ function JavaASMDex:compile()
 				end
 			end
 		end
-		
+
 		-- collect all methods that are direct vs virtual
 		local directMethodIndexes = table() 	-- 1-based
 		local virtualMethodIndexes = table()	-- 1-based
@@ -1718,9 +1788,9 @@ function JavaASMDex:compile()
 			and method.accessFlags
 			and method.accessFlags ~= 0
 			then
-				if method.isStatic 
-				or method.isPrivate 
-				or method.isConstructor 
+				if method.isStatic
+				or method.isPrivate
+				or method.isConstructor
 				then
 					directMethodIndexes:insert(i)
 				else
@@ -1728,15 +1798,16 @@ function JavaASMDex:compile()
 				end
 			end
 		end
-		
+
 		if #staticFieldIndexes > 0
 		or #instanceFieldIndexes > 0
 		or #directMethodIndexes > 0
 		or #virtualMethodIndexes > 0
 		then
+			classDataCount = classDataCount + 1
 			-- change the class data offset to here
 			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 16 + (classIndex-1) * 24)
-			classDataPtr[0] = blob.ofs
+			classDataPtr[0] = #blob
 
 			blob:writeUleb128(#staticFieldIndexes)
 			blob:writeUleb128(#instanceFieldIndexes)
@@ -1753,11 +1824,11 @@ function JavaASMDex:compile()
 					end
 					blob:writeUleb128(self.fields[fieldIndex].accessFlags)
 					lastFieldIndex = fieldIndex
-				end		
+				end
 			end
 			writeFields(staticFieldIndexes)
 			writeFields(instanceFieldIndexes)
-		
+
 			local function writeMethods(methodIndexes)
 				local lastMethodIndex
 				for _,methodIndex in ipairs(methodIndexes) do
@@ -1777,8 +1848,32 @@ function JavaASMDex:compile()
 			writeMethods(virtualMethodIndexes)
 		end
 	end
+	if classDataCount > 0 then
+		self.map:insert{type='class_data_item', offset=classDataOfs, count=classDataCount }
+	end
 
 	-- TODO link data last?
+
+	-- only after everything, write the map data
+	if #self.map > 0 then	-- should always be true
+		align(4)
+		self.map:insert{type='map_list', offset=#blob, count=1}
+		ffi.cast('uint32_t*', blob.data.v + mapOfsOfs)[0] = #blob
+		blob:writeu4(#self.map)
+		for _,entry in ipairs(self.map) do
+			blob:writeu2((assert.index(mapListTypeForName, entry.type)))
+			blob:writeu2(0)	-- unused
+			blob:writeu4(entry.count)
+			blob:writeu4(entry.offset)
+		end
+	end
+
+	-- finally write the data section,
+	-- which starts after the header's tables and ends here
+	ffi.cast('uint32_t*', blob.data.v + datasOfs)[0] = datasStartOfs
+	ffi.cast('uint32_t*', blob.data.v + datasOfs + 4)[0] = #blob - datasStartOfs
+
+	ffi.cast('uint32_t*', blob.data.v + fileSizeOfs)[0] = #blob
 
 	-- TODO done?
 
