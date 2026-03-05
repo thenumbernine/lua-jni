@@ -19,6 +19,7 @@ local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's 
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
 
+local sizeOfClass = 8 * ffi.sizeof'uint32_t'
 
 local mapListTypes = table{
 	[0] = 'header_item',
@@ -1049,16 +1050,16 @@ print('map['..i..'] = '..require 'ext.tolua'(map))
 	self.strings = strings
 	for i=0,numStrings-1 do
 		blob.ofs = stringOfsOfs + ffi.sizeof'uint32_t' * i
-print('stringOfsOfs', blob.ofs)
+--DEBUG:print('stringOfsOfs', blob.ofs)
 		blob.ofs = blob:readu4()
-print('stringOfs', blob.ofs)
+--DEBUG:print('stringOfs', blob.ofs)
 		if blob.ofs < 0 or blob.ofs >= fileSize then
 			error("string has bad ofs: 0x"..string.hex(blob.ofs))
 		end
 		local len = blob:readUleb128()
 		local str = blob:readString(len)
 		strings[i+1] = str
---DEBUG:print('string['..i..'] = '..str)
+print('string['..i..'] = '..require 'ext.tolua'(str))
 	end
 
 	assert.le(0, typeOfs)
@@ -1088,7 +1089,7 @@ print('stringOfs', blob.ofs)
 		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
 		protos[i+1] = sig
 
---DEBUG:print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
+print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 	end
 
 	local sizeOfField = 2*ffi.sizeof'uint32_t'
@@ -1114,24 +1115,33 @@ print('stringOfs', blob.ofs)
 		method.class = assert.index(types, 1 + blob:readu2())
 		method.sig = deepCopy(assert.index(protos, 1 + blob:readu2()))
 		method.name = assert.index(strings, 1 + blob:readu4())
+print('read method['..i..'] = '..require 'ext.tolua'(method))	
 	end
 
 	-- so this is interesting
 	-- an ASMDex file can be more than one class
 	-- oh well, as long as there's one ASMDex per DexLoader or whatever
-	local sizeOfClass = 8 * ffi.sizeof'uint32_t'
 	assert.le(0, classOfs)
 	assert.le(classOfs + sizeOfClass * numClasses, fileSize)
 	self.classes = table()
+print('read classDataOfs', classOfs)
 	for i=0,numClasses-1 do
 		blob.ofs = classOfs + i * sizeOfClass
 		local class = {}
 		self.classes[i+1] = class
-		class.thisClass = assert.index(types, 1 + blob:readu4())
-		setFlagsToObj(class, blob:readu4(), classAccessFlags)
-		class.superClass = assert.index(types, 1 + blob:readu4())
+		local thisClassIndex = blob:readu4()
+print('read class thisClassIndex', thisClassIndex) 		
+		class.thisClass = assert.index(types, 1 + thisClassIndex)
+		local accessFlags = blob:readu4()
+print('read class accessFlags', accessFlags)		
+		setFlagsToObj(class, accessFlags, classAccessFlags)
+		local superClassIndex = blob:readu4()
+print('read class superClassIndex', superClassIndex)
+		class.superClass = assert.index(types, 1 + superClassIndex)
 		local interfacesOfs = blob:readu4()
-		class.sourceFile = assert.index(strings, 1 + blob:readu4())
+		local sourceFileIndex = blob:readu4()
+print('read class sourceFileIndex', sourceFileIndex)
+		class.sourceFile = assert.index(strings, 1 + sourceFileIndex)
 		local annotationsOfs = blob:readu4()
 		local classDataOfs = blob:readu4()
 		local staticValueOfs = blob:readu4()
@@ -1171,7 +1181,9 @@ print('stringOfs', blob.ofs)
 				local methodIndex = 0
 				for i=0,count-1 do
 --DEBUG:local methodStartOfs = blob.ofs
-					methodIndex = methodIndex + blob:readUleb128()
+					local delta = blob:readUleb128()
+					methodIndex = methodIndex + delta
+print('read class data methodIndex delta', delta, 'index', methodIndex)
 					local method = assert.index(self.methods, 1 + methodIndex)
 --DEBUG:print('reading method data', method.class, method.name, method.sig, 'from ofs 0x'..bit.tohex(methodStartOfs, 8))
 					setFlagsToObj(method, blob:readUleb128(), methodAccessFlags)
@@ -1404,7 +1416,7 @@ function JavaASMDex:compile()
 		-- ultimately strings will be preceded by a uleb128 of the length
 		-- but equality is the same with the original so dont convert just yet
 		local stringIndex = addUnique(self.strings, str)
-print('adding string', stringIndex, str)		
+--DEBUG:print('adding string', stringIndex, str)		
 		return stringIndex
 	end
 	self.addString = addString
@@ -1417,7 +1429,7 @@ print('adding string', stringIndex, str)
 		w:writeu4(stringIndex)
 		local b = w:compile()
 		local typeIndex = addUnique(self.types, b)
-print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strings[stringIndex+1])
+--DEBUG:print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strings[stringIndex+1])
 		return typeIndex
 	end
 	self.addType = addType
@@ -1438,6 +1450,7 @@ print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strin
 
 	-- return 0-based index into protos
 	local function addProto(sigstr)
+print('addProto', sigstr)		
 		assert(sigstr)
 		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
 		local sig = sigStrToObj(sigstr)
@@ -1456,10 +1469,16 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 				arrayPrefix = arrayPrefix .. '['
 			until false
 			-- convert base type to prim if possible
-			sigi = primSigStrForName[sigi] or sigi
+			local prim = primSigStrForName[sigi]
+			if prim then
+				sigi = prim
+			else
+				sigi = 'L'..sigi:gsub('%.', '/')..';'
+			end
 			shorts[i] = arrayPrefix..(sigi:match'^L' or sigi)
 			-- re-add array
 			sigi = arrayPrefix .. sigi
+			sig[i] = sigi
 		end
 
 		local w = WriteBlobLE()
@@ -1491,11 +1510,12 @@ assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
 	local function addMethod(class, name, sig)
 		local w = WriteBlobLE()
 		w:writeu2(addType(class))
+print('adding method with sig', sig)		
 		w:writeu2(addProto(sig))
 		w:writeu4(addString(name))
 		local b = w:compile()
 		local methodIndex = addUnique(self.methodBlobs, b)
-print('adding method '..methodIndex..' = '..string.hex(b))
+--DEBUG:print('adding method '..methodIndex..' = '..string.hex(b))
 		return methodIndex
 	end
 	self.addMethod = addMethod
@@ -1503,9 +1523,11 @@ print('adding method '..methodIndex..' = '..string.hex(b))
 	-- now to extract out uniques from classes, fields, methods, methods.code
 	for _,class in ipairs(self.classes) do
 		class.thisClassIndex = addType(class.thisClass)
+print('adding class thisClass', class.thisClass, class.thisClassIndex)
 		class.accessFlags = getFlagsFromObj(class, classAccessFlags)
+print('adding class accessFlags', class.accessFlags)
 		class.superClassIndex = addType(class.superClass)
-print('adding superclass', class.superClass, class.superClassIndex)
+print('adding class superclass', class.superClass, class.superClassIndex)
 		class.interfaceIndex = addTypeList(class.interfaces)
 		class.sourceFileIndex = addString(class.sourceFile)
 		-- then annotations
@@ -1519,10 +1541,13 @@ print('adding superclass', class.superClass, class.superClassIndex)
 		addField(field.class, field.name, field.sig)
 		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
 	end
-	for _,method in ipairs(self.methods) do
-		method.classIndex = addType(method.class)
-		method.sigIndex = addType(method.sig)
-		method.nameIndex = addString(method.name)
+print('checking '..#self.methods..' for writing')	
+	for i,method in ipairs(self.methods) do
+print('checking method '..i..' = '..require'ext.tolua'(method))
+		method.methodIndex = addMethod(method.class, method.name, method.sig)
+		
+		-- the rest goes in the method's extra info
+
 		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
 
 		if method.code then
@@ -1532,6 +1557,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 				local instDesc = assert.index(instDescForOp, lo)
 				cblob:writeu1(lo)
 				instDesc.write(inst, cblob, self)
+				assert.eq(0, bit.band(#cblob, 1))
 			end
 			method.codeData = cblob:compile()
 		end
@@ -1544,7 +1570,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 			end
 		end
 	end
-
+print('came up with '..#self.methodBlobs..' unique method signatures')
 
 	self.map = table()
 	self.map:insert{type='header_item', count=1, offset=0}
@@ -1671,6 +1697,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 		ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = #blob
 		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodBlobs}
 		for i,method in ipairs(self.methodBlobs) do
+print('writing method', i-1, require 'ext.string'.hex(method))
 			assert.len(method, 8)
 			blob:writeString(method)
 		end
@@ -1679,18 +1706,26 @@ print('adding superclass', class.superClass, class.superClassIndex)
 	-- fill in classdata
 	assert.gt(#self.classes, 0) 	-- otherwise why are we here...
 	align(4)
+print('write classDataOfs', #blob)
 	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = #blob
 	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
 	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
+local startOfs = #blob
+print('writing class thisClassIndex', class.thisClassIndex)
 		blob:writeu4(class.thisClassIndex)
+print('writing class accessFlags', class.accessFlags)
 		blob:writeu4(class.accessFlags)
+print('writing class superClassIndex', class.superClassIndex)
 		blob:writeu4(class.superClassIndex)
+print('writing class interfaceIndex', class.interfaceIndex)
 		blob:writeu4(class.interfaceIndex)	-- fill in interface-offset later
+print('writing class sourceFileIndex', class.sourceFileIndex)
 		blob:writeu4(class.sourceFileIndex)
 		blob:writeu4(0)	-- fill in annotation-offset later
 		blob:writeu4(0)	-- fill in data-offset later
 		blob:writeu4(0)	-- fill in static-value-offset later
+assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 	end
 
 	-- keep track of where the headers structures end
@@ -1708,6 +1743,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 	if #self.strings > 0 then
 		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
 		for i,s in ipairs(self.strings) do
+--DEBUG:print('setting string data item to', #blob)
 			ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))[0] = #blob
 			blob:writeUleb128(#s)
 			blob:writeString(s)
@@ -1728,13 +1764,15 @@ print('adding superclass', class.superClass, class.superClassIndex)
 			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 12 * (i-1) + 8)
 			if protoArgTypeListPtr[0] ~= 0 then
 				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
+--DEBUG:print('setting protoArgTypeListPtr to', protoArgTypeListPtr[0])	
 			end
 		end
 		-- now replace all class interfaceIndexes
 		for i=1,#self.classes do
-			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 8 + (i-1) * 32)
+			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 12 + (i-1) * sizeOfClass)
 			if classInterfaceTypeListPtr[0] ~= 0 then
 				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
+--DEBUG:print('setting classInterfaceTypeListPtr to', classInterfaceTypeListPtr[0])
 			end
 		end
 	end
@@ -1743,6 +1781,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 	align(4)
 	local codeItemOfs = #blob
 	local codeItemCount = 0
+	-- TODO sort by methodIndex, or iterate by methodIndex, or somethign
 	for _,method in ipairs(self.methods) do
 		if method.codeData then
 			codeItemCount = codeItemCount + 1
@@ -1752,6 +1791,8 @@ print('adding superclass', class.superClass, class.superClassIndex)
 			blob:writeu2(method.regsIn or 0)
 			blob:writeu2(method.regsOut or 0)
 			blob:writeu2(method.tries and #method.tries or 0)
+			blob:writeu4(0)	-- debugInfoOfs
+			blob:writeu4(bit.rshift(#method.codeData, 1))	-- instructions size in uint16_t's
 			blob:writeString(method.codeData)
 
 			if bit.band(3, #blob) == 2 then blob:writeu2(0) end
@@ -1768,6 +1809,7 @@ print('adding superclass', class.superClass, class.superClassIndex)
 				for _,try in ipairs(method.tries) do
 					-- fill in try.handlerOfs
 					ffi.cast('uint16_t*', blob.data.v + try.handlerOfsOfs)[0] = #blob - encodedCatchHandlerListOfs
+--DEBUG:print('setting try.handlerOfsOfs to',#blob - encodedCatchHandlerListOfs)
 					blob:writeSleb128(try.catchAllAddr and -#try or #try)
 					for i,addrPair in ipairs(try) do
 						blob:writeUleb128(addrPair.typeIndex)
@@ -1811,17 +1853,21 @@ print('adding superclass', class.superClass, class.superClassIndex)
 		-- collect all methods that are direct vs virtual
 		local directMethodIndexes = table() 	-- 1-based
 		local virtualMethodIndexes = table()	-- 1-based
+print('class data checking '..#self.methods..' methods')		
 		for i,method in ipairs(self.methods) do
 			if method.class == class.thisClass
-			and method.accessFlags
-			and method.accessFlags ~= 0
-			then
+			and (
+				(method.accessFlags and method.accessFlags ~= 0)
+				or (method.codeOfs and method.codeOfs ~= 0)
+			) then
 				if method.isStatic
 				or method.isPrivate
 				or method.isConstructor
 				then
+print('class data adding method '..i..' to direct')					
 					directMethodIndexes:insert(i)
 				else
+print('class data adding method '..i..' to virtual')					
 					virtualMethodIndexes:insert(i)
 				end
 			end
@@ -1834,8 +1880,9 @@ print('adding superclass', class.superClass, class.superClassIndex)
 		then
 			classDataCount = classDataCount + 1
 			-- change the class data offset to here
-			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 16 + (classIndex-1) * 32)
+			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 + (classIndex-1) * sizeOfClass)
 			classDataPtr[0] = #blob
+--DEBUG:print('setting classDataPtr to', #blob)
 
 			blob:writeUleb128(#staticFieldIndexes)
 			blob:writeUleb128(#instanceFieldIndexes)
@@ -1843,13 +1890,9 @@ print('adding superclass', class.superClass, class.superClassIndex)
 			blob:writeUleb128(#virtualMethodIndexes)
 
 			local function writeFields(fieldIndexes)
-				local lastFieldIndex
+				local lastFieldIndex = 1	-- from 1-based to 0-based
 				for _,fieldIndex in ipairs(fieldIndexes) do
-					if not lastFieldIndex then
-						blob:writeUleb128(fieldIndex-1)	-- from 1-based to 0-based
-					else
-						blob:writeUleb128(fieldIndex - lastFieldIndex)
-					end
+					blob:writeUleb128(fieldIndex - lastFieldIndex)
 					blob:writeUleb128(self.fields[fieldIndex].accessFlags)
 					lastFieldIndex = fieldIndex
 				end
@@ -1858,13 +1901,10 @@ print('adding superclass', class.superClass, class.superClassIndex)
 			writeFields(instanceFieldIndexes)
 
 			local function writeMethods(methodIndexes)
-				local lastMethodIndex
+				local lastMethodIndex = 1	-- from 1-based to 0-based
 				for _,methodIndex in ipairs(methodIndexes) do
-					if not lastMethodIndex then
-						blob:writeUleb128(methodIndex-1)	-- from 1-based to 0-based
-					else
-						blob:writeUleb128(methodIndex - lastMethodIndex)
-					end
+print('writing class data for method', methodIndex-1)
+					blob:writeUleb128(methodIndex - lastMethodIndex)
 					local method = self.methods[methodIndex]
 					blob:writeUleb128(method.accessFlags)
 					-- I guess this means I better already have written the code offset data
