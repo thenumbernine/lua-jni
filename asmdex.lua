@@ -81,12 +81,6 @@ local function instReadMethod(inst, index, asm)
 end
 
 
-local function readconst(s)
-	return (assert(tonumber(s)))
-end
-local function readconstopt(s)
-	return tonumber(s) or 0
-end
 local function readreg(s)
 	return (assert(tonumber(s:match'^v(.*)$', 16)))
 end
@@ -97,10 +91,10 @@ end
 
 local rw10x = {}
 function rw10x.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(hi, 2))				-- NOTICE throws away hi
+	inst:insert(hi)				-- NOTICE throws away hi
 end
 function rw10x.write(inst, blob, asm)
-	blob:writeu1(readconstopt(inst[2]))
+	blob:writeu1(inst[2] or 0)
 end
 
 local rw12x = {}
@@ -126,21 +120,21 @@ end
 local rw11n = {}
 function rw11n.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(0xf, hi), 1))	-- A = reg (4 bits)
-	inst:insert('0x'..bit.tohex(bit.band(0xf, bit.rshift(hi, 8)), 1))		-- B = signed 4 bit
+	inst:insert(bit.band(0xf, bit.rshift(hi, 8)))		-- B = signed 4 bit
 end
 function rw11n.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
-		bit.lshift(bit.band(0xf, readconst(inst[3])), 4)
+		bit.lshift(bit.band(0xf, inst[3]), 4)
 	))
 end
 
 local rw10t = {}
 function rw10t.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(hi, 2))					-- signed 8 bit branch offset
+	inst:insert(hi)					-- signed 8 bit branch offset
 end
 function rw10t.write(inst, blob, asm)
-	blob:writeu1(readconst(inst[2]))
+	blob:writeu1(inst[2])
 end
 
 local rw22x = {}
@@ -156,21 +150,21 @@ end
 local rw21s = {}
 function rw21s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))	-- signed
+	inst:insert(blob:readu2())	-- signed
 end
 function rw21s.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu2(readconst(inst[3]))
+	blob:writeu2(inst[3])
 end
 
 local rw21h = {}
 function rw21h.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
+	inst:insert(blob:readu2())
 end
 function rw21h.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu2(readconst(inst[3]))
+	blob:writeu2(inst[3])
 end
 
 local rw21c_string = {}
@@ -245,65 +239,64 @@ end
 
 local rw20t = {}
 function rw20t.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
-	inst:insert('0x'..bit.tohex(hi, 2))		-- NOTICE throws away hi
+	inst:insert(blob:reads2())		-- signed
+	inst:insert(hi)		-- NOTICE throws away hi
 end
 function rw20t.write(inst, blob, asm)
-	blob:writeu1(readconstopt(inst[3]))	-- out of order, throw-away is last
-	blob:writeu2(readconst(inst[2]))
+	blob:writeu1(inst[3] or 0)	-- out of order, throw-away is last
+	blob:writes2(inst[2])
 end
 
 local rw22t = {}
 function rw22t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))		-- signed
+	inst:insert(blob:reads2())
 end
 function rw22t.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
 	))
-	blob:writeu2(readconst(inst[4]))
+	blob:writes2(inst[4])
 end
 
 local rw21t = {}
 function rw21t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
+	inst:insert(blob:reads2())
 end
 function rw21t.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu2(readconst(inst[3]))
+	blob:writes2(inst[3])
 end
 
 local rw22s = {}
 function rw22s.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	inst:insert('0x'..bit.tohex(blob:read'int16_t', 4))	-- signed
+	inst:insert(blob:reads2())
 end
 function rw22s.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
 	))
-	blob:writeu2(readconst(inst[4]))
+	blob:writes2(inst[4])
 end
 
 local rw22b = {}
 function rw22b.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	inst:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
-	local C = blob:read'int16_t'				-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
-	inst:insert('0x'..bit.tohex(C, 4))
+	inst:insert(blob:reads2())	-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
 end
 function rw22b.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(inst[2])),
 		bit.lshift(bit.band(0xf, readreg(inst[3])), 4)
 	))
-	blob:writeu2(readconst(inst[4]))
+	blob:writes2(inst[4])
 end
 
 local rw21c_method = {}
@@ -330,10 +323,10 @@ local rw32x = {}
 function rw32x.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))
-	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE throws away hi
+	inst:insert(hi)	-- NOTICE throws away hi
 end
 function rw32x.write(inst, blob, asm)
-	blob:writeu1(readconstopt(inst[4]))
+	blob:writeu1(inst[4] or 0)
 	blob:writeu2(readreg(inst[2]))
 	blob:writeu2(readreg(inst[3]))
 end
@@ -341,11 +334,11 @@ end
 local rw31i = {}
 function rw31i.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu4(), 8))	-- signed ... will this be 4-byte aligned?
+	inst:insert(blob:reads4())	-- will this be 4-byte aligned?
 end
 function rw31i.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu4(readconst(inst[3]))
+	blob:writes4(inst[3])
 end
 
 local rw31c_string = {}
@@ -443,13 +436,13 @@ end
 
 local rw3rc_type = {}
 function rw3rc_type.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
+	inst:insert(hi)	-- A = array size and argument word count ... N = A + C - 1
 	local typeIndex = blob:readu2()	-- B = type
 	instPushType(inst, typeIndex, asm)
 	inst:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
 function rw3rc_type.write(inst, blob, asm)
-	blob:writeu1(readconst(inst[2]))
+	blob:writeu1(inst[2])
 	blob:writeu2(instReadType(inst, 3, asm))
 	blob:writeu2(readreg(inst[4]))
 end
@@ -470,47 +463,47 @@ end
 local rw31t = {}
 function rw31t.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed branch offset to table data pseudo-instruction
+	inst:insert(blob:reads4())	-- signed branch offset to table data pseudo-instruction
 end
 function rw31t.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:writeu4(readconst(inst[3]))
+	blob:writes4(inst[3])
 end
 
 local rw30t = {}
 function rw30t.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(blob:read'int32_t', 8))	-- signed
-	inst:insert('0x'..bit.tohex(hi, 2))	-- NOTICE hi gets thrown away
+	inst:insert(blob:reads4())
+	inst:insert(hi)	-- NOTICE hi gets thrown away
 end
 function rw30t.write(inst, blob, asm)
-	blob:writeu1(readconstopt(inst[3]))
-	blob:writeu4(readconst(inst[2]))
+	blob:writeu1(inst[3] or 0)
+	blob:writes4(inst[2])
 end
 
 local rw35c_callsite = {}
 function rw35c_callsite.read(inst, hi, blob, asm)
 	-- TODO
-	inst:insert('0x'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
+	inst:insert(hi)
+	inst:insert(blob:readu2())
+	inst:insert(blob:readu2())
 end
 function rw35c_callsite.write(inst, blob, asm)
-	blob:writeu1(readconst(inst[2]))
-	blob:writeu2(readconst(inst[3]))
-	blob:writeu2(readconst(inst[4]))
+	blob:writeu1(inst[2])
+	blob:writeu2(inst[3])
+	blob:writeu2(inst[4])
 end
 
 local rw3rc_callsite = {}
 function rw3rc_callsite.read(inst, hi, blob, asm)
 	-- TODO
-	inst:insert('0x'..bit.tohex(hi, 2))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
-	inst:insert('0x'..bit.tohex(blob:readu2(), 4))
+	inst:insert(hi)
+	inst:insert(blob:readu2())
+	inst:insert(blob:readu2())
 end
 function rw3rc_callsite.write(inst, blob, asm)
-	blob:writeu1(readconst(inst[2]))
-	blob:writeu2(readconst(inst[3]))
-	blob:writeu2(readconst(inst[4]))
+	blob:writeu1(inst[2])
+	blob:writeu2(inst[3])
+	blob:writeu2(inst[4])
 end
 
 
@@ -562,7 +555,7 @@ end
 
 local rw4rcc = {}
 function rw4rcc.read(inst, hi, blob, asm)
-	inst:insert('0x'..bit.tohex(hi, 2))	-- arg word count 8 bits
+	inst:insert(hi)	-- arg word count 8 bits
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
 	instPushMethod(inst, methodIndex, asm)
@@ -574,7 +567,7 @@ function rw4rcc.read(inst, hi, blob, asm)
 end
 function rw4rcc.write(inst, blob, asm)
 	blob:writeu1(bit.bor(
-		bit.band(0xf, readconst(inst[2])),
+		bit.band(0xf, inst[2]),
 		bit.lshift(bit.band(0xf, readreg(inst[6])), 4)
 	))
 	blob:writeu2(instReadMethod(inst, 3, asm))
@@ -585,11 +578,11 @@ end
 local rw51l_double = {}
 function rw51l_double.read(inst, hi, blob, asm)
 	inst:insert('v'..bit.tohex(hi, 2))
-	inst:insert(tostring(blob:read'jdouble'))
+	inst:insert(blob:read'jdouble')
 end
 function rw51l_double.write(inst, blob, asm)
 	blob:writeu1(readreg(inst[2]))
-	blob:write('jdouble', readconst(inst[3]))
+	blob:write('jdouble', inst[3])
 end
 
 local instDescForOp = {
