@@ -54,7 +54,7 @@ function M:run(env)
 					isConstructor=true,
 					isPublic=true,
 					name="<init>",
-					sig="()V"
+					sig="()V",
 					maxRegs=1,
 					regsIn=1,
 					regsOut=1,

@@ -8,6 +8,7 @@ local class = require 'ext.class'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
 local string = require 'ext.string'
+local sha2 = require 'sha2'
 local ReadBlobLE = require 'java.blob'.ReadBlobLE
 local WriteBlobLE = require 'java.blob'.WriteBlobLE
 local deepCopy = require 'java.util'.deepCopy
@@ -1368,6 +1369,19 @@ end
 
 -------------------------------- WRITING --------------------------------
 
+-- https://en.wikipedia.org/wiki/Adler-32
+local function adler32(data, len)
+	data = ffi.cast('uint8_t*', data)
+    local a = 1
+	local b = 0
+	local MOD_ADLER = 65521
+    for index=0,len-1 do
+        a = (a + data[index]) % MOD_ADLER
+        b = (b + a) % MOD_ADLER
+    end
+    return bit.bor(bit.lshift(b, 16), a)
+end
+
 function JavaASMDex:compile()
 	-- *) traversal fields and methods and method code
 	-- *) build up a list of unique constants:
@@ -1989,8 +2003,22 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 --DEBUG:local from = ptr[0]
 	ptr[0] = #blob
 --DEBUG:print('changing fileSize from', from, 'to', ptr[0])
-	-- TODO done?
 
+	-- now sha1 checksum TODO
+	local ptr = ffi.cast('uint8_t*', blob.data.v + sha1Ofs)
+	local sha1sig = sha2.sha1(ffi.string(ptr + 20, #blob - sha1Ofs - 20))
+--DEBUG:print('sha1sig', sha1sig)
+	assert.len(sha1sig, 40)
+	sha1sig = string.unhex(sha1sig)
+	assert.type(sha1sig, 'string')
+	assert.len(sha1sig, 20)
+	ffi.copy(ptr, sha1sig, 20)
+
+	-- now adler
+	local ptr = ffi.cast('uint8_t*', blob.data.v + checksumOfs)
+	local checksum = adler32(ptr + 4, #blob - checksumOfs - 4)
+	ffi.cast('uint32_t*', ptr)[0] = checksum
+--DEBUG:print('adler32', '0x'..bit.tohex(checksum, 8))
 	-- TODO remove temp write fields?
 
 	return blob:compile()

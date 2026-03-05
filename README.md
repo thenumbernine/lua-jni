@@ -358,10 +358,11 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 # Dependencies
 
-- [`lua-ext`](http://github.com/thenumbernine/lua-ext) - For some basic utility functions.
-- [`lua-stl`](http://github.com/thenumbernine/lua-stl) - I tried hard not to use this, but here it is, for the stl-vector implementation.  Maybe I'll replace it with a luajit string.buffer.
-- [`lua-thread`](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread`.
-- [`lua-make`](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the java/build.lua file to invoke javac or gcc.
+- [lua-ext](http://github.com/thenumbernine/lua-ext) - For some basic utility functions.
+- [lua-stl](http://github.com/thenumbernine/lua-stl) - I tried hard not to use this, but here it is, for the stl-vector implementation.  Maybe I'll replace it with a luajit string.buffer.
+- [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread`.
+- [lua-make](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the `java/build.lua` file to invoke javac or gcc.
+- [SHA2](https://github.com/Egor-Skriptunoff/pure_lua_SHA) - optional, but required if you are using `java/asmdex.lua`.
 
 # Examples
 

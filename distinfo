@@ -79,9 +79,10 @@ files = {
 }
 deps = {
 	"ext",
-	--"make",	-- used by java.build, only if you want to invoke `javac` at runtime.
+	--"sha2",	-- used by java/asmdex.lua
+	--"make",	-- used by java/build.lua, only if you want to invoke `gcc` or `javac` at runtime.
 	--"thread",	-- for tests/
-	--"ffi",	-- for tests/
+	--"ffi",	-- for tests/, just for ffi.c.pthread, for getting pthread_self()
 }
 generateBindings = ||{
 	{
