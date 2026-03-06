@@ -6,7 +6,6 @@ return function(J)
 	local NativeCallback = require 'java.nativecallback'(J)
 
 	local newClassName = 'io.github.thenumbernine.NativeActionListener'
-	local newClassNameSlashSep = newClassName:gsub('%.', '/')
 
 	-- check if it's already loaded
 	local cl = J:_findClass(newClassName)
@@ -16,9 +15,9 @@ return function(J)
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,
-		thisClass = newClassNameSlashSep,
-		superClass = 'java/lang/Object',
-		interfaces = {'java/awt/event/ActionListener'},
+		thisClass = newClassName,
+		superClass = 'java.lang.Object',
+		interfaces = {'java.awt.event.ActionListener'},
 		fields = {
 			{
 				isPublic = true,
@@ -35,10 +34,10 @@ return function(J)
 				maxLocals=3,
 				code = [[
 aload_0
-invokespecial java/lang/Object <init> ()V
+invokespecial java.lang.Object <init> ()V
 aload_0
 lload_1
-putfield ]]..newClassNameSlashSep..[[ funcptr J
+putfield ]]..newClassName..[[ funcptr J
 return
 ]],
 			},
@@ -50,7 +49,7 @@ return
 				maxLocals=2,
 				code = [[
 aload_0
-getfield ]]..newClassNameSlashSep..[[ funcptr J
+getfield ]]..newClassName..[[ funcptr J
 aload_1
 invokestatic ]]..NativeCallback._classpath:gsub('%.', '/')
 	..' '..assert(NativeCallback._runMethodName)

@@ -50,22 +50,22 @@ function M:run(env)
 			superClass = 'java.lang.Object',
 			methods={
 				{	-- needs a ctor? even though it's never used?
-					isConstructor=true,
-					isPublic=true,
-					name="<init>",
-					sig="()V",
-					maxRegs=1,
-					regsIn=1,
-					regsOut=1,
+					isConstructor = true,
+					isPublic = true,
+					name = '<init>',
+					sig = '()V',
+					maxRegs = 1,
+					regsIn = 1,
+					regsOut = 1,
 					code = [[
-invoke-direct Ljava/lang/Object; <init> ()V
+invoke-direct java.lang.Object <init> ()V
 return-void
 ]],
 				},
 				{
-					isNative=true,
-					isPublic=true,
-					isStatic=true,
+					isNative = true,
+					isPublic = true,
+					isStatic = true,
 					name = M.runMethodName,
 					sig = M.runMethodSig,
 				},
@@ -83,8 +83,6 @@ return-void
 					isPublic = true,
 					name = '<init>',
 					sig = '()V',
-					maxStack = 1,
-					maxLocals = 1,
 					code = [[
 aload_0
 invokespecial java.lang.Object <init> ()V

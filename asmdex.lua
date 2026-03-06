@@ -18,21 +18,8 @@ local getFlagsFromObj = require 'java.util'.getFlagsFromObj
 local classAccessFlags = require 'java.util'.nestedClassAccessFlags	-- dalvik's class access flags matches up with .class's nested-class access flags
 local fieldAccessFlags = require 'java.util'.fieldAccessFlags
 local methodAccessFlags = require 'java.util'.methodAccessFlags
-
-
-local function LSlashToDotName(s)
-	s = s:match'^L(.*);$' or s
-	s = s:gsub('/', '.')
-	return s
-end
-
-local function dotToLSlashName(s)
-	s = s:gsub('%.', '/')
-	if not s:match'^L.*;$' then
-		s = 'L'..s..';'
-	end
-	return s
-end
+local toLSlashSepSemName = require 'java.util'.toLSlashSepSemName
+local toDotSepName  = java_util.toDotSepName
 
 
 local NO_INDEX = 0xffffffff
@@ -104,7 +91,7 @@ local function instPushField(inst, fieldIndex, asm)
 	if not field then
 		error('OOB field '..fieldIndex)
 	end
-	inst:insert(field.class)
+	inst:insert(toLSlashSepSemName(field.class))
 	inst:insert(field.name)
 	inst:insert(field.sig)
 end
@@ -117,7 +104,7 @@ local function instPushMethod(inst, methodIndex, asm)
 	if not method then
 		error('OOB method '..methodIndex)
 	end
-	inst:insert(method.class)
+	inst:insert(toLSlashSepSemName(method.class))
 	inst:insert(method.name)
 	inst:insert(method.sig)
 end
@@ -923,30 +910,8 @@ function JavaASMDex:init(args)
 		self:readData(args)	-- assume its raw data
 	elseif type(args) == 'nil' then
 	elseif type(args) == 'table' then
-		for k,v in pairs(args) do
-			self[k] = v
-		end
+		self:fromArgs(args)
 
-		-- while we're here, prepare / validate args:
-		for _,method in ipairs(self.methods) do
-			-- parse method.code if it is instructions
-			if type(method.code) == 'string' then
-
-				-- argument validation:
-				-- do this here or upon ctor?
-				method.code = string.split(string.trim(method.code), '\n')
-					:mapi(function(line)
-						return string.trim(line)
-					end)
-					:filteri(function(line)
-						return line:sub(1, #self.lineComment) ~= self.lineComment
-					end)
-					:mapi(function(line)
-						return string.split(line, '%s+')
-					end)
-
-			end
-		end
 	else
 		error("idk how to init this")
 	end
@@ -1383,11 +1348,11 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	-- [[ convert self.thisClass from dex's L...; to just ...
 	-- to make the args match up with ASMClass
 	for _,class in ipairs(self.classes) do
-		class.thisClass = LSlashToDotName(class.thisClass)
-		class.superClass = LSlashToDotName(class.superClass)
+		class.thisClass = toDotSepName(class.thisClass)
+		class.superClass = toDotSepName(class.superClass)
 		if class.interfaces then
 			for i=1,#class.interfaces do
-				class.interfaces[i] = LSlashToDotName(class.interfaces[i])
+				class.interfaces[i] = toDotSepName(class.interfaces[i])
 			end
 		end
 	end
@@ -1419,6 +1384,33 @@ local function adler32(data, len)
         b = (b + a) % MOD_ADLER
     end
     return bit.bor(bit.lshift(b, 16), a)
+end
+
+function JavaASMDex:fromArgs(args)
+	for k,v in pairs(args) do
+		self[k] = v
+	end
+
+	-- while we're here, prepare / validate args:
+	for _,method in ipairs(self.methods) do
+		-- parse method.code if it is instructions
+		if type(method.code) == 'string' then
+
+			-- argument validation:
+			-- do this here or upon ctor?
+			method.code = string.split(string.trim(method.code), '\n')
+				:mapi(function(line)
+					return string.trim(line)
+				end)
+				:filteri(function(line)
+					return line:sub(1, #self.lineComment) ~= self.lineComment
+				end)
+				:mapi(function(line)
+					return string.split(line, '%s+')
+				end)
+
+		end
+	end
 end
 
 function JavaASMDex:compile()
@@ -1462,11 +1454,11 @@ function JavaASMDex:compile()
 
 	-- [[ now convert dot names to L...; names
 	for _,class in ipairs(self.classes) do
-		class.thisClass = dotToLSlashName(class.thisClass)
-		class.superClass = dotToLSlashName(class.superClass)
+		class.thisClass = toLSlashSepSemName(class.thisClass)
+		class.superClass = toLSlashSepSemName(class.superClass)
 		if class.interfaces then
 			for i=1,#class.interfaces do
-				class.interfaces[i] = dotToLSlashName(class.interfaces[i])
+				class.interfaces[i] = toLSlashSepSemName(class.interfaces[i])
 			end
 		end
 	end

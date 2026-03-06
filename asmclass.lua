@@ -41,8 +41,8 @@ local setFlagsToObj = java_util.setFlagsToObj
 local getFlagsFromObj = java_util.getFlagsFromObj
 local sigStrToObj = java_util.sigStrToObj
 local deepCopy = java_util.deepCopy
-local toSlashSepName  = java_util.toSlashSepName 
-local toDotSepName  = java_util.toDotSepName 
+local toSlashSepName  = java_util.toSlashSepName
+local toDotSepName  = java_util.toDotSepName
 
 
 local jint = ffi.typeof'jint'
