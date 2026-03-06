@@ -137,25 +137,25 @@ Instr.insert = table.insert
 Instr.append = table.append
 
 local Instr10x = Instr:subclass()
-function Instr10x.read(self, hi, blob, asm)
+function Instr10x:read(hi, blob, asm)
 	self:insert(hi)				-- NOTICE throws away hi
 end
-function Instr10x.write(self, blob, asm)
+function Instr10x:write(blob, asm)
 	blob:writeu1(self[2] or 0)
 end
 
 local Instr12x = Instr:subclass()
-function Instr12x.readRegs(self, hi, blob, asm)
+function Instr12x:readRegs(hi, blob, asm)
 	return
 		bit.tohex(bit.band(hi, 0xf), 1),
 		bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1)
 end
-function Instr12x.read(self, hi, blob, asm)
-	local A, B = Instr12x.readRegs(self, hi, blob, asm)
+function Instr12x:read(hi, blob, asm)
+	local A, B = self:readRegs(hi, blob, asm)
 	self:insert('v'..A)
 	self:insert('v'..B)
 end
-function Instr12x.write(self, blob, asm)
+function Instr12x:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -163,19 +163,19 @@ function Instr12x.write(self, blob, asm)
 end
 
 local Instr11x = Instr:subclass()
-function Instr11x.read(self, hi, blob, asm)
+function Instr11x:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 end
-function Instr11x.write(self, blob, asm)
+function Instr11x:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 end
 
 local Instr11n = Instr:subclass()
-function Instr11n.read(self, hi, blob, asm)
+function Instr11n:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(0xf, hi), 1))	-- A = reg (4 bits)
 	self:insert(bit.band(0xf, bit.rshift(hi, 8)))		-- B = signed 4 bit
 end
-function Instr11n.write(self, blob, asm)
+function Instr11n:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, self[3]), 4)
@@ -183,80 +183,80 @@ function Instr11n.write(self, blob, asm)
 end
 
 local Instr10t = Instr:subclass()
-function Instr10t.read(self, hi, blob, asm)
+function Instr10t:read(hi, blob, asm)
 	self:insert(hi)					-- signed 8 bit branch offset
 end
-function Instr10t.write(self, blob, asm)
+function Instr10t:write(blob, asm)
 	blob:writeu1(self[2])
 end
 
 local Instr22x = Instr:subclass()
-function Instr22x.read(self, hi, blob, asm)
+function Instr22x:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert('v'..bit.tohex(blob:readu2(), 4))
 end
-function Instr22x.write(self, blob, asm)
+function Instr22x:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(readreg(self[3]))
 end
 
 local Instr21s = Instr:subclass()
-function Instr21s.read(self, hi, blob, asm)
+function Instr21s:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:readu2())	-- signed
 end
-function Instr21s.write(self, blob, asm)
+function Instr21s:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(self[3])
 end
 
 local Instr21h = Instr:subclass()
-function Instr21h.read(self, hi, blob, asm)
+function Instr21h:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:readu2())
 end
-function Instr21h.write(self, blob, asm)
+function Instr21h:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(self[3])
 end
 
 local Instr21c_string = Instr:subclass()
-function Instr21c_string.read(self, hi, blob, asm)
+function Instr21c_string:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushString(self, blob:readu2(), asm)
 end
-function Instr21c_string.write(self, blob, asm)
+function Instr21c_string:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadString(self, 3, asm))
 end
 
 local Instr21c_type = Instr:subclass()
-function Instr21c_type.read(self, hi, blob, asm)
+function Instr21c_type:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushType(self, blob:readu2(), asm)
 end
-function Instr21c_type.write(self, blob, asm)
+function Instr21c_type:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadType(self, 3, asm))
 end
 
 local Instr21c_field = Instr:subclass()
-function Instr21c_field.read(self, hi, blob, asm)
+function Instr21c_field:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushField(self, blob:readu2(), asm)
 end
-function Instr21c_field.write(self, blob, asm)
+function Instr21c_field:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadField(self, 3, asm))
 end
 
 local Instr22c_type = Instr:subclass()
-function Instr22c_type.read(self, hi, blob, asm)
+function Instr22c_type:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	self:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	instPushType(self, blob:readu2(), asm)
 end
-function Instr22c_type.write(self, blob, asm)
+function Instr22c_type:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -265,12 +265,12 @@ function Instr22c_type.write(self, blob, asm)
 end
 
 local Instr22c_field = Instr:subclass()
-function Instr22c_field.read(self, hi, blob, asm)
+function Instr22c_field:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	self:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	instPushField(self, blob:readu2(), asm)
 end
-function Instr22c_field.write(self, blob, asm)
+function Instr22c_field:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -279,34 +279,34 @@ function Instr22c_field.write(self, blob, asm)
 end
 
 local Instr23x = Instr:subclass()
-function Instr23x.read(self, hi, blob, asm)
+function Instr23x:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert('v'..bit.tohex(blob:readu1(), 2))	-- I'm sure I'm doign this wrong but it says vAA vBB vCC and that A is 8 bits and that the whole instruction reads 2 words, so *shrug* no sign of bitness of B or C
 	self:insert('v'..bit.tohex(blob:readu1(), 2))
 end
-function Instr23x.write(self, blob, asm)
+function Instr23x:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu1(readreg(self[3]))
 	blob:writeu1(readreg(self[4]))
 end
 
 local Instr20t = Instr:subclass()
-function Instr20t.read(self, hi, blob, asm)
+function Instr20t:read(hi, blob, asm)
 	self:insert(blob:reads2())		-- signed
 	self:insert(hi)		-- NOTICE throws away hi
 end
-function Instr20t.write(self, blob, asm)
+function Instr20t:write(blob, asm)
 	blob:writeu1(self[3] or 0)	-- out of order, throw-away is last
 	blob:writes2(self[2])
 end
 
 local Instr22t = Instr:subclass()
-function Instr22t.read(self, hi, blob, asm)
+function Instr22t:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	self:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	self:insert(blob:reads2())
 end
-function Instr22t.write(self, blob, asm)
+function Instr22t:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -315,22 +315,22 @@ function Instr22t.write(self, blob, asm)
 end
 
 local Instr21t = Instr:subclass()
-function Instr21t.read(self, hi, blob, asm)
+function Instr21t:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:reads2())
 end
-function Instr21t.write(self, blob, asm)
+function Instr21t:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writes2(self[3])
 end
 
 local Instr22s = Instr:subclass()
-function Instr22s.read(self, hi, blob, asm)
+function Instr22s:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	self:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	self:insert(blob:reads2())
 end
-function Instr22s.write(self, blob, asm)
+function Instr22s:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -339,12 +339,12 @@ function Instr22s.write(self, blob, asm)
 end
 
 local Instr22b = Instr:subclass()
-function Instr22b.read(self, hi, blob, asm)
+function Instr22b:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(bit.band(hi, 0xf), 1))
 	self:insert('v'..bit.tohex(bit.band(bit.rshift(hi, 4), 0xf), 1))
 	self:insert(blob:reads2())	-- A is bits, B is 8 bits, C is 8 bits ... so C hi is unused? ... or C lo?
 end
-function Instr22b.write(self, blob, asm)
+function Instr22b:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, readreg(self[2])),
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
@@ -353,59 +353,59 @@ function Instr22b.write(self, blob, asm)
 end
 
 local Instr21c_method = Instr:subclass()
-function Instr21c_method.read(self, hi, blob, asm)
+function Instr21c_method:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushMethod(self, blob:readu2(), asm)
 end
-function Instr21c_method.write(self, blob, asm)
+function Instr21c_method:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadMethod(self, 3, asm))
 end
 
 local Instr21c_proto = Instr:subclass()
-function Instr21c_proto.read(self, hi, blob, asm)
+function Instr21c_proto:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushProto(blob:readu2())
 end
-function Instr21c_proto.write(self, blob, asm)
+function Instr21c_proto:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadProto(self, 3, asm))
 end
 
 local Instr32x = Instr:subclass()
-function Instr32x.read(self, hi, blob, asm)
+function Instr32x:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(blob:readu2(), 4))
 	self:insert('v'..bit.tohex(blob:readu2(), 4))
 	self:insert(hi)	-- NOTICE throws away hi
 end
-function Instr32x.write(self, blob, asm)
+function Instr32x:write(blob, asm)
 	blob:writeu1(self[4] or 0)
 	blob:writeu2(readreg(self[2]))
 	blob:writeu2(readreg(self[3]))
 end
 
 local Instr31i = Instr:subclass()
-function Instr31i.read(self, hi, blob, asm)
+function Instr31i:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:reads4())	-- will this be 4-byte aligned?
 end
-function Instr31i.write(self, blob, asm)
+function Instr31i:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writes4(self[3])
 end
 
 local Instr31c_string = Instr:subclass()
-function Instr31c_string.read(self, hi, blob, asm)
+function Instr31c_string:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	instPushString(self, blob:readu4(), asm)
 end
-function Instr31c_string.write(self, blob, asm)
+function Instr31c_string:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu4(instReadString(inst3, 3, asm))
 end
 
 local Instr35c_type = Instr:subclass()
-function Instr35c_type.read(self, hi, blob, asm)
+function Instr35c_type:read(hi, blob, asm)
 	local argc = bit.band(hi, 0xf)
 	if argc < 1 or argc > 5 then
 		error(self[1].." expected 1-5 args, found "..argc)
@@ -427,7 +427,7 @@ function Instr35c_type.read(self, hi, blob, asm)
 	}
 	self:append(regs:sub(1, argc))
 end
-function Instr35c_type.write(self, blob, asm)
+function Instr35c_type:write(blob, asm)
 	local argc = #self - 2
 	if argc < 1 or argc > 5 then
 		error(self[1].." expected 1-5 args, found "..argc)
@@ -447,7 +447,7 @@ function Instr35c_type.write(self, blob, asm)
 end
 
 local Instr35c_method = Instr:subclass()
-function Instr35c_method.read(self, hi, blob, asm)
+function Instr35c_method:read(hi, blob, asm)
 	local argc = bit.band(hi, 0xf)
 	if argc < 0 or argc > 5 then
 		error(self[1].." expected 0-5 args, found "..argc)
@@ -468,7 +468,7 @@ function Instr35c_method.read(self, hi, blob, asm)
 	}
 	self:append(regs:sub(1, argc))
 end
-function Instr35c_method.write(self, blob, asm)
+function Instr35c_method:write(blob, asm)
 	local argc = #self - 4
 	if argc < 0 or argc > 5 then
 		error(self[1].." expected 0-5 args, found "..argc)
@@ -488,72 +488,72 @@ function Instr35c_method.write(self, blob, asm)
 end
 
 local Instr3rc_type = Instr:subclass()
-function Instr3rc_type.read(self, hi, blob, asm)
+function Instr3rc_type:read(hi, blob, asm)
 	self:insert(hi)	-- A = array size and argument word count ... N = A + C - 1
 	local typeIndex = blob:readu2()	-- B = type
 	instPushType(self, typeIndex, asm)
 	self:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
-function Instr3rc_type.write(self, blob, asm)
+function Instr3rc_type:write(blob, asm)
 	blob:writeu1(self[2])
 	blob:writeu2(instReadType(self, 3, asm))
 	blob:writeu2(readreg(self[4]))
 end
 
 local Instr3rc_method = Instr:subclass()
-function Instr3rc_method.read(self, hi, blob, asm)
+function Instr3rc_method:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))	-- A = array size and argument word count ... N = A + C - 1
 	local methodIndex = blob:readu2()	-- B = method
 	instPushMethod(self, methodIndex, asm)
 	self:insert('v'..bit.tohex(blob:readu2(), 4))				-- C = first arg register
 end
-function Instr3rc_method.write(self, blob, asm)
+function Instr3rc_method:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadType(self, 3, asm))
 	blob:writeu2(readreg(self[4]))
 end
 
 local Instr31t = Instr:subclass()
-function Instr31t.read(self, hi, blob, asm)
+function Instr31t:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:reads4())	-- signed branch offset to table data pseudo-instruction
 end
-function Instr31t.write(self, blob, asm)
+function Instr31t:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writes4(self[3])
 end
 
 local Instr30t = Instr:subclass()
-function Instr30t.read(self, hi, blob, asm)
+function Instr30t:read(hi, blob, asm)
 	self:insert(blob:reads4())
 	self:insert(hi)	-- NOTICE hi gets thrown away
 end
-function Instr30t.write(self, blob, asm)
+function Instr30t:write(blob, asm)
 	blob:writeu1(self[3] or 0)
 	blob:writes4(self[2])
 end
 
 local Instr35c_callsite = Instr:subclass()
-function Instr35c_callsite.read(self, hi, blob, asm)
+function Instr35c_callsite:read(hi, blob, asm)
 	-- TODO
 	self:insert(hi)
 	self:insert(blob:readu2())
 	self:insert(blob:readu2())
 end
-function Instr35c_callsite.write(self, blob, asm)
+function Instr35c_callsite:write(blob, asm)
 	blob:writeu1(self[2])
 	blob:writeu2(self[3])
 	blob:writeu2(self[4])
 end
 
 local Instr3rc_callsite = Instr:subclass()
-function Instr3rc_callsite.read(self, hi, blob, asm)
+function Instr3rc_callsite:read(hi, blob, asm)
 	-- TODO
 	self:insert(hi)
 	self:insert(blob:readu2())
 	self:insert(blob:readu2())
 end
-function Instr3rc_callsite.write(self, blob, asm)
+function Instr3rc_callsite:write(blob, asm)
 	blob:writeu1(self[2])
 	blob:writeu2(self[3])
 	blob:writeu2(self[4])
@@ -561,7 +561,7 @@ end
 
 
 local Instr45cc = Instr:subclass()
-function Instr45cc.read(self, hi, blob, asm)
+function Instr45cc:read(hi, blob, asm)
 	local argc = bit.band(0xf, hi)
 	if argc < 1 or argc > 5 then
 		error(self[1].." expected 1-5 args, found "..argc)
@@ -584,7 +584,7 @@ function Instr45cc.read(self, hi, blob, asm)
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(self, protoIndex, asm)
 end
-function Instr45cc.write(self, blob, asm)
+function Instr45cc:write(blob, asm)
 	local argc = #self - 5
 	if argc < 1 or argc > 5 then
 		error(self[1].." expected 1-5 args, found "..argc)
@@ -607,7 +607,7 @@ function Instr45cc.write(self, blob, asm)
 end
 
 local Instr4rcc = Instr:subclass()
-function Instr4rcc.read(self, hi, blob, asm)
+function Instr4rcc:read(hi, blob, asm)
 	self:insert(hi)	-- arg word count 8 bits
 
 	local methodIndex = blob:readu2()	-- B = method (16 bits)
@@ -618,7 +618,7 @@ function Instr4rcc.read(self, hi, blob, asm)
 	local protoIndex = blob:readu2()	-- H = proto
 	instPushProto(self, protoIndex, asm)
 end
-function Instr4rcc.write(self, blob, asm)
+function Instr4rcc:write(blob, asm)
 	blob:writeu1(bit.bor(
 		bit.band(0xf, self[2]),
 		bit.lshift(bit.band(0xf, readreg(self[6])), 4)
@@ -629,11 +629,11 @@ function Instr4rcc.write(self, blob, asm)
 end
 
 local Instr51l_double = Instr:subclass()
-function Instr51l_double.read(self, hi, blob, asm)
+function Instr51l_double:read(hi, blob, asm)
 	self:insert('v'..bit.tohex(hi, 2))
 	self:insert(blob:read'jdouble')
 end
-function Instr51l_double.write(self, blob, asm)
+function Instr51l_double:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:write('jdouble', self[3])
 end
@@ -896,8 +896,8 @@ local InstrClassesForOp = {
 	[0xfe] = Instr21c_method:subclass{name='const-method-handle'},			-- fe 21c	const-method-handle vAA, method_handle@BBBB	A: destination register (8 bits) B: method handle index (16 bits)	Move a reference to the method handle specified by the given index into the specified register. Present in Dex files from version 039 onwards.
 	[0xff] = Instr21c_proto:subclass{name='const-method-type'},			-- ff 21c	const-method-type vAA, proto@BBBB	A: destination register (8 bits) B: method prototype reference (16 bits)	Move a reference to the method prototype specified by the given index into the specified register. Present in Dex files from version 039 onwards.
 }
-local opForInstName = table.map(InstrClassesForOp, function(inst,op)
-	return op, inst.name
+local opForInstName = table.map(InstrClassesForOp, function(cl, op)
+	return op, cl.name
 end)
 
 local JavaASMDex = class()

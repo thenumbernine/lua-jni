@@ -226,53 +226,54 @@ end
 
 
 local Instr = class()
+-- just nop that uses the default aka nothing for these:
+function Instr:read() end
+function Instr:write() end
 
 local InstrS8 = Instr:subclass()
-function InstrS8.read(inst, blob, asm)
-	inst:insert((blob:reads1()))
+function InstrS8:read(blob, asm)
+	self:insert((blob:reads1()))
 end
-function InstrS8.write(inst, blob, asm)
-	blob:writes1(inst[2])
+function InstrS8:write(blob, asm)
+	blob:writes1(self[2])
 end
 
 
 local InstrU8 = Instr:subclass()
-function InstrU8.read(inst, blob, asm)
-	inst:insert((blob:readu1()))
+function InstrU8:read(blob, asm)
+	self:insert((blob:readu1()))
 end
-function InstrU8.write(inst, blob, asm)
-	blob:writeu1(inst[2])
+function InstrU8:write(blob, asm)
+	blob:writeu1(self[2])
 end
 
 local InstrS16 = Instr:subclass()
-function InstrS16.read(inst, blob, asm)
-	inst:insert((blob:reads2()))
+function InstrS16:read(blob, asm)
+	self:insert((blob:reads2()))
 end
-function InstrS16.write(inst, blob, asm)
-	blob:writes2(inst[2])
+function InstrS16:write(blob, asm)
+	blob:writes2(self[2])
 end
 
 
 local InstrU16 = Instr:subclass()
-function InstrU16.read(inst, blob, asm)
-	inst:insert((blob:readu2()))
+function InstrU16:read(blob, asm)
+	self:insert((blob:readu2()))
 end
-function InstrU16.write(inst, blob, asm)
-	blob:writeu2(inst[2])
+function InstrU16:write(blob, asm)
+	blob:writeu2(self[2])
 end
 
 local InstrS32 = Instr:subclass()
-function InstrS32.read(inst, blob, asm)
-	inst:insert((blob:reads4()))
+function InstrS32:read(blob, asm)
+	self:insert((blob:reads4()))
 end
-function InstrS32.write(inst, blob, asm)
-	blob:writes4(inst[2])
+function InstrS32:write(blob, asm)
+	blob:writes4(self[2])
 end
 
 
-
-
-local instDescForOp = {
+local InstrClassesForOp = {
 	[0x00] = Instr:subclass{name='nop'},	-- [No change] .... perform no operation
 	[0x01] = Instr:subclass{name='aconst_null', stackadd=1},	-- → null .... push a null reference onto the stack
 	[0x02] = Instr:subclass{name='iconst_m1', stackadd=1},	-- → -1 .... load the int value −1 onto the stack
@@ -297,11 +298,11 @@ local instDescForOp = {
 		name='ldc',
 		stackadd=1,
 		-- TODO is it worth it to lookup the constants[] table if the arg could be dynamically-computed constant?
-		read = function(inst, blob, asm)
-			instPushConst(inst, blob, asm, blob:readu1())
+		read = function(self, blob, asm)
+			instPushConst(self, blob, asm, blob:readu1())
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu1(instReadConst(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu1(instReadConst(self, 2, asm))
 		end,
 	},
 
@@ -309,11 +310,11 @@ local instDescForOp = {
 	[0x13] = Instr:subclass{
 		name='ldc_w',
 		stackadd=1,
-		read = function(inst, blob, asm)
-			instPushConst(inst, blob, asm, blob:readu2())
+		read = function(self, blob, asm)
+			instPushConst(self, blob, asm, blob:readu2())
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadConst(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadConst(self, 2, asm))
 		end,
 	},
 
@@ -321,11 +322,11 @@ local instDescForOp = {
 	[0x14] = Instr:subclass{
 		name='ldc2_w',
 		stackadd=2,
-		read = function(inst, blob, asm)
-			instPushConst2(inst, blob, asm, blob:readu2())
+		read = function(self, blob, asm)
+			instPushConst2(self, blob, asm, blob:readu2())
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadConst2(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadConst2(self, 2, asm))
 		end,
 	},
 
@@ -333,8 +334,8 @@ local instDescForOp = {
 	[0x15] = InstrU8:subclass{
 		name='iload',
 		stackadd=1,
-		maxLocals = function(inst)
-			return assert(tonumber(inst[2])) + 1
+		maxLocals = function(self)
+			return assert(tonumber(self[2])) + 1
 		end,
 	},
 
@@ -342,8 +343,8 @@ local instDescForOp = {
 	[0x16] = InstrU8{
 		name='lload',
 		stackadd=2,
-		maxLocals = function(inst)
-			return assert(tonumber(inst[2])) + 2
+		maxLocals = function(self)
+			return assert(tonumber(self[2])) + 2
 		end,
 	},
 
@@ -351,8 +352,8 @@ local instDescForOp = {
 	[0x17] = InstrU8{
 		name='fload',
 		stackadd=1,
-		maxLocals = function(inst)
-			return assert(tonumber(inst[2])) + 1
+		maxLocals = function(self)
+			return assert(tonumber(self[2])) + 1
 		end,
 	},
 
@@ -360,8 +361,8 @@ local instDescForOp = {
 	[0x18] = InstrU8{
 		name='dload',
 		stackadd=2,
-		maxLocals = function(inst)
-			return assert(tonumber(inst[2])) + 2
+		maxLocals = function(self)
+			return assert(tonumber(self[2])) + 2
 		end,
 	},
 
@@ -369,8 +370,8 @@ local instDescForOp = {
 	[0x19] = InstrU8{
 		name='aload',
 		stackadd=1,
-		maxLocals = function(inst)
-			return assert(tonumber(inst[2])) + 1
+		maxLocals = function(self)
+			return assert(tonumber(self[2])) + 1
 		end,
 	},
 
@@ -408,9 +409,9 @@ local instDescForOp = {
 	[0x36] = InstrU8:subclass{
 		name='istore',
 		stacksub=1,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- istore $localIndex
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 1
 		end,
 	},
@@ -419,9 +420,9 @@ local instDescForOp = {
 	[0x37] = InstrU8:subclass{
 		name='lstore',
 		stacksub=2,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- lstore $localIndex
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 2
 		end,
 	},
@@ -430,9 +431,9 @@ local instDescForOp = {
 	[0x38] = InstrU8:subclass{
 		name='fstore',
 		stacksub=1,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- fstore $localIndex
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 1
 		end,
 	},
@@ -441,9 +442,9 @@ local instDescForOp = {
 	[0x39] = InstrU8:subclass{
 		name='dstore',
 		stacksub=2,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- dstore $localIndex
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 2
 		end,
 	},
@@ -452,9 +453,9 @@ local instDescForOp = {
 	[0x3a] = InstrU8:subclass{
 		name='astore',
 		stacksub=1,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- astore $localIndex
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 1
 		end,
 	},
@@ -536,17 +537,17 @@ local instDescForOp = {
 	-- 2: index, const .... [No change] .... increment local variable #index by signed byte const
 	[0x84] = Instr:subclass{
 		name='iinc',
-		read = function(inst, blob, asm)
-			inst:insert((blob:readu1()))
-			inst:insert((blob:reads1()))
+		read = function(self, blob, asm)
+			self:insert((blob:readu1()))
+			self:insert((blob:reads1()))
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu1(inst[2])
-			blob:writes1(inst[3])
+		write = function(self, blob, asm)
+			blob:writeu1(self[2])
+			blob:writes1(self[3])
 		end,
-		maxLocals = function(inst)
+		maxLocals = function(self)
 			-- iinc $localIndex $amount
-			local localIndex = assert(tonumber(inst[2]))
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 1
 		end,
 	},
@@ -591,8 +592,8 @@ local instDescForOp = {
 	-- 1: index .... [No change] .... continue execution from address taken from a local variable #index (the asymmetry with jsr is intentional)
 	[0xa9] = InstrS8:subclass{
 		name='ret',
-		maxLocals = function(inst)
-			local localIndex = assert(tonumber(inst[2]))
+		maxLocals = function(self)
+			local localIndex = assert(tonumber(self[2]))
 			return localIndex + 1
 		end,
 	},
@@ -619,40 +620,40 @@ local instDescForOp = {
 	-- 2: indexbyte1, indexbyte2 .... → value .... get a static field value of a class, where the field is identified by field reference in the constant pool index (indexbyte1 << 8 | indexbyte2)
 	[0xb2] = Instr:subclass{
 		name='getstatic',
-		stackadd = function(inst, curStack)	-- NOTICE this will depend on the field type
+		stackadd = function(self, curStack)	-- NOTICE this will depend on the field type
 			-- getstatic $class $fieldName $fieldSig
-			local fieldSig = assert.index(inst, 4)
+			local fieldSig = assert.index(self, 4)
 			if fieldSig == 'J' or fieldsig == 'D' then
 				return curStack + 2
 			end
 			return curStack + 1
 		end,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushField(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushField(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadField(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadField(self, 2, asm))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2 .... value → .... set static field to value in a class, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb3] = Instr:subclass{
 		name='putstatic',
-		stacksub = function(inst, curStack)	-- NOTICE this will depend on the field type
+		stacksub = function(self, curStack)	-- NOTICE this will depend on the field type
 			-- putstatic $class $fieldName $fieldSig
-			local fieldSig = assert.index(inst, 4)
+			local fieldSig = assert.index(self, 4)
 			if fieldSig == 'J' or fieldSig == 'D' then
 				return curStack - 2
 			end
 			return curStack - 1
 		end,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushField(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushField(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadField(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadField(self, 2, asm))
 		end,
 	},
 
@@ -660,45 +661,45 @@ local instDescForOp = {
 	[0xb4] = Instr:subclass{
 		name='getfield',
 		stacksub = 1,
-		stackadd = function(inst, curStack)	-- NOTICE this will depend on the field type
+		stackadd = function(self, curStack)	-- NOTICE this will depend on the field type
 			-- getfield $class $fieldName $fieldSig
-			local fieldSig = assert.index(inst, 4)
+			local fieldSig = assert.index(self, 4)
 			if fieldSig == 'J' or fieldsig == 'D' then
 				return curStack + 2
 			end
 			return curStack + 1
 		end,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushField(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushField(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadField(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadField(self, 2, asm))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2 .... objectref, value → .... set field to value in an object objectref, where the field is identified by a field reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb5] = Instr:subclass{
 		name='putfield',
-		stacksub = function(inst, curStack)	-- NOTICE this will depend on the field type ... -1 for removing the object ref
+		stacksub = function(self, curStack)	-- NOTICE this will depend on the field type ... -1 for removing the object ref
 			curStack  = curStack - 1	-- object ref
 			-- getfield $class $fieldName $fieldSig
-			local fieldSig = assert.index(inst, 4)
+			local fieldSig = assert.index(self, 4)
 			if fieldSig == 'J' or fieldsig == 'D' then
 				return curStack - 2
 			end
 			return curStack - 1
 		end,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
+		read = function(self, blob, asm)
 			assert(xpcall(function()
-				instPushField(inst, blob, asm)
+				instPushField(self, blob, asm)
 			end, function(err)
 				return 'at putfield at ofs='..blob.ofs..'\n'..err
 			end))
 		end,
-		write = function(inst, blob, asm)
-			local fieldIndex = instReadField(inst, 2, asm)
+		write = function(self, blob, asm)
+			local fieldIndex = instReadField(self, 2, asm)
 --DEBUG:print('write putfield '..fieldIndex)
 			blob:writeu2(fieldIndex)
 		end,
@@ -707,9 +708,9 @@ local instDescForOp = {
 	-- 2: indexbyte1, indexbyte2 .... objectref, [arg1, arg2, ...] → result .... invoke virtual method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb6] = Instr:subclass{
 		name='invokevirtual',
-		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+		stackadd = function(self, curStack)	-- NOTICE this depends on return type
 			-- invokevirtual $class $methodName $sig
-			local sig = assert.index(inst,4)
+			local sig = assert.index(self,4)
 			if sig:match'J$' or sig:match'D$' then
 				return curStack + 2
 			elseif sig:match'V$' then
@@ -717,9 +718,9 @@ local instDescForOp = {
 			end
 			return curStack + 1
 		end,
-		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+		stacksub = function(self, curStack)	-- NOTICE this depends on args
 			curStack  = curStack - 1
-			local sig = sigStrToObj(assert.index(inst,4))
+			local sig = sigStrToObj(assert.index(self,4))
 			for i=2,#sig do
 				local sigi = sig[i]
 				if sigi == 'long' or sigi == 'double' then
@@ -730,20 +731,20 @@ local instDescForOp = {
 			end
 			return curStack
 		end,
-		read = function(inst, blob, asm)
-			instPushMethod(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushMethod(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadMethod(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadMethod(self, 2, asm))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2 .... objectref, [arg1, arg2, ...] → result .... invoke instance method on object objectref and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb7] = Instr:subclass{
 		name='invokespecial',
-		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+		stackadd = function(self, curStack)	-- NOTICE this depends on return type
 			-- invokespecial $class $methodName $sig
-			local sig = assert.index(inst,4)
+			local sig = assert.index(self,4)
 			if sig:match'J$' or sig:match'D$' then
 				return curStack + 2
 			elseif sig:match'V$' then
@@ -751,9 +752,9 @@ local instDescForOp = {
 			end
 			return curStack + 1
 		end,
-		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+		stacksub = function(self, curStack)	-- NOTICE this depends on args
 			curStack  = curStack - 1
-			local sig = sigStrToObj(assert.index(inst,4))
+			local sig = sigStrToObj(assert.index(self,4))
 			for i=2,#sig do
 				local sigi = sig[i]
 				if sigi == 'long' or sigi == 'double' then
@@ -764,20 +765,20 @@ local instDescForOp = {
 			end
 			return curStack
 		end,
-		read = function(inst, blob, asm)
-			instPushMethod(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushMethod(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadMethod(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadMethod(self, 2, asm))
 		end,
 	},
 
 	-- 2: indexbyte1, indexbyte2 .... [arg1, arg2, ...] → result .... invoke a static method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb8] = Instr:subclass{
 		name='invokestatic',
-		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+		stackadd = function(self, curStack)	-- NOTICE this depends on return type
 			-- invokestatic $class $methodName $sig
-			local sig = assert.index(inst,4)
+			local sig = assert.index(self,4)
 			if sig:match'J$' or sig:match'D$' then
 				return curStack + 2
 			elseif sig:match'V$' then
@@ -785,9 +786,9 @@ local instDescForOp = {
 			end
 			return curStack + 1
 		end,
-		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+		stacksub = function(self, curStack)	-- NOTICE this depends on args
 			-- no -1 since no object
-			local sig = sigStrToObj(assert.index(inst,4))
+			local sig = sigStrToObj(assert.index(self,4))
 			for i=2,#sig do
 				local sigi = sig[i]
 				if sigi == 'long' or sigi == 'double' then
@@ -798,20 +799,20 @@ local instDescForOp = {
 			end
 			return curStack
 		end,
-		read = function(inst, blob, asm)
-			instPushMethod(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushMethod(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadMethod(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadMethod(self, 2, asm))
 		end,
 	},
 
 	-- 4: indexbyte1, indexbyte2, count, 0 .... objectref, [arg1, arg2, ...] → result .... invokes an interface method on object objectref and puts the result on the stack (might be void); the interface method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xb9] = Instr:subclass{
 		name='invokeinterface',
-		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+		stackadd = function(self, curStack)	-- NOTICE this depends on return type
 			-- invokeinterface $class $methodName $sig
-			local sig = assert.index(inst,4)
+			local sig = assert.index(self,4)
 			if sig:match'J$' or sig:match'D$' then
 				return curStack + 2
 			elseif sig:match'V$' then
@@ -819,9 +820,9 @@ local instDescForOp = {
 			end
 			return curStack + 1
 		end,
-		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+		stacksub = function(self, curStack)	-- NOTICE this depends on args
 			curStack  = curStack - 1
-			local sig = sigStrToObj(assert.index(inst,4))
+			local sig = sigStrToObj(assert.index(self,4))
 			for i=2,#sig do
 				local sigi = sig[i]
 				if sigi == 'long' or sigi == 'double' then
@@ -832,15 +833,15 @@ local instDescForOp = {
 			end
 			return curStack
 		end,
-		read = function(inst, blob, asm)
-			instPushMethod(inst, blob, asm)
-			inst:insert(blob:readu1())	-- count ... what's count for?
+		read = function(self, blob, asm)
+			instPushMethod(self, blob, asm)
+			self:insert(blob:readu1())	-- count ... what's count for?
 			assert.eq(blob:readu1(), 0)	-- 0
 		end,
-		write = function(inst, blob, asm)
-			local methodIndex, index = instReadMethod(inst, 2, asm)
+		write = function(self, blob, asm)
+			local methodIndex, index = instReadMethod(self, 2, asm)
 			blob:writeu2(methodIndex)
-			blob:writeu1(inst[index])
+			blob:writeu1(self[index])
 			blob:writeu1(0)
 		end,
 	},
@@ -848,9 +849,9 @@ local instDescForOp = {
 	-- 4: indexbyte1, indexbyte2, 0, 0 .... [arg1, arg2, ...] → result .... invokes a dynamic method and puts the result on the stack (might be void); the method is identified by method reference index in constant pool (indexbyte1 << 8 | indexbyte2)
 	[0xba] = Instr:subclass{
 		name='invokedynamic',
-		stackadd = function(inst, curStack)	-- NOTICE this depends on return type
+		stackadd = function(self, curStack)	-- NOTICE this depends on return type
 			-- invokedynamic $class $methodName $sig
-			local sig = assert.index(inst,4)
+			local sig = assert.index(self,4)
 			if sig:match'J$' or sig:match'D$' then
 				return curStack + 2
 			elseif sig:match'V$' then
@@ -858,9 +859,9 @@ local instDescForOp = {
 			end
 			return curStack + 1
 		end,
-		stacksub = function(inst, curStack)	-- NOTICE this depends on args
+		stacksub = function(self, curStack)	-- NOTICE this depends on args
 			-- TODO what is a dynamic method, and how come there's no object ref?
-			local sig = sigStrToObj(assert.index(inst,4))
+			local sig = sigStrToObj(assert.index(self,4))
 			for i=2,#sig do
 				local sigi = sig[i]
 				if sigi == 'long' or sigi == 'double' then
@@ -872,12 +873,12 @@ local instDescForOp = {
 			return curStack
 		end,
 		--read={'uint16_t', 'uint8_t', 'uint8_t'},
-		read = function(inst, blob, asm)
-			instPushMethod(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushMethod(self, blob, asm)
 			assert.eq(blob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadMethod(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadMethod(self, 2, asm))
 			blob:writeu2(0)
 		end,
 	},
@@ -887,11 +888,11 @@ local instDescForOp = {
 		name='new',
 		stackadd = 1,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushClass(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushClass(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadClass(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadClass(self, 2, asm))
 		end,
 	},
 
@@ -909,11 +910,11 @@ local instDescForOp = {
 		stacksub = 1,
 		stackadd = 1,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushClass(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushClass(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadClass(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadClass(self, 2, asm))
 		end,
 	},
 
@@ -926,11 +927,11 @@ local instDescForOp = {
 		stacksub = 1,
 		stackadd = 1,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushClass(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushClass(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadClass(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadClass(self, 2, asm))
 		end,
 	},
 
@@ -940,11 +941,11 @@ local instDescForOp = {
 		stacksub = 1,
 		stackadd = 1,
 		--read={'uint16_t'},
-		read = function(inst, blob, asm)
-			instPushClass(inst, blob, asm)
+		read = function(self, blob, asm)
+			instPushClass(self, blob, asm)
 		end,
-		write = function(inst, blob, asm)
-			blob:writeu2(instReadClass(inst, 2, asm))
+		write = function(self, blob, asm)
+			blob:writeu2(instReadClass(self, 2, asm))
 		end,
 	},
 
@@ -955,21 +956,21 @@ local instDescForOp = {
 	-- 3: indexbyte1, indexbyte2, dimensions .... count1, [count2,...] → arrayref .... create a new array of dimensions dimensions of type identified by class reference in constant pool index (indexbyte1 << 8 | indexbyte2); the sizes of each dimension is identified by count1, [count2, etc.]
 	[0xc5] = Instr:subclass{
 		name='multianewarray',
-		stacksub = function(inst, curStack)
-			-- inst = {'multianewarray' indexhi, indexlo, dimension}
-			local dim = assert(tonumber(inst[4]))
+		stacksub = function(self, curStack)
+			-- self = {'multianewarray' indexhi, indexlo, dimension}
+			local dim = assert(tonumber(self[4]))
 			curStack = curStack - dim
 		end,
 		stackadd = 1,	-- new ref
 		--read={'uint16_t', 'uint8_t'}
-		read = function(inst, blob, asm)
-			instPushClass(inst, blob, asm)
-			inst:insert(blob:readu1())
+		read = function(self, blob, asm)
+			instPushClass(self, blob, asm)
+			self:insert(blob:readu1())
 		end,
-		write = function(inst, blob, asm)
-			local classIndex, index = instReadClass(inst, 2, asm)
+		write = function(self, blob, asm)
+			local classIndex, index = instReadClass(self, 2, asm)
 			blob:writeu2(classIndex)
-			blob:writeu1(inst[index])
+			blob:writeu1(self[index])
 		end,
 	},
 
@@ -982,8 +983,8 @@ local instDescForOp = {
 	[0xff] = Instr:subclass{name='impdep2'},	-- reserved for implementation-dependent operations within debuggers; should not appear in any class file
 	--(no name) .... cb-fd ....  ....  ....  .... these values are currently unassigned for opcodes and are reserved for future use
 }
-local opForInstName = table.map(instDescForOp, function(inst,op)
-	return op, inst.name
+local opForInstName = table.map(InstrClassesForOp, function(cl, op)
+	return op, cl.name
 end)
 
 
@@ -1281,13 +1282,10 @@ io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
 				-- [[
 				while blob.ofs < insnEndOfs do
 					local op = blob:readu1()
-					local instDesc = assert.index(instDescForOp, op)
-					local inst = table()
-					inst:insert((assert.index(instDesc, 'name')))
-
-					if instDesc.read then
-						instDesc.read(inst, blob, self)
-					end
+					local instrClass = assert.index(InstrClassesForOp, op)
+					local inst = setmetatable({}, instrClass)
+					inst:insert((assert.index(inst, 'name')))
+					inst:read(blob, self)
 					code:insert(inst)
 				end
 				assert.eq(blob.ofs, insnEndOfs)
@@ -1781,16 +1779,17 @@ assert.type(const.name, 'string')
 				local instBlob = WriteBlob()
 				for instrIndex,inst in ipairs(method.code) do
 					local op = assert.index(opForInstName, inst[1])
-					local instDesc = assert.index(instDescForOp, op)
+					local instrClass = assert.index(InstrClassesForOp, op)
+					setmetatable(inst, instrClass)
 
 					-- while we're here, track the stack level so we can auto set 'maxStack'
-					if instDesc.stacksub then
-						if type(instDesc.stacksub) == 'number' then
-							curStack = curStack - instDesc.stacksub
-						elseif type(instDesc.stacksub) == 'function' then
-							curStack = instDesc.stacksub(inst, curStack)
+					if inst.stacksub then
+						if type(inst.stacksub) == 'number' then
+							curStack = curStack - inst.stacksub
+						elseif type(inst.stacksub) == 'function' then
+							curStack = inst:stacksub(curStack)
 						else
-							error("idk how to handle stacksub type "..type(instDesc.stacksub))
+							error("idk how to handle stacksub type "..type(inst.stacksub))
 						end
 						minStack = math.min(minStack, curStack)
 						if minStack < 0 then
@@ -1800,28 +1799,26 @@ assert.type(const.name, 'string')
 								..' stack underflow detected.\n')
 						end
 					end
-					if instDesc.stackadd then
-						if type(instDesc.stackadd) == 'number' then
-							curStack = curStack + instDesc.stackadd
-						elseif type(instDesc.stackadd) == 'function' then
-							curStack = instDesc.stackadd(inst, curStack)
+					if inst.stackadd then
+						if type(inst.stackadd) == 'number' then
+							curStack = curStack + inst.stackadd
+						elseif type(inst.stackadd) == 'function' then
+							curStack = inst:stackadd(curStack)
 						else
-							error("idk how to handle stackadd type "..type(instDesc.stackadd))
+							error("idk how to handle stackadd type "..type(inst.stackadd))
 						end
 						maxStack = math.max(maxStack, curStack)
 					end
-					if type(instDesc.maxLocals) == 'number' then
-						maxLocals = math.max(maxLocals, instDesc.maxLocals)
-					elseif type(instDesc.maxLocals) == 'function' then
-						maxLocals = math.max(maxLocals, instDesc.maxLocals(inst))
-					elseif type(instDesc.maxLocals) ~= 'nil' then
-						error("idk how to handle maxLocals type "..type(instDesc.maxLocals))
+					if type(inst.maxLocals) == 'number' then
+						maxLocals = math.max(maxLocals, inst.maxLocals)
+					elseif type(inst.maxLocals) == 'function' then
+						maxLocals = math.max(maxLocals, inst.maxLocals(inst))
+					elseif type(inst.maxLocals) ~= 'nil' then
+						error("idk how to handle maxLocals type "..type(inst.maxLocals))
 					end
 
 					instBlob:writeu1(op)
-					if instDesc.write then
-						instDesc.write(inst, instBlob, self)
-					end
+					inst:write(instBlob, self)
 				end
 
 				-- if you get a vm segfault from bad max stack/locals then read from these fields to find what my algo deduces they shoudl be
