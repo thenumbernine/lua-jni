@@ -394,14 +394,14 @@ local instDescForOp = {
 	[0x2b] = Instr:subclass{name='aload_1', stackadd=1, maxLocals=2},	-- → objectref .... load a reference onto the stack from local variable 1
 	[0x2c] = Instr:subclass{name='aload_2', stackadd=1, maxLocals=3},	-- → objectref .... load a reference onto the stack from local variable 2
 	[0x2d] = Instr:subclass{name='aload_3', stackadd=1, maxLocals=4},	-- → objectref .... load a reference onto the stack from local variable 3
-	[0x2e] = Instr:subclass{name='iaload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load an int from an array
-	[0x2f] = Instr:subclass{name='laload', stackadd=2, stacksub=2},	-- arrayref, index → value .... load a long from an array
-	[0x30] = Instr:subclass{name='faload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a float from an array
-	[0x31] = Instr:subclass{name='daload', stackadd=2, stacksub=2},	-- arrayref, index → value .... load a double from an array
-	[0x32] = Instr:subclass{name='aaload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load onto the stack a reference from an array
-	[0x33] = Instr:subclass{name='baload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a byte or Boolean value from an array
-	[0x34] = Instr:subclass{name='caload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load a char from an array
-	[0x35] = Instr:subclass{name='saload', stackadd=1, stacksub=2},	-- arrayref, index → value .... load short from array
+	[0x2e] = Instr:subclass{name='iaload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load an int from an array
+	[0x2f] = Instr:subclass{name='laload', stacksub=2, stackadd=2},	-- arrayref, index → value .... load a long from an array
+	[0x30] = Instr:subclass{name='faload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a float from an array
+	[0x31] = Instr:subclass{name='daload', stacksub=2, stackadd=2},	-- arrayref, index → value .... load a double from an array
+	[0x32] = Instr:subclass{name='aaload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load onto the stack a reference from an array
+	[0x33] = Instr:subclass{name='baload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a byte or Boolean value from an array
+	[0x34] = Instr:subclass{name='caload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a char from an array
+	[0x35] = Instr:subclass{name='saload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load short from array
 
 	-- 1: index .... value → .... store int value into variable #index
 	-- TODO in some cases where the previous instruction is a pushed int, the maxLocals from this can be deterministic...
@@ -489,49 +489,49 @@ local instDescForOp = {
 	[0x56] = Instr:subclass{name='sastore', stacksub=3},	-- arrayref, index, value → .... store short to array
 	[0x57] = Instr:subclass{name='pop', stacksub=1},	-- value → .... discard the top value on the stack
 	[0x58] = Instr:subclass{name='pop2', stacksub=2},	-- {value2, value1} → .... discard the top two values on the stack (or one value, if it is a double or long)
-	[0x59] = Instr:subclass{name='dup', stackadd=2, stacksub=1},	-- value → value, value .... duplicate the value on top of the stack
-	[0x5a] = Instr:subclass{name='dup_x1', stackadd=3, stacksub=2},	-- value2, value1 → value1, value2, value1 .... insert a copy of the top value into the stack two values from the top. value1 and value2 must not be of the type double or long.
-	[0x5b] = Instr:subclass{name='dup_x2', stackadd=4, stacksub=3},	-- value3, value2, value1 → value1, value3, value2, value1 .... insert a copy of the top value into the stack two (if value2 is double or long it takes up the entry of value3, too) or three values (if value2 is neither double nor long) from the top
-	[0x5c] = Instr:subclass{name='dup2', stackadd=4, stacksub=2},	-- {value2, value1} → {value2, value1}, {value2, value1} .... duplicate top two stack words (two values, if value1 is not double nor long; a single value, if value1 is double or long)
-	[0x5d] = Instr:subclass{name='dup2_x1', stackadd=5, stacksub=3},	-- value3, {value2, value1} → {value2, value1}, value3, {value2, value1} .... duplicate two words and insert beneath third word (see explanation above)
-	[0x5e] = Instr:subclass{name='dup2_x2', stackadd=6, stacksub=4},	-- {value4, value3}, {value2, value1} → {value2, value1}, {value4, value3}, {value2, value1} .... duplicate two words and insert beneath fourth word
-	[0x5f] = Instr:subclass{name='swap', stackadd=2, stacksub=2},	-- value2, value1 → value1, value2 .... swaps two top words on the stack (note that value1 and value2 must not be double or long)
-	[0x60] = Instr:subclass{name='iadd', stackadd=1, stacksub=2},	-- value1, value2 → result .... add two ints
-	[0x61] = Instr:subclass{name='ladd', stackadd=2, stacksub=4},	-- value1, value2 → result .... add two longs
-	[0x62] = Instr:subclass{name='fadd', stackadd=1, stacksub=2},	-- value1, value2 → result .... add two floats
-	[0x63] = Instr:subclass{name='dadd', stackadd=2, stacksub=4},	-- value1, value2 → result .... add two doubles
-	[0x64] = Instr:subclass{name='isub', stackadd=1, stacksub=2},	-- value1, value2 → result .... int subtract
-	[0x65] = Instr:subclass{name='lsub', stackadd=2, stacksub=4},	-- value1, value2 → result .... subtract two longs
-	[0x66] = Instr:subclass{name='fsub', stackadd=1, stacksub=2},	-- value1, value2 → result .... subtract two floats
-	[0x67] = Instr:subclass{name='dsub', stackadd=2, stacksub=4},	-- value1, value2 → result .... subtract a double from another
-	[0x68] = Instr:subclass{name='imul', stackadd=1, stacksub=2},	-- value1, value2 → result .... multiply two integers
-	[0x69] = Instr:subclass{name='lmul', stackadd=2, stacksub=4},	-- value1, value2 → result .... multiply two longs
-	[0x6a] = Instr:subclass{name='fmul', stackadd=1, stacksub=2},	-- value1, value2 → result .... multiply two floats
-	[0x6b] = Instr:subclass{name='dmul', stackadd=2, stacksub=4},	-- value1, value2 → result .... multiply two doubles
-	[0x6c] = Instr:subclass{name='idiv', stackadd=1, stacksub=2},	-- value1, value2 → result .... divide two integers
-	[0x6d] = Instr:subclass{name='ldiv', stackadd=2, stacksub=4},	-- value1, value2 → result .... divide two longs
-	[0x6e] = Instr:subclass{name='fdiv', stackadd=1, stacksub=2},	-- value1, value2 → result .... divide two floats
-	[0x6f] = Instr:subclass{name='ddiv', stackadd=2, stacksub=4},	-- value1, value2 → result .... divide two doubles
-	[0x70] = Instr:subclass{name='irem', stackadd=1, stacksub=2},	-- value1, value2 → result .... logical int remainder
-	[0x71] = Instr:subclass{name='lrem', stackadd=2, stacksub=4},	-- value1, value2 → result .... remainder of division of two longs
-	[0x72] = Instr:subclass{name='frem', stackadd=1, stacksub=2},	-- value1, value2 → result .... get the remainder from a division between two floats
-	[0x73] = Instr:subclass{name='drem', stackadd=2, stacksub=4},	-- value1, value2 → result .... get the remainder from a division between two doubles
-	[0x74] = Instr:subclass{name='ineg', stackadd=1, stacksub=1},	-- value → result .... negate int
-	[0x75] = Instr:subclass{name='lneg', stackadd=2, stacksub=2},	-- value → result .... negate a long
-	[0x76] = Instr:subclass{name='fneg', stackadd=1, stacksub=1},	-- value → result .... negate a float
-	[0x77] = Instr:subclass{name='dneg', stackadd=2, stacksub=2},	-- value → result .... negate a double
-	[0x78] = Instr:subclass{name='ishl', stackadd=1, stacksub=2},	-- value1, value2 → result .... int shift left
-	[0x79] = Instr:subclass{name='lshl', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift left of a long value1 by int value2 positions
-	[0x7a] = Instr:subclass{name='ishr', stackadd=1, stacksub=2},	-- value1, value2 → result .... int arithmetic shift right
-	[0x7b] = Instr:subclass{name='lshr', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions
-	[0x7c] = Instr:subclass{name='iushr', stackadd=1, stacksub=2},	-- value1, value2 → result .... int logical shift right
-	[0x7d] = Instr:subclass{name='lushr', stackadd=2, stacksub=3},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions, unsigned
-	[0x7e] = Instr:subclass{name='iand', stackadd=1, stacksub=2},	-- value1, value2 → result .... perform a bitwise AND on two integers
-	[0x7f] = Instr:subclass{name='land', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise AND of two longs
-	[0x80] = Instr:subclass{name='ior', stackadd=1, stacksub=2},	-- value1, value2 → result .... bitwise int OR
-	[0x81] = Instr:subclass{name='lor', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise OR of two longs
-	[0x82] = Instr:subclass{name='ixor', stackadd=1, stacksub=2},	-- value1, value2 → result .... int xor
-	[0x83] = Instr:subclass{name='lxor', stackadd=2, stacksub=4},	-- value1, value2 → result .... bitwise XOR of two longs
+	[0x59] = Instr:subclass{name='dup', stacksub=1, stackadd=2},	-- value → value, value .... duplicate the value on top of the stack
+	[0x5a] = Instr:subclass{name='dup_x1', stacksub=2, stackadd=3},	-- value2, value1 → value1, value2, value1 .... insert a copy of the top value into the stack two values from the top. value1 and value2 must not be of the type double or long.
+	[0x5b] = Instr:subclass{name='dup_x2', stacksub=3, stackadd=4},	-- value3, value2, value1 → value1, value3, value2, value1 .... insert a copy of the top value into the stack two (if value2 is double or long it takes up the entry of value3, too) or three values (if value2 is neither double nor long) from the top
+	[0x5c] = Instr:subclass{name='dup2', stacksub=2, stackadd=4},	-- {value2, value1} → {value2, value1}, {value2, value1} .... duplicate top two stack words (two values, if value1 is not double nor long; a single value, if value1 is double or long)
+	[0x5d] = Instr:subclass{name='dup2_x1', stacksub=3, stackadd=5},	-- value3, {value2, value1} → {value2, value1}, value3, {value2, value1} .... duplicate two words and insert beneath third word (see explanation above)
+	[0x5e] = Instr:subclass{name='dup2_x2', stacksub=4, stackadd=6},	-- {value4, value3}, {value2, value1} → {value2, value1}, {value4, value3}, {value2, value1} .... duplicate two words and insert beneath fourth word
+	[0x5f] = Instr:subclass{name='swap', stacksub=2, stackadd=2},	-- value2, value1 → value1, value2 .... swaps two top words on the stack (note that value1 and value2 must not be double or long)
+	[0x60] = Instr:subclass{name='iadd', stacksub=2, stackadd=1},	-- value1, value2 → result .... add two ints
+	[0x61] = Instr:subclass{name='ladd', stacksub=4, stackadd=2},	-- value1, value2 → result .... add two longs
+	[0x62] = Instr:subclass{name='fadd', stacksub=2, stackadd=1},	-- value1, value2 → result .... add two floats
+	[0x63] = Instr:subclass{name='dadd', stacksub=4, stackadd=2},	-- value1, value2 → result .... add two doubles
+	[0x64] = Instr:subclass{name='isub', stacksub=2, stackadd=1},	-- value1, value2 → result .... int subtract
+	[0x65] = Instr:subclass{name='lsub', stacksub=4, stackadd=2},	-- value1, value2 → result .... subtract two longs
+	[0x66] = Instr:subclass{name='fsub', stacksub=2, stackadd=1},	-- value1, value2 → result .... subtract two floats
+	[0x67] = Instr:subclass{name='dsub', stacksub=4, stackadd=2},	-- value1, value2 → result .... subtract a double from another
+	[0x68] = Instr:subclass{name='imul', stacksub=2, stackadd=1},	-- value1, value2 → result .... multiply two integers
+	[0x69] = Instr:subclass{name='lmul', stacksub=4, stackadd=2},	-- value1, value2 → result .... multiply two longs
+	[0x6a] = Instr:subclass{name='fmul', stacksub=2, stackadd=1},	-- value1, value2 → result .... multiply two floats
+	[0x6b] = Instr:subclass{name='dmul', stacksub=4, stackadd=2},	-- value1, value2 → result .... multiply two doubles
+	[0x6c] = Instr:subclass{name='idiv', stacksub=2, stackadd=1},	-- value1, value2 → result .... divide two integers
+	[0x6d] = Instr:subclass{name='ldiv', stacksub=4, stackadd=2},	-- value1, value2 → result .... divide two longs
+	[0x6e] = Instr:subclass{name='fdiv', stacksub=2, stackadd=1},	-- value1, value2 → result .... divide two floats
+	[0x6f] = Instr:subclass{name='ddiv', stacksub=4, stackadd=2},	-- value1, value2 → result .... divide two doubles
+	[0x70] = Instr:subclass{name='irem', stacksub=2, stackadd=1},	-- value1, value2 → result .... logical int remainder
+	[0x71] = Instr:subclass{name='lrem', stacksub=4, stackadd=2},	-- value1, value2 → result .... remainder of division of two longs
+	[0x72] = Instr:subclass{name='frem', stacksub=2, stackadd=1},	-- value1, value2 → result .... get the remainder from a division between two floats
+	[0x73] = Instr:subclass{name='drem', stacksub=4, stackadd=2},	-- value1, value2 → result .... get the remainder from a division between two doubles
+	[0x74] = Instr:subclass{name='ineg', stacksub=1, stackadd=1},	-- value → result .... negate int
+	[0x75] = Instr:subclass{name='lneg', stacksub=2, stackadd=2},	-- value → result .... negate a long
+	[0x76] = Instr:subclass{name='fneg', stacksub=1, stackadd=1},	-- value → result .... negate a float
+	[0x77] = Instr:subclass{name='dneg', stacksub=2, stackadd=2},	-- value → result .... negate a double
+	[0x78] = Instr:subclass{name='ishl', stacksub=2, stackadd=1},	-- value1, value2 → result .... int shift left
+	[0x79] = Instr:subclass{name='lshl', stacksub=3, stackadd=2},	-- value1, value2 → result .... bitwise shift left of a long value1 by int value2 positions
+	[0x7a] = Instr:subclass{name='ishr', stacksub=2, stackadd=1},	-- value1, value2 → result .... int arithmetic shift right
+	[0x7b] = Instr:subclass{name='lshr', stacksub=3, stackadd=2},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions
+	[0x7c] = Instr:subclass{name='iushr', stacksub=2, stackadd=1},	-- value1, value2 → result .... int logical shift right
+	[0x7d] = Instr:subclass{name='lushr', stacksub=3, stackadd=2},	-- value1, value2 → result .... bitwise shift right of a long value1 by int value2 positions, unsigned
+	[0x7e] = Instr:subclass{name='iand', stacksub=2, stackadd=1},	-- value1, value2 → result .... perform a bitwise AND on two integers
+	[0x7f] = Instr:subclass{name='land', stacksub=4, stackadd=2},	-- value1, value2 → result .... bitwise AND of two longs
+	[0x80] = Instr:subclass{name='ior', stacksub=2, stackadd=1},	-- value1, value2 → result .... bitwise int OR
+	[0x81] = Instr:subclass{name='lor', stacksub=4, stackadd=2},	-- value1, value2 → result .... bitwise OR of two longs
+	[0x82] = Instr:subclass{name='ixor', stacksub=2, stackadd=1},	-- value1, value2 → result .... int xor
+	[0x83] = Instr:subclass{name='lxor', stacksub=4, stackadd=2},	-- value1, value2 → result .... bitwise XOR of two longs
 
 	-- 2: index, const .... [No change] .... increment local variable #index by signed byte const
 	[0x84] = Instr:subclass{
@@ -551,26 +551,26 @@ local instDescForOp = {
 		end,
 	},
 
-	[0x85] = Instr:subclass{name='i2l', stackadd=2, stacksub=1},	-- value → result .... convert an int into a long
-	[0x86] = Instr:subclass{name='i2f', stackadd=1, stacksub=1},	-- value → result .... convert an int into a float
-	[0x87] = Instr:subclass{name='i2d', stackadd=2, stacksub=1},	-- value → result .... convert an int into a double
-	[0x88] = Instr:subclass{name='l2i', stackadd=1, stacksub=2},	-- value → result .... convert a long to a int
-	[0x89] = Instr:subclass{name='l2f', stackadd=1, stacksub=2},	-- value → result .... convert a long to a float
-	[0x8a] = Instr:subclass{name='l2d', stackadd=2, stacksub=2},	-- value → result .... convert a long to a double
-	[0x8b] = Instr:subclass{name='f2i', stackadd=1, stacksub=1},	-- value → result .... convert a float to an int
-	[0x8c] = Instr:subclass{name='f2l', stackadd=2, stacksub=1},	-- value → result .... convert a float to a long
-	[0x8d] = Instr:subclass{name='f2d', stackadd=2, stacksub=1},	-- value → result .... convert a float to a double
-	[0x8e] = Instr:subclass{name='d2i', stackadd=1, stacksub=2},	-- value → result .... convert a double to an int
-	[0x8f] = Instr:subclass{name='d2l', stackadd=2, stacksub=2},	-- value → result .... convert a double to a long
-	[0x90] = Instr:subclass{name='d2f', stackadd=1, stacksub=2},	-- value → result .... convert a double to a float
-	[0x91] = Instr:subclass{name='i2b', stackadd=1, stacksub=1},	-- value → result .... convert an int into a byte
-	[0x92] = Instr:subclass{name='i2c', stackadd=1, stacksub=1},	-- value → result .... convert an int into a character
-	[0x93] = Instr:subclass{name='i2s', stackadd=1, stacksub=1},	-- value → result .... convert an int into a short
-	[0x94] = Instr:subclass{name='lcmp', stackadd=1, stacksub=4},	-- value1, value2 → result .... push 0 if the two longs are the same, 1 if value1 is greater than value2, -1 otherwise
-	[0x95] = Instr:subclass{name='fcmpl', stackadd=1, stacksub=2},	-- value1, value2 → result .... compare two floats, -1 on NaN
-	[0x96] = Instr:subclass{name='fcmpg', stackadd=1, stacksub=2},	-- value1, value2 → result .... compare two floats, 1 on NaN
-	[0x97] = Instr:subclass{name='dcmpl', stackadd=1, stacksub=4},	-- value1, value2 → result .... compare two doubles, -1 on NaN
-	[0x98] = Instr:subclass{name='dcmpg', stackadd=1, stacksub=4},	-- value1, value2 → result .... compare two doubles, 1 on NaN
+	[0x85] = Instr:subclass{name='i2l', stacksub=1, stackadd=2},	-- value → result .... convert an int into a long
+	[0x86] = Instr:subclass{name='i2f', stacksub=1, stackadd=1},	-- value → result .... convert an int into a float
+	[0x87] = Instr:subclass{name='i2d', stacksub=1, stackadd=2},	-- value → result .... convert an int into a double
+	[0x88] = Instr:subclass{name='l2i', stacksub=2, stackadd=1},	-- value → result .... convert a long to a int
+	[0x89] = Instr:subclass{name='l2f', stacksub=2, stackadd=1},	-- value → result .... convert a long to a float
+	[0x8a] = Instr:subclass{name='l2d', stacksub=2, stackadd=2},	-- value → result .... convert a long to a double
+	[0x8b] = Instr:subclass{name='f2i', stacksub=1, stackadd=1},	-- value → result .... convert a float to an int
+	[0x8c] = Instr:subclass{name='f2l', stacksub=1, stackadd=2},	-- value → result .... convert a float to a long
+	[0x8d] = Instr:subclass{name='f2d', stacksub=1, stackadd=2},	-- value → result .... convert a float to a double
+	[0x8e] = Instr:subclass{name='d2i', stacksub=2, stackadd=1},	-- value → result .... convert a double to an int
+	[0x8f] = Instr:subclass{name='d2l', stacksub=2, stackadd=2},	-- value → result .... convert a double to a long
+	[0x90] = Instr:subclass{name='d2f', stacksub=2, stackadd=1},	-- value → result .... convert a double to a float
+	[0x91] = Instr:subclass{name='i2b', stacksub=1, stackadd=1},	-- value → result .... convert an int into a byte
+	[0x92] = Instr:subclass{name='i2c', stacksub=1, stackadd=1},	-- value → result .... convert an int into a character
+	[0x93] = Instr:subclass{name='i2s', stacksub=1, stackadd=1},	-- value → result .... convert an int into a short
+	[0x94] = Instr:subclass{name='lcmp', stacksub=4, stackadd=1},	-- value1, value2 → result .... push 0 if the two longs are the same, 1 if value1 is greater than value2, -1 otherwise
+	[0x95] = Instr:subclass{name='fcmpl', stacksub=2, stackadd=1},	-- value1, value2 → result .... compare two floats, -1 on NaN
+	[0x96] = Instr:subclass{name='fcmpg', stacksub=2, stackadd=1},	-- value1, value2 → result .... compare two floats, 1 on NaN
+	[0x97] = Instr:subclass{name='dcmpl', stacksub=4, stackadd=1},	-- value1, value2 → result .... compare two doubles, -1 on NaN
+	[0x98] = Instr:subclass{name='dcmpg', stacksub=4, stackadd=1},	-- value1, value2 → result .... compare two doubles, 1 on NaN
 	[0x99] = InstrS16:subclass{name='ifeq', stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
 	[0x9a] = InstrS16:subclass{name='ifne', stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is not 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
 	[0x9b] = InstrS16:subclass{name='iflt', stacksub=1},	-- 2: branchbyte1, branchbyte2 .... value → .... if value is less than 0, branch to instruction at branchoffset (signed short constructed from unsigned bytes branchbyte1 << 8 | branchbyte2)
@@ -991,7 +991,10 @@ local JavaASMClass = class()
 JavaASMClass.__name = 'JavaASMClass'
 
 -- ; is a popular asm comment syntax, right?
-JavaASMClass.lineComment = ';'
+-- yeah but it's also a part of java method syntax
+-- meaning either space should be part of the comment as well, i.e. ';%s', 
+-- or we should use another character...
+JavaASMClass.lineComment = '#'
 
 function JavaASMClass:init(args)
 	if type(args) == 'string' then
@@ -1272,9 +1275,9 @@ io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
 				local insnDataLength = blob:readu4()
 				local insnStartOfs = blob.ofs
 				local insnEndOfs = insnStartOfs + insnDataLength
-				local insBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
---DEBUG:print('reading method '..methodIndex..' insn blob '..#insBlobData)
---DEBUG:print(require 'ext.string'.hexdump(insBlobData))
+				local instBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
+--DEBUG:print('reading method '..methodIndex..' insn blob '..#instBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(instBlobData))
 				-- [[
 				while blob.ofs < insnEndOfs do
 					local op = blob:readu1()
@@ -1539,8 +1542,8 @@ end
 function JavaASMClass:compile()
 
 	-- convert names to .class's internal method, which is slash-separated (except in method signatures where they are L-slash-separated-semicolon names)
-	self.thisClass = toSlashSepName(self.thisClass)
-	self.superClass = toSlashSepName(self.superClass)
+	self.thisClass = toSlashSepName((assert.index(self, 'thisClass')))
+	self.superClass = toSlashSepName((assert.index(self, 'superClass')))
 	if self.interfaces then
 		for i=1,#self.interfaces do
 			self.interfaces[i] = toSlashSepName(self.interfaces[i])
@@ -1775,7 +1778,7 @@ assert.type(const.name, 'string')
 				end
 
 
-				local insBlob = WriteBlob()
+				local instBlob = WriteBlob()
 				for instrIndex,inst in ipairs(method.code) do
 					local op = assert.index(opForInstName, inst[1])
 					local instDesc = assert.index(instDescForOp, op)
@@ -1815,9 +1818,9 @@ assert.type(const.name, 'string')
 						error("idk how to handle maxLocals type "..type(instDesc.maxLocals))
 					end
 
-					insBlob:writeu1(op)
+					instBlob:writeu1(op)
 					if instDesc.write then
-						instDesc.write(inst, insBlob, self)
+						instDesc.write(inst, instBlob, self)
 					end
 				end
 
@@ -1852,11 +1855,11 @@ assert.type(const.name, 'string')
 				cblob:writeu2(maxStack)
 				cblob:writeu2(maxLocals)
 
-				local insBlobData = insBlob:compile()
---DEBUG:print('writing method '..i..' insn blob '..#insBlobData)
---DEBUG:print(require 'ext.string'.hexdump(insBlobData))
-				cblob:writeu4(#insBlobData)
-				cblob:writeString(insBlobData)
+				local instBlobData = instBlob:compile()
+--DEBUG:print('writing method '..i..' insn blob '..#instBlobData)
+--DEBUG:print(require 'ext.string'.hexdump(instBlobData))
+				cblob:writeu4(#instBlobData)
+				cblob:writeString(instBlobData)
 
 				if not method.exceptions then
 					cblob:writeu2(0)
@@ -2009,5 +2012,188 @@ end
 function JavaASMClass:_defineClass(env, ...)
 	return env:_defineClass(self, ...)
 end
+
+-- ok here's my attempt at an asm code for java
+-- I'll model it somewhat like jasmin: https://jasmin.sourceforge.net/guide.html
+-- but no promises, esp how their method refs are a single amalgamation of java/lang/class/path/methodName(Ljni/sig/methods;)V ... nah I'll pass on that.
+function JavaASMClass:fromAsm(code)
+	local currentMethod
+	local args = {}
+	local lines = string.split(code, '\n')
+	for _,line in ipairs(lines) do
+		line = line:match('^(.*)'..string.patescape(self.lineComment)) or line
+		line = string.trim(line)
+		if line == '' then goto lineDone end
+		local sourceFileDef = line:match'^%.source%s+(.-)$'	-- .source
+		if sourceFileDef then
+			args.sourceFile = sourceFileDef
+			goto lineDone
+		end
+		local function applyClassFlags(parts)
+			for _,part in ipairs(parts) do
+				args[assert.index({
+					public = 'isPublic',
+					final = 'isFinal',
+					super = 'isSuper',	-- when is this used?
+					interface = 'isInterface',
+					abstract = 'isAbstract',
+				}, part, 'unknown class access-flag')] = true
+			end	
+		end
+		do
+			local classDef = line:match'^%.class%s+(.-)$'	-- .class
+			if classDef then
+				local parts = string.split(classDef, '%s+')
+				args.thisClass = parts:remove()	-- last is class name, rest are access flags
+				applyClassFlags(parts)
+				goto lineDone
+			end
+		end
+		do
+			local interfaceDef = line:match'^%.interface%s+(.-)$'	-- .interface
+			if interfaceDef then
+				local parts = string.split(interfaceDef, '%s+')
+				assert(not args.thisClass, "can't use .interface and .class at the same time")
+				args.thisClass = parts:remove()
+				args.isInterface = true
+				applyClassFlags(parts)
+				goto lineDone
+			end
+		end
+		local superClassDef = line:match'^%.super%s+(.-)$'	-- .super
+		if superClassDef then
+			args.superClass = superClassDef
+			goto lineDone
+		end
+		local implementsClass = line:match'^%.implements%s+(.-)$'	-- .implements
+		if implementsClass then
+			args.interfaces = args.interfaces or table()
+			args.interfaces:insert(implementsClass)
+			goto lineDone
+		end
+		do
+			local fieldDef = line:match'^%.field%s+(.-)$'	--- .field
+			if fieldDef then
+				local field = {}
+				local parts = string.split(fieldDef, '%s+')	
+				if parts[#parts-1] == '=' then
+					local value = parts:remove()
+					parts:remove()
+					
+					-- convert value into a constant entry here
+					if value == 'true' then
+						-- wait how are bool constants stored?
+						field.value = {tag='int', value=1}
+					elseif value == 'false' then
+						field.value = {tag='int', value=0}
+					elseif value:match'L$' then
+						local rest = value:match'^(.*)L$'
+						assert(tonumber(rest))
+						-- as a string?
+						-- TODO how to parse int64_t here...
+						field.value = {tag='long', value=rest}
+					else
+						local num = tonumber(value)
+						if num then
+							if value:find'%.' then
+								field.value = {tag='float', value=value}
+							else
+								field.value = {tag='int', value=value}
+							end
+						else
+							-- make sure it's got quotes here
+							-- treat it as a string
+							local rest = value:match'^"(.*)"$'
+							if not rest then
+								error('expected boolean, number or "string"') 
+							end
+							-- unescape
+							rest = require 'ext.fromlua'(value)
+							field.value = {tag='string', value=rest}
+						end
+					end
+				end
+				field.sig = assert(parts:remove(), "expected field signature")
+				field.name = assert(parts:remove(), "expected field name")
+				for _,part in ipairs(parts) do
+					field[assert.index({
+						public = 'isPublic',
+						private = 'isPrivate',
+						protected = 'isProtected',
+						static = 'isStatic',
+						final = 'isFinal',
+						volatile = 'isVolatile',
+						transient = 'isTransient',
+					}, part, 'unknown field access-flag')] = true
+				end
+				args.fields = args.fields or table()
+				args.fields:insert(field)
+				goto lineDone
+			end
+		end
+		do
+			-- TODO hand this off to another method, from lines .method to .end method,
+			-- and allow methods[] to contain strings to be parsed by this?
+			local methodDef = line:match'^%.method%s+(.-)$'	--- .method
+			if methodDef then
+				local method = {}
+				local parts = string.split(methodDef, '%s+')	
+				method.sig = assert(parts:remove(), "expected sig")
+				method.name = assert(parts:remove(), "expected name")
+				if method.name == '<init>' then method.isConstructor = true end	-- dalvik flag
+				for _,part in ipairs(parts) do
+					method[assert.index({
+						public = 'isPublic',
+						private = 'isPrivate',
+						protected = 'isProtected',
+						static = 'isStatic',
+						final = 'isFinal',
+						synchronized = 'isSynchronized',
+						native = 'isNative',
+						abstract = 'isAbstract',
+					}, part, 'unknown method access-flag')] = true
+				end
+				args.methods = args.methods or table()
+				args.methods:insert(method)		
+				currentMethod = method
+				goto lineDone
+			end
+		end
+		if line:match'^%.end%s+method$' then
+			currentMethod = nil
+			goto lineDone
+		end
+		if currentMethod then
+			local maxStackDef = line:match'^%.limit%s+stack%s+(.*)$'
+			if maxStackDef then
+				currentMethod.maxStack = assert(tonumber(maxStackDef))
+				goto lineDone
+			end
+			local maxLocalsDef = line:match'^%.limit%s+stack%s+(.*)$'
+			if maxLocalsDef then
+				currentMethod.maxLocals = assert(tonumber(maxLocalsDef))
+				goto lineDone
+			end
+			-- TODO .line
+			-- TODO .var
+			-- TODO .throws
+			-- TODO .catch
+			-- parse instructions as line contents
+			-- TODO types, like field values
+			-- for now I require type indicators preceding the instruction
+			local parts = string.split(line, '%s+')
+			assert.index(opForInstName, parts[1], "got an unknown instruction")
+			currentMethod.code = currentMethod.code or table()
+			currentMethod.code:insert(parts)
+			goto lineDone
+		end
+		error("got a line I couldn't understand: "..line)
+::lineDone::
+	end
+	-- self is a class, or it should be
+	assert.eq(self.class, self)
+	return self(args)
+end
+
 
 return JavaASMClass

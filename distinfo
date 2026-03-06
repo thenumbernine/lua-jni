@@ -79,6 +79,8 @@ files = {
 }
 deps = {
 	"ext",
+	"struct",	-- slowly incorporating this into the asm reader/writers
+	"template",	-- now that I'm writing java asm, template is useful
 	--"sha2",	-- used by java/asmdex.lua
 	--"make",	-- used by java/build.lua, only if you want to invoke `gcc` or `javac` at runtime.
 	--"thread",	-- for tests/
