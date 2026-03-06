@@ -20,34 +20,6 @@ local jlong = ffi.typeof'jlong'
 local jdouble = ffi.typeof'jdouble'
 
 
-local function castToNumberOrJPrim(value)
-	if type(value) == 'number' then
-		return value
-	end
-	if type(value) == 'cdata' then
-		-- TODO rest of prims?
-		-- though a few will get default cast to lua number anyways ...
-		if ffi.typeof(value) == jlong
-		or ffi.typeof(value) == jdouble
-		then
-			return value
-		end
-	end
-	if type(value) == 'string' then
-		return assert(fromlua(value))
-	end
-
-	error("I expected a lua number or cdata jlong or jdouble. "
-		..' found type='..type(value)
-		..(type(value) == 'cdata'
-			and (' typeof='..tostring(ffi.typeof(value)))
-			or ''
-		)
-		..' value='..tostring(value)
-	)
-end
-
-
 -- TODO I could combine ReadBlob and WriteBlob into a File-like class that just has a rw head at some location...
 local ReadBlob = class()
 ReadBlob.littleEndian = false
@@ -80,6 +52,7 @@ function ReadBlob:read(ctype)
 	end
 	self.ofs = self.ofs + size
 --DEBUG(@5):print('read', self.ofs, ctype, result)
+	--assert.type(result, 'cdata')
 	return result
 end
 function ReadBlob:readString(size)
@@ -140,15 +113,14 @@ WriteBlob.littleEndian = false
 function WriteBlob:init()
 	self.data = vector(uint8_t)	-- TODO luajit string.buffer ?
 end
-function WriteBlob:write(ctype, value)
-	value = castToNumberOrJPrim(value)
---DEBUG(@5):print('write', #self.data, ctype, value)
-	ctype = ffi.typeof(ctype)
+function WriteBlob:write(value)
+	assert.type(value, 'cdata')
+	local ctype = ffi.typeof(value)
+	local ofs = #self.data
+--DEBUG(@5):print('write', ofs, ctype, value)
 	local size = ffi.sizeof(ctype)
 	local result
-	local data = ffi.typeof('$[1]', ctype)()
-	data[0] = value
-	local ofs = #self.data
+	local data = ffi.typeof('$[1]', ctype)(value)
 	self.data:resize(ofs + size)
 	if ffi.abi'le' == self.littleEndian then
 		ffi.copy(self.data.v + ofs, data, size)
@@ -166,12 +138,14 @@ function WriteBlob:writeString(s)
 	self.data:resize(ofs + n)
 	ffi.copy(self.data.v + ofs, s, n)
 end
-function WriteBlob:writes1(...) return self:write(int8_t, ...) end
-function WriteBlob:writeu1(...) return self:write(uint8_t, ...) end
-function WriteBlob:writes2(...) return self:write(int16_t, ...) end
-function WriteBlob:writeu2(...) return self:write(uint16_t, ...) end
-function WriteBlob:writes4(...) return self:write(int32_t, ...) end
-function WriteBlob:writeu4(...) return self:write(uint32_t, ...) end
+function WriteBlob:writes1(value) return self:write(int8_t(value)) end
+function WriteBlob:writeu1(value) return self:write(uint8_t(value)) end
+function WriteBlob:writes2(value) return self:write(int16_t(value)) end
+function WriteBlob:writeu2(value) return self:write(uint16_t(value)) end
+function WriteBlob:writes4(value) return self:write(int32_t(value)) end
+function WriteBlob:writeu4(value) return self:write(uint32_t(value)) end
+function WriteBlob:writes8(value) return self:write(int64_t(value)) end
+function WriteBlob:writeu8(value) return self:write(uint64_t(value)) end
 function WriteBlob:writeUleb128(value)
 	for count=1,5 do
 		local byte = bit.band(0x7f, value)
@@ -212,5 +186,4 @@ return {
 	WriteBlob = WriteBlob,
 	ReadBlobLE = ReadBlobLE,
 	WriteBlobLE = WriteBlobLE,
-	castToNumberOrJPrim = castToNumberOrJPrim,
 }

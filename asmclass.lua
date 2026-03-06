@@ -30,7 +30,6 @@ local JavaASM = require 'java.asm'
 local java_blob = require 'java.blob'
 local ReadBlob = java_blob.ReadBlob
 local WriteBlob = java_blob.WriteBlob
-local castToNumberOrJPrim = java_blob.castToNumberOrJPrim
 
 local java_util = require 'java.util'
 --local classAccessFlags = java_util.classAccessFlags
@@ -213,12 +212,15 @@ local function instReadConst2(inst, index, asm)
 	local tag = inst[index] index=index+1
 	if type(tag) == 'number' then
 		return tag, index
-	elseif tag == 'long' or tag == 'double' then
-		local value = assert.index(inst, index)
-		value = castToNumberOrJPrim(value)
+	elseif tag == 'long' then
 		return asm.addConst{
 			tag = tag,
-			value = value,
+			value = jlong((assert.index(inst, index))),
+		}, index+1
+	elseif tag == 'double' then
+		return asm.addConst{
+			tag = tag,
+			value = jdouble((assert.index(inst, index))),
 		}, index+1
 	else
 		error('instReadConst2 with unsupported tag '..tag)
@@ -1568,16 +1570,16 @@ assert.type(const.value, 'string')
 				constBlob:writeu2(addConst(const.value))	-- utf8string
 			elseif const.tag == 'int' then
 				constBlob:writeu1(3)
-				constBlob:write(jint, const.value)
+				constBlob:write(jint(const.value))
 			elseif const.tag == 'float' then
 				constBlob:writeu1(4)
-				constBlob:write(jfloat, const.value)
+				constBlob:write(jfloat(const.value))
 			elseif const.tag == 'long' then
 				constBlob:writeu1(5)
-				constBlob:write(jlong, const.value)
+				constBlob:write(jlong(const.value))
 			elseif const.tag == 'double' then
 				constBlob:writeu1(6)
-				constBlob:write(jdouble, const.value)
+				constBlob:write(jdouble(const.value))
 			elseif const.tag == 'nameAndType' then
 				constBlob:writeu1(12)
 assert.type(const.name, 'string')

@@ -1305,7 +1305,7 @@ key differences in ASMDex vs ASMClass:
 function JavaASMDex:readData(data)
 	local blob = ReadBlobLE(data)
 
-	local header = ffi.cast(ffi.typeof('$*', header_item), blob.data.v)
+	local header = blob:read(header_item)
 	assert.eq(ffi.string(header.magic, 4), 'dex\n')
 --DEBUG:print('version', bit.tohex(header.version, 8)))
 --DEBUG:print('checksum = 0x'..bit.tohex(header.checksum, 8))
@@ -1580,10 +1580,8 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
 --DEBUG:print('reading code for method', methodIndex)
 						blob.ofs = codeOfs
-						local codeItem = ffi.cast(ffi.typeof('$*', code_item), blob.data.v + blob.ofs)
+						local codeItem = blob:read(code_item)
 --DEBUG:print('method codeItem ', codeItem)
-						if endianFlipped then flipEndianStruct(codeItem) end
-						blob.ofs = blob.ofs + ffi.sizeof(code_item)
 
 						-- read code
 						method.maxRegs = codeItem.maxRegs	-- same as "maxLocals" but for registers?
@@ -1626,12 +1624,9 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 								local try = {}
 								method.tries:insert(try)
 
-								local trysrc = ffi.cast(ffi.typeof('$*', try_item), blob.data.v + blob.ofs)
-								if endianFlipped then flipEndianStruct(trysrc) end
-								blob.ofs = blob.ofs + ffi.sizeof(try_item)
-
 								-- "The address is a count of 16-bit code units to the start of the first covered instruction."
 								--  so does that mean they are indexes into the insns[] table, or are they byte offsets, or are they file offsets?
+								local trysrc = blob:read(try_item)
 								try.startAddr = trysrc.startAddr
 								try.numInsts = trysrc.numInsts
 								try.handlerOfs = trysrc.handlerOfs
@@ -2074,6 +2069,60 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
 	end
 
+--[==[ with structs
+
+	--[===[
+	blob:write(header_item{
+		--magic = "dex\n",
+		version = 0x393330,	-- little endian
+		-- skip checksum
+		-- skip sha1sig
+		-- skip fileSize
+		headerSize = ffi.sizeof(header_item),
+		endianTag = 0x12345678,
+		numStrings = #self.strings,
+		numTypes = #self.types,
+		numProtos = #self.protos,
+		numFields = #self.fieldBlobs,
+		numMethods = #self.methodBlobs,
+		numClasses = #self.classes,
+	})
+assert.eq(#blob, ffi.sizeof(header_item))
+
+	--]===]
+	-- [===[
+	blob:write(header_item())
+	assert.eq(#blob, ffi.sizeof(header_item))
+	local header = ffi.cast(ffi.typeof('$*', header_item), blob.data.v)
+	-- valid until you resize teh blob again ...
+	ffi.copy(header.magic, 'dex\n', 4)
+	header.version = 0x393330
+	header.headerSize = ffi.sizeof(header_item)
+	header.endianTag = 0x12345678
+	header.numStrings = #self.strings
+	header.numTypes = #self.types
+	header.numProtos = #self.protos
+	header.numFields = #self.fieldBlobs
+	header.numMethods = #self.methodBlobs
+	header.numClasses = #self.classes
+	--]===]
+
+	local checksumOfs = ffi.offsetof(header_item, 'checksum')
+	local sha1Ofs = ffi.offsetof(header_item, 'sha1sig')
+	local fileSizeOfs = ffi.offsetof(header_item, 'fileSize')
+	local mapOfsOfs = ffi.offsetof(header_item, 'mapOfs')
+	local stringOfsOfs = ffi.offsetof(header_item, 'stringOfsOfs')
+	local typeOfs = ffi.offsetof(header_item, 'typeOfs')
+	local protoOfs = ffi.offsetof(header_item, 'protoOfs')
+	local fieldOfs = ffi.offsetof(header_item, 'fieldOfs')
+	local methodOfs = ffi.offsetof(header_item, 'methodOfs')
+	local classOfs = ffi.offsetof(header_item, 'classOfs')
+	local datasOfs = ffi.offsetof(header_item, 'datasOfs')
+
+
+--]==]
+-- [==[ without
+
 	blob:writeString('dex\n')
 	blob:writeString(self.version or '\x30\x33\x39\0')
 
@@ -2127,6 +2176,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 
 	-- fill in header size
 	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = #blob
+--]==]
 
 --do return blob:compile() end
 
