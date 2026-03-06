@@ -130,6 +130,28 @@ local class_def_item = struct{
 	},
 }
 
+-- just the header of code_item until its first variable-length array
+local code_item = struct{
+	anonymous = true,
+	fields = {
+		{name='maxRegs', type='uint16_t'},
+		{name='regsIn', type='uint16_t'},
+		{name='regsOut', type='uint16_t'},
+		{name='numTries', type='uint16_t'},
+		{name='debugInfoOfs', type='uint32_t'},
+		{name='instSize', type='uint32_t'},	-- times two, since its in uint16 blocks
+	},
+}
+
+local try_item = struct{
+	anonymous = true,
+	fields = {
+		{name='startAddr', type='uint32_t'},
+		{name='instSize', type='uint16_t'},
+		{name='handlerOfs', type='uint16_t'},
+	},
+}
+
 -- assumes o is cdata with ctype a struct
 -- runs :fielditer() on o, flips all endian-ness fields.
 -- swaps in place, idcare
@@ -1283,7 +1305,7 @@ key differences in ASMDex vs ASMClass:
 function JavaASMDex:readData(data)
 	local blob = ReadBlobLE(data)
 
-	local header = blob:read(header_item)
+	local header = ffi.cast(ffi.typeof('$*', header_item), blob.data.v)
 	assert.eq(ffi.string(header.magic, 4), 'dex\n')
 --DEBUG:print('version', bit.tohex(header.version, 8)))
 --DEBUG:print('checksum = 0x'..bit.tohex(header.checksum, 8))
@@ -1558,16 +1580,19 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
 --DEBUG:print('reading code for method', methodIndex)
 						blob.ofs = codeOfs
+						local codeItem = ffi.cast(ffi.typeof('$*', code_item), blob.data.v + blob.ofs)
+--DEBUG:print('method codeItem ', codeItem)
+						if endianFlipped then flipEndianStruct(codeItem) end
+						blob.ofs = blob.ofs + ffi.sizeof(code_item)
 
 						-- read code
-						method.maxRegs = blob:readu2()	-- same as "maxLocals" but for registers?
-						method.regsIn = blob:readu2()
-						method.regsOut = blob:readu2()
-						local numTries = blob:readu2()
-						local debugInfoOfs = blob:readu4()
-						local numInsns = blob:readu4()	-- "in 16-bit code units..." ... this is the number of uint16_t's
---DEBUG:print('method numInsns ', numInsns)
-						local instEndOfs = blob.ofs + bit.lshift(numInsns, 1)
+						method.maxRegs = codeItem.maxRegs	-- same as "maxLocals" but for registers?
+						method.regsIn = codeItem.regsIn
+						method.regsOut = codeItem.regsOut
+						local numTries = codeItem.numTries
+						local debugInfoOfs = codeItem.debugInfoOfs
+						-- codeItem.instSize is "in 16-bit code units..." ... this is the number of uint16_t's
+						local instEndOfs = blob.ofs + bit.lshift(codeItem.instSize, 1)
 						local code = table()
 						method.code = code
 						while blob.ofs < instEndOfs do
@@ -1576,8 +1601,9 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 							-- "Also, if this happens to be in an endian-swapped file, then the swapping is only done on individual ushort instances and not on the larger internal structures."
 							-- ...whatever that means. "Sometimes." smh.
 							-- is the opcode hi and lo swapped as well????
-							local lo = blob:readu1()
-							local hi = blob:readu1()
+							local op = blob:readu2()
+							local lo = bit.band(0xff, op)
+							local hi = bit.rshift(op, 8)
 							local instrClass = assert.index(InstrClassesForOp, lo)
 							local inst = setmetatable({}, instrClass)
 							inst:insert(inst.name)
@@ -1599,17 +1625,22 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 								-- read tries
 								local try = {}
 								method.tries:insert(try)
+
+								local trysrc = ffi.cast(ffi.typeof('$*', try_item), blob.data.v + blob.ofs)
+								if endianFlipped then flipEndianStruct(trysrc) end
+								blob.ofs = blob.ofs + ffi.sizeof(try_item)
+
 								-- "The address is a count of 16-bit code units to the start of the first covered instruction."
 								--  so does that mean they are indexes into the insns[] table, or are they byte offsets, or are they file offsets?
-								try.startAddr = blob:readu4()
-								try.numInsts = blob:readu2()
-								try.handlerOfs = blob:readu2()
+								try.startAddr = trysrc.startAddr
+								try.numInsts = trysrc.numInsts
+								try.handlerOfs = trysrc.handlerOfs
 --DEBUG:print('got try #'..j..':', require 'ext.tolua'(try))
 								-- "Elements of the array must be non-overlapping in range and in order from low to high address. "
 								if lasttry then
 									assert.le(lasttry.startAddr + lasttry.numInsts, try.startAddr, "try begins after previous try ends")
 								end
-								assert.le(try.startAddr + try.numInsts, numInsns, "try extends past file size")
+								assert.le(try.startAddr + try.numInsts, codeItem.instSize, "try extends past file size")
 								lasttry = try
 							end
 						end
