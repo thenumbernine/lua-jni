@@ -227,6 +227,8 @@ end
 
 
 local Instr = class()
+Instr.insert = table.insert
+
 -- just nop that uses the default aka nothing for these:
 function Instr:read() end
 function Instr:write() end
@@ -1237,7 +1239,7 @@ io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
 		-- method attribute #1 = code attribute
 		method.attrs = table()
 		readAttrs(blob, function(methodAttrName, methodAttrLen)
---DEBUG:local methodAttrData = blob.data:sub(blob.ofs+1, blob.ofs+methodAttrLen)
+--DEBUG:local methodAttrData = blob.data:dataToStr():sub(blob.ofs+1, blob.ofs+methodAttrLen)
 --DEBUG:print('reading method '..methodIndex..' methodAttrData '..#methodAttrData)
 --DEBUG:print(require 'ext.string'.hexdump(methodAttrData))
 
@@ -1257,7 +1259,7 @@ io.stderr:write('TODO not yet supported field attr: '..fieldAttrName)
 				local insnDataLength = blob:readu4()
 				local insnStartOfs = blob.ofs
 				local insnEndOfs = insnStartOfs + insnDataLength
-				local instBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
+--DEBUG:local instBlobData = blob.data:sub(blob.ofs+1, insnDataLength)
 --DEBUG:print('reading method '..methodIndex..' insn blob '..#instBlobData)
 --DEBUG:print(require 'ext.string'.hexdump(instBlobData))
 				-- [[

@@ -48,12 +48,13 @@ local function castToNumberOrJPrim(value)
 end
 
 
+-- TODO I could combine ReadBlob and WriteBlob into a File-like class that just has a rw head at some location...
 local ReadBlob = class()
 ReadBlob.littleEndian = false
 function ReadBlob:init(data)
-	self.data = assert.type(data, 'string')
-	self.len = #self.data
-	self.ptr = ffi.cast(uint8_t_ptr, self.data)
+	local n = #data
+	self.data = vector(uint8_t, n)
+	ffi.copy(self.data.v, data, n)
 	self.ofs = 0
 end
 function ReadBlob:read(ctype)
@@ -62,18 +63,18 @@ function ReadBlob:read(ctype)
 	if self.ofs < 0 then
 		error("read before beginning")
 	end
-	if size + self.ofs > self.len then
+	if size + self.ofs > #self.data then
 		error("read past the end")
 	end
 
 	local result
 	if ffi.abi'le' == self.littleEndian then
-		result = ffi.cast(ffi.typeof('$*', ctype), self.ptr + self.ofs)[0]
+		result = ffi.cast(ffi.typeof('$*', ctype), self.data.v + self.ofs)[0]
 	else
 		local tmp = ffi.typeof('$[1]', ctype)()
 		local tmpb = ffi.cast(uint8_t_ptr, tmp)
 		for i=0,ffi.sizeof(ctype)-1 do
-			tmpb[i] = self.ptr[self.ofs + ffi.sizeof(ctype)-1-i]
+			tmpb[i] = self.data.v[self.ofs + ffi.sizeof(ctype)-1-i]
 		end
 		result = tmp[0]
 	end
@@ -85,10 +86,10 @@ function ReadBlob:readString(size)
 	if self.ofs < 0 then
 		error("read before beginning")
 	end
-	if size + self.ofs > self.len then
+	if size + self.ofs > #self.data then
 		error("read past the end")
 	end
-	local result = ffi.string(self.ptr + self.ofs, size)
+	local result = ffi.string(self.data.v + self.ofs, size)
 	self.ofs = self.ofs + size
 --DEBUG(@5):print('readstring', self.ofs, result)
 	return result
@@ -126,10 +127,10 @@ function ReadBlob:readUleb128()
 	end
 	return result
 end
-function ReadBlob:done() return self.ofs == self.len end
+function ReadBlob:done() return self.ofs == #self.data end
 function ReadBlob:assertDone()
-	if self.ofs < self.len then
-		error('still have '..(self.len-self.ofs)..' bytes remaining')
+	if self.ofs < #self.data then
+		error('still have '..(#self.data-self.ofs)..' bytes remaining')
 	end
 end
 
@@ -173,7 +174,7 @@ function WriteBlob:writes4(...) return self:write(int32_t, ...) end
 function WriteBlob:writeu4(...) return self:write(uint32_t, ...) end
 function WriteBlob:writeUleb128(value)
 	for count=1,5 do
-		local byte = bit.band(0x7f, value) 
+		local byte = bit.band(0x7f, value)
 		value = bit.rshift(value, 7)
 		if value ~= 0 then byte = bit.bor(0x80, byte) end
 		self:writeu1(byte)
@@ -182,7 +183,7 @@ function WriteBlob:writeUleb128(value)
 end
 function WriteBlob:writeSleb128()
 	for count=1,5 do
-		local byte = bit.band(0x7f, value) 
+		local byte = bit.band(0x7f, value)
 		value = bit.rshift(value, 7)
 		if (value == 0 and bit.band(byte, 0x40) == 0)
 		or (value == -1 and bit.band(byte, 0x40) ~= 0)

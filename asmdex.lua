@@ -9,6 +9,7 @@ local assert = require 'ext.assert'
 local table = require 'ext.table'
 local string = require 'ext.string'
 local sha2 = require 'sha2'
+local struct = require 'struct'
 
 local JavaASM = require 'java.asm'
 
@@ -27,6 +28,40 @@ local fieldAccessFlags = java_util.fieldAccessFlags
 local methodAccessFlags = java_util.methodAccessFlags
 local toLSlashSepSemName = java_util.toLSlashSepSemName
 local toDotSepName  = java_util.toDotSepName
+
+
+local header_item = struct{
+	anonymous = true,
+	fields = {
+		{name='magic', type='uint8_t[4]'},
+		{name='version', type='uint8_t[4]'},
+		{name='checksum', type='uint32_t'},
+		{name='sha1sig', type='uint8_t[20]'},
+		{name='fileSize', type='uint32_t'},
+		{name='headerSize', type='uint32_t'},
+		{name='endianTag', type='uint32_t'},
+		{name='numLinks', type='uint32_t'},
+		{name='linkOfs', type='uint32_t'},
+		{name='mapOfs', type='uint32_t'},
+		{name='numStrings', type='uint32_t'},
+		{name='stringOfsOfs', type='uint32_t'},
+		{name='numTypes', type='uint32_t'},
+		{name='typeOfs', type='uint32_t'},
+		{name='numProtos', type='uint32_t'},
+		{name='protoOfs', type='uint32_t'},
+		{name='numFields', type='uint32_t'},
+		{name='fieldOfs', type='uint32_t'},
+		{name='numMethods', type='uint32_t'},
+		{name='methodOfs', type='uint32_t'},
+		{name='numClasses', type='uint32_t'},
+		{name='classOfs', type='uint32_t'},
+		{name='numDatas', type='uint32_t'},
+		{name='dataOfs', type='uint32_t'},
+		-- then there's supposed to be containerSize and headerOffset, but neither are present in the dex file I'm getting from android...
+	},
+	metatable = function(mt)
+	end,
+}
 
 
 local NO_INDEX = 0xffffffff
@@ -1245,12 +1280,16 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	-- wait is this redundant to the subsequent structures?
 	-- or is this the equivalent of the old "constants" table in .class files?
 	-- it's redundant.  and stupid.
+	-- "This is a list of the entire contents of a file, in order."
+	-- "Additionally, the map entries must be ordered by initial offset and must not overlap."
+	-- Does one of those two statements imply it is supposed to be sorted by type?  Because the one that android is spitting out is not sorted by type...
 	if mapOfs ~= 0 then
 		blob.ofs = mapOfs
 		local count = blob:readu4()
 		for i=0,count-1 do
 			local map = {}
-			map.type = assert.index(mapListTypes, blob:readu2())
+			local typeIndex = blob:readu2()
+			map.type = assert.index(mapListTypes, typeIndex)
 			blob:readu2()	-- unused
 			map.count = blob:readu4()
 			map.offset = blob:readu4()
@@ -1350,7 +1389,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	assert.le(0, classOfs)
 	assert.le(classOfs + sizeOfClass * numClasses, fileSize)
 	self.classes = table()
---DEBUG:print('read classDataOfs', classOfs)
+--DEBUG:print('read classOfs', classOfs)
 	for i=0,numClasses-1 do
 		blob.ofs = classOfs + i * sizeOfClass
 		local class = {}
@@ -1508,6 +1547,10 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 --DEBUG:print('try.catchAllAddr', try.catchAllAddr)
 								end
 							end
+						end
+
+						if debugInfoOfs ~= 0 then
+io.stderr:write'!!! TODO !!! debugInfoOfs\n'
 						end
 
 						blob.ofs = push
