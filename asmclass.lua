@@ -25,17 +25,24 @@ local assert = require 'ext.assert'
 local string = require 'ext.string'
 local path = require 'ext.path'
 local class = require 'ext.class'
-local ReadBlob = require 'java.blob'.ReadBlob
-local WriteBlob = require 'java.blob'.WriteBlob
-local castToNumberOrJPrim = require 'java.blob'.castToNumberOrJPrim
-local classAccessFlags = require 'java.util'.classAccessFlags
-local nestedClassAccessFlags = require 'java.util'.nestedClassAccessFlags
-local fieldAccessFlags = require 'java.util'.fieldAccessFlags
-local methodAccessFlags = require 'java.util'.methodAccessFlags
-local setFlagsToObj = require 'java.util'.setFlagsToObj
-local getFlagsFromObj = require 'java.util'.getFlagsFromObj
-local sigStrToObj = require 'java.util'.sigStrToObj
-local deepCopy = require 'java.util'.deepCopy
+
+local java_blob = require 'java.blob'
+local ReadBlob = java_blob.ReadBlob
+local WriteBlob = java_blob.WriteBlob
+local castToNumberOrJPrim = java_blob.castToNumberOrJPrim
+
+local java_util = require 'java.util'
+--local classAccessFlags = java_util.classAccessFlags
+--local nestedClassAccessFlags = java_util.nestedClassAccessFlags	-- TODO?
+local classAccessFlags = java_util.nestedClassAccessFlags	-- or is the only difference between nested-class and class in .class files whether there's a $ in the filename?
+local fieldAccessFlags = java_util.fieldAccessFlags
+local methodAccessFlags = java_util.methodAccessFlags
+local setFlagsToObj = java_util.setFlagsToObj
+local getFlagsFromObj = java_util.getFlagsFromObj
+local sigStrToObj = java_util.sigStrToObj
+local deepCopy = java_util.deepCopy
+local toSlashSepName  = java_util.toSlashSepName 
+local toDotSepName  = java_util.toDotSepName 
 
 
 local jint = ffi.typeof'jint'
@@ -43,14 +50,6 @@ local jfloat = ffi.typeof'jfloat'
 local jlong = ffi.typeof'jlong'
 local jdouble = ffi.typeof'jdouble'
 
-
-local function dotToSlashName(s)
-	return (s:gsub('%.', '/'))
-end
-
-local function slashToDotName(s)
-	return (s:gsub('/', '.'))
-end
 
 -- I'd write these as member methods, but I don't want to write the instruction table as a member so ...
 local function readClassName(asm, index)
@@ -63,10 +62,10 @@ end
 local function instPushClass(inst, blob, asm)
 	inst:insert((readClassName(asm, blob:readu2())))
 end
-local function insPopClass(inst, index, asm)
+local function instReadClass(inst, index, asm)
 	return asm.addConst{
 		tag = 'class',
-		name = inst[index],
+		name = toSlashSepName(inst[index]),
 	}, index+1
 end
 
@@ -78,12 +77,12 @@ local function instPushMethod(inst, blob, asm)
 	inst:insert(method.nameAndType.name)
 	inst:insert(method.nameAndType.sig)
 end
-local function instPopMethod(inst, index, asm)
+local function instReadMethod(inst, index, asm)
 	local methodIndex = asm.addConst{
 		tag = 'methodRef',
 		class = {
 			tag = 'class',
-			name = inst[index],
+			name = toSlashSepName(inst[index]),
 		},
 		nameAndType = {
 			tag = 'nameAndType',
@@ -104,12 +103,12 @@ local function instPushField(inst, blob, asm)
 	inst:insert(field.nameAndType.name)
 	inst:insert(field.nameAndType.sig)
 end
-local function instPopField(inst, index, asm)
+local function instReadField(inst, index, asm)
 	local fieldIndex = asm.addConst{
 		tag = 'fieldRef',
 		class = {
 			tag = 'class',
-			name = inst[index],
+			name = toSlashSepName(inst[index]),
 		},
 		nameAndType = {
 			tag = 'nameAndType',
@@ -154,14 +153,14 @@ local function instPushConst(inst, blob, asm, constIndex)
 		end
 	end
 end
-local function instPopConst(inst, index, asm)
+local function instReadConst(inst, index, asm)
 	local tag = inst[index] index=index+1
 	if type(tag) == 'number' then
 		return tag, index
 	elseif tag == 'class' then
 		return asm.addConst{
 			tag = tag,
-			name = inst[index],
+			name = toSlashSepName(inst[index]),
 		}, index+1
 	elseif tag == 'methodHandle' then
 		return asm.addConst{
@@ -174,7 +173,9 @@ local function instPopConst(inst, index, asm)
 			tag = tag,
 			sig = inst[index],
 		}, index+1
-	elseif tag == 'float' or tag == 'int' then
+	elseif tag == 'float'
+	or tag == 'int'
+	then
 		return asm.addConst{
 			tag = tag,
 			value = inst[index],
@@ -185,7 +186,7 @@ local function instPopConst(inst, index, asm)
 			value = inst[index],
 		}, index+1
 	else
-		error('instPopConst with unsupported tag '..tag)
+		error('instReadConst with unsupported tag '..tag)
 	end
 end
 
@@ -207,7 +208,7 @@ local function instPushConst2(inst, blob, asm, constIndex)
 		end
 	end
 end
-local function instPopConst2(inst, index, asm)
+local function instReadConst2(inst, index, asm)
 	local tag = inst[index] index=index+1
 	if type(tag) == 'number' then
 		return tag, index
@@ -219,7 +220,7 @@ local function instPopConst2(inst, index, asm)
 			value = value,
 		}, index+1
 	else
-		error('instPopConst2 with unsupported tag '..tag)
+		error('instReadConst2 with unsupported tag '..tag)
 	end
 end
 
@@ -300,7 +301,7 @@ local instDescForOp = {
 			instPushConst(inst, blob, asm, blob:readu1())
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu1(instPopConst(inst, 2, asm))
+			blob:writeu1(instReadConst(inst, 2, asm))
 		end,
 	},
 
@@ -312,7 +313,7 @@ local instDescForOp = {
 			instPushConst(inst, blob, asm, blob:readu2())
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopConst(inst, 2, asm))
+			blob:writeu2(instReadConst(inst, 2, asm))
 		end,
 	},
 
@@ -324,7 +325,7 @@ local instDescForOp = {
 			instPushConst2(inst, blob, asm, blob:readu2())
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopConst2(inst, 2, asm))
+			blob:writeu2(instReadConst2(inst, 2, asm))
 		end,
 	},
 
@@ -631,7 +632,7 @@ local instDescForOp = {
 			instPushField(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopField(inst, 2, asm))
+			blob:writeu2(instReadField(inst, 2, asm))
 		end,
 	},
 
@@ -651,7 +652,7 @@ local instDescForOp = {
 			instPushField(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopField(inst, 2, asm))
+			blob:writeu2(instReadField(inst, 2, asm))
 		end,
 	},
 
@@ -672,7 +673,7 @@ local instDescForOp = {
 			instPushField(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopField(inst, 2, asm))
+			blob:writeu2(instReadField(inst, 2, asm))
 		end,
 	},
 
@@ -697,7 +698,7 @@ local instDescForOp = {
 			end))
 		end,
 		write = function(inst, blob, asm)
-			local fieldIndex = instPopField(inst, 2, asm)
+			local fieldIndex = instReadField(inst, 2, asm)
 --DEBUG:print('write putfield '..fieldIndex)
 			blob:writeu2(fieldIndex)
 		end,
@@ -733,7 +734,7 @@ local instDescForOp = {
 			instPushMethod(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopMethod(inst, 2, asm))
+			blob:writeu2(instReadMethod(inst, 2, asm))
 		end,
 	},
 
@@ -767,7 +768,7 @@ local instDescForOp = {
 			instPushMethod(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopMethod(inst, 2, asm))
+			blob:writeu2(instReadMethod(inst, 2, asm))
 		end,
 	},
 
@@ -801,7 +802,7 @@ local instDescForOp = {
 			instPushMethod(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopMethod(inst, 2, asm))
+			blob:writeu2(instReadMethod(inst, 2, asm))
 		end,
 	},
 
@@ -837,7 +838,7 @@ local instDescForOp = {
 			assert.eq(blob:readu1(), 0)	-- 0
 		end,
 		write = function(inst, blob, asm)
-			local methodIndex, index = instPopMethod(inst, 2, asm)
+			local methodIndex, index = instReadMethod(inst, 2, asm)
 			blob:writeu2(methodIndex)
 			blob:writeu1(inst[index])
 			blob:writeu1(0)
@@ -876,7 +877,7 @@ local instDescForOp = {
 			assert.eq(blob:readu2(), 0)	-- why are there uint16 of 0 when this is a uint32 method?
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(instPopMethod(inst, 2, asm))
+			blob:writeu2(instReadMethod(inst, 2, asm))
 			blob:writeu2(0)
 		end,
 	},
@@ -890,7 +891,7 @@ local instDescForOp = {
 			instPushClass(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(insPopClass(inst, 2, asm))
+			blob:writeu2(instReadClass(inst, 2, asm))
 		end,
 	},
 
@@ -912,7 +913,7 @@ local instDescForOp = {
 			instPushClass(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(insPopClass(inst, 2, asm))
+			blob:writeu2(instReadClass(inst, 2, asm))
 		end,
 	},
 
@@ -929,7 +930,7 @@ local instDescForOp = {
 			instPushClass(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(insPopClass(inst, 2, asm))
+			blob:writeu2(instReadClass(inst, 2, asm))
 		end,
 	},
 
@@ -943,7 +944,7 @@ local instDescForOp = {
 			instPushClass(inst, blob, asm)
 		end,
 		write = function(inst, blob, asm)
-			blob:writeu2(insPopClass(inst, 2, asm))
+			blob:writeu2(instReadClass(inst, 2, asm))
 		end,
 	},
 
@@ -966,7 +967,7 @@ local instDescForOp = {
 			inst:insert(blob:readu1())
 		end,
 		write = function(inst, blob, asm)
-			local classIndex, index = insPopClass(inst, 2, asm)
+			local classIndex, index = instReadClass(inst, 2, asm)
 			blob:writeu2(classIndex)
 			blob:writeu1(inst[index])
 		end,
@@ -997,30 +998,7 @@ function JavaASMClass:init(args)
 		self:readData(args)	-- assume its raw data
 	elseif type(args) == 'nil' then
 	elseif type(args) == 'table' then
-		for k,v in pairs(args) do
-			self[k] = v
-		end
-
-		-- while we're here, prepare / validate args:
-		for _,method in ipairs(self.methods) do
-			-- parse method.code if it is instructions
-			if type(method.code) == 'string' then
-
-				-- argument validation:
-				-- do this here or upon ctor?
-				method.code = string.split(string.trim(method.code), '\n')
-					:mapi(function(line)
-						return string.trim(line)
-					end)
-					:filteri(function(line)
-						return line:sub(1, #self.lineComment) ~= self.lineComment
-					end)
-					:mapi(function(line)
-						return string.split(line, '%s+')
-					end)
-
-			end
-		end
+		self:fromArgs(args)
 	else
 		error("idk how to init this")
 	end
@@ -1515,11 +1493,11 @@ io.stderr:write("TODO handle reading class attr "..tostring(attr.name))
 	self.constants = nil
 
 	-- also standardize some names
-	self.thisClass = slashToDotName(self.thisClass)
-	self.superClass = slashToDotName(self.superClass)
+	self.thisClass = toDotSepName(self.thisClass)
+	self.superClass = toDotSepName(self.superClass)
 	if self.interfaces then
 		for i=1,#self.interfaces do
-			self.interfaces[i] = slashToDotName(self.interfaces[i])
+			self.interfaces[i] = toDotSepName(self.interfaces[i])
 		end
 	end
 end
@@ -1527,18 +1505,47 @@ end
 
 -------------------------------- WRITING --------------------------------
 
+-- static class method to build a JavaASMClass from arguments for :compile()'ing later:
+function JavaASMClass:fromArgs(args)
+	for k,v in pairs(args) do
+		self[k] = v
+	end
+
+	-- while we're here, prepare / validate args:
+	for _,method in ipairs(self.methods) do
+		-- parse method.code if it is instructions
+		-- TODO better string quote parsing, and better type detection
+		if type(method.code) == 'string' then
+
+			-- argument validation:
+			-- do this here or upon ctor?
+			method.code = string.split(string.trim(method.code), '\n')
+				:mapi(function(line)
+					return string.trim(line)
+				end)
+				:filteri(function(line)
+					return line:sub(1, #self.lineComment) ~= self.lineComment
+				end)
+				:mapi(function(line)
+					return string.split(line, '%s+')
+				end)
+		end
+	end
+end
+
+-- TODO method for parsing from asm src
+
 -- hmm maybe 'toByteCode()' ?
 function JavaASMClass:compile()
 
-	-- un-standardize names:
-	self.thisClass = dotToSlashName(self.thisClass)
-	self.superClass = dotToSlashName(self.superClass)
+	-- convert names to .class's internal method, which is slash-separated (except in method signatures where they are L-slash-separated-semicolon names)
+	self.thisClass = toSlashSepName(self.thisClass)
+	self.superClass = toSlashSepName(self.superClass)
 	if self.interfaces then
 		for i=1,#self.interfaces do
-			self.interfaces[i] = dotToSlashName(self.interfaces[i])
+			self.interfaces[i] = toSlashSepName(self.interfaces[i])
 		end
 	end
-
 
 	--[[
 	build constants fresh?  why not?

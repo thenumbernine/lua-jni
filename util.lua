@@ -12,6 +12,35 @@ local function deepCopy(t)
 	return t2
 end
 
+
+--[[
+Ok I gotta think of some way to describe the different names ...
+There's slash-separated names.  .class files use these.
+... arrays are [ prefix, primitives are single-letter. 
+There's L-slash-separated-semicolon names.  JNI-call-signatures use these, and .dex files use these.
+... arrays are [ prefix, primitives are single-letter. 
+There's dot-separated names.  The Java language API uses these.
+... arrays are [] suffix,primitives are whole words. 
+--]]
+local function toSlashSepName(s)
+	s = s:match'^L(.*);$' or s	-- from L-slash-sep-; to slash-sep
+	s = s:gsub('%.', '/')		-- from dot-sep to slash-sep
+	return s
+end
+local function toDotSepName(s)
+	s = s:match'^L(.*);$' or s	-- from L-slash-sep-; to slash-sep
+	s = s:gsub('/', '.')		-- from slash-sep to dot-sep
+	return s
+end
+local function toLSlashSepSemName(s)
+	s = s:gsub('%.', '/')		-- from dot-sep to slash-sep
+	if not s:match'^L.*$' then
+		s = 'L'..s..';'			-- from slash-sep to L-slash-sep-;
+	end
+	return s
+end
+
+
 -- seems this goes somewhere with the sig stuff in java.class
 local prims = table{
 	'boolean',
@@ -236,6 +265,7 @@ local accessFlags = {
 }
 
 -- .class class access flags
+-- maybe I don't need this, and just use nestedClassAccessFlags?
 local classAccessFlags = {
 	isPublic = 0x0001,
 	isFinal = 0x0010,
@@ -326,4 +356,7 @@ return {
 	methodAccessFlags = methodAccessFlags,
 	setFlagsToObj = setFlagsToObj,
 	getFlagsFromObj = getFlagsFromObj,
+	toSlashSepName = toSlashSepName,
+	toDotSepName = toDotSepName,
+	toLSlashSepSemName = toLSlashSepSemName,
 }

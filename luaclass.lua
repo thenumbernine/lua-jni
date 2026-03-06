@@ -104,10 +104,8 @@ function M:run(args)
 			..'_'..uniqueNameCounter
 		uniqueNameCounter = uniqueNameCounter + 1
 	end
-	local classnameSlashSep = classname:gsub('%.', '/')
 
 	local parentClass = args.extends or 'java.lang.Object'
-	local parentClassSlashSep = parentClass:gsub('%.', '/')
 
 	local interfaces
 	if args.implements then
@@ -122,7 +120,7 @@ function M:run(args)
 			else
 				error(".interfaces["..i.."] expects a string or a JavaClass")
 			end
-			interfaces[i] = name:gsub('%.', '/')
+			interfaces[i] = name
 		end
 	end
 
@@ -134,8 +132,8 @@ function M:run(args)
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,
-		thisClass = classnameSlashSep,
-		superClass = parentClassSlashSep,
+		thisClass = classname,
+		superClass = parentClass,
 		interfaces = interfaces,
 		fields = table(),
 		methods = table(),
@@ -226,7 +224,7 @@ function M:run(args)
 		-- special for ctors, call parent
 		if method.name == '<init>' then
 			code:insert{'aload_0'}
-			code:insert{'invokespecial', parentClassSlashSep, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
+			code:insert{'invokespecial', parentClass, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
 		end
 
 		local func = assert.index(method, 'value')
@@ -310,10 +308,9 @@ function M:run(args)
 					code:insert{argOpcode, localVarIndex}
 				end
 				if primInfo then
-					local boxedTypeSlashSep = primInfo.boxedType:gsub('%.', '/')
 					code:insert{
 						'invokestatic',
-						boxedTypeSlashSep,
+						primInfo.boxedType,
 						'valueOf',
 						getJNISig{primInfo.boxedType, primInfo.name}
 					}
@@ -333,7 +330,7 @@ function M:run(args)
 		-- call `NativeCallback.run(funcptr, Object[]{this, args...})`
 		code:insert{
 			'invokestatic',
-			NativeCallback._classpath:gsub('%.', '/'),
+			NativeCallback._classpath,
 			assert(NativeCallback._runMethodName),
 			'(JLjava/lang/Object;)Ljava/lang/Object;',
 		}
@@ -346,11 +343,10 @@ function M:run(args)
 			code:insert{'return'}
 		elseif primInfo then
 			-- cast to BoxedType
-			local boxedTypeSlashName = primInfo.boxedType:gsub('%.', '/')
-			code:insert{'checkcast', boxedTypeSlashName}
+			code:insert{'checkcast', primInfo.boxedType}
 			code:insert{
 				'invokevirtual',
-				boxedTypeSlashName,
+				primInfo.boxedType,
 				primInfo.name..'Value',
 				getJNISig{primInfo.name},
 			}
@@ -386,7 +382,7 @@ function M:run(args)
 			-- provide a default ctor, no need for closure or callback
 			code = [[
 aload_0
-invokespecial ]]..parentClassSlashSep..[[ <init> ()V
+invokespecial ]]..parentClass..[[ <init> ()V
 return
 ]],
 		}

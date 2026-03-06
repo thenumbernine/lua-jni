@@ -87,7 +87,7 @@ return-void
 					maxLocals = 1,
 					code = [[
 aload_0
-invokespecial java/lang/Object <init> ()V
+invokespecial java.lang.Object <init> ()V
 return
 ]],
 				},
