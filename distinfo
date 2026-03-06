@@ -6,12 +6,13 @@ name = "java"
 files = {
 	"README.md",
 	"array.lua",
-	"build.lua",
-	"callresolve.lua",
-	"class.lua",
 	"asm.lua",
 	"asmclass.lua",
 	"asmdex.lua",
+	"blob.lua",
+	"build.lua",
+	"callresolve.lua",
+	"class.lua",
 	"distinfo",
 	"ffi/jni.lua",
 	"field.lua",
@@ -23,15 +24,19 @@ files = {
 	"object.lua",
 	"string.lua",
 	"tests/applet-lambdas/applet_lambdas.lua",
-	"tests/basic-tests/primitives.lua",
-	"tests/basic-tests/string.lua",
-	"tests/bytecodetoclass.lua",
+	"tests/asmclass/TestClassVisitor.java",
 	"tests/asmclass/applet.lua",
-	"tests/asmclass/javafx.lua",
+	"tests/asmclass/disasm.lua",
 	"tests/asmclass/nativeactionlistener_asmclass.lua",
 	"tests/asmclass/nativerunnable_asmclass.lua",
 	"tests/asmclass/runnable.lua",
 	"tests/asmclass/runnable_mt.lua",
+	"tests/asmclass/test_asmclass.lua",
+	"tests/asmdex/disasm.lua",
+	"tests/asmdex/test_asmdex.lua",
+	"tests/basic-tests/primitives.lua",
+	"tests/basic-tests/string.lua",
+	"tests/bytecodetoclass.lua",
 	"tests/ffm/TestFFM.java",
 	"tests/ffm/ffm.lua",
 	"tests/info/info.lua",
@@ -43,7 +48,6 @@ files = {
 	"tests/java-asm/applet.lua",
 	"tests/java-asm/applet_lua_java.lua",
 	"tests/java-asm/applet_sam.lua",
-	"tests/java-asm/io_github_thenumbernine_NativeCallback.c",
 	"tests/java-asm/javafx.lua",
 	"tests/java-asm/lua_java_class.lua",
 	"tests/java-asm/lua_java_class_from_sam.lua",
@@ -57,7 +61,6 @@ files = {
 	"tests/java-asm/runnable_sam.lua",
 	"tests/java-asm/test-java-asm.lua",
 	"tests/java-asm/test_lua_java_class.lua",
-	"tests/javac/TestClassVisitor.java",
 	"tests/javac/TestRunRunnable.java",
 	"tests/javac/TestSwing.java",
 	"tests/javac/ThreadTest.java",
@@ -70,8 +73,13 @@ files = {
 	"tests/javac/nativerunnable.lua",
 	"tests/javac/runnable.lua",
 	"tests/javac/runnable_mt.lua",
-	"tests/javac/test_asmclass.lua",
 	"tests/javafx/TestJavaFX.java",
+	"tests/luaclass/applet_sam.lua",
+	"tests/luaclass/javafx.lua",
+	"tests/luaclass/runnable.lua",
+	"tests/luaclass/runnable_mt.lua",
+	"tests/luaclass/test.lua",
+	"tests/luaclass/test2.lua",
 	"tests/println.lua",
 	"tests/test/Test.java",
 	"tests/test/TestTest.java",
@@ -81,12 +89,13 @@ files = {
 }
 deps = {
 	"ext",
-	"struct",	-- slowly incorporating this into the asm reader/writers
-	"template",	-- now that I'm writing java asm, template is useful
-	--"sha2",	-- used by java/asmdex.lua
-	--"make",	-- used by java/build.lua, only if you want to invoke `gcc` or `javac` at runtime.
-	--"thread",	-- for tests/
 	--"ffi",	-- for tests/, just for ffi.c.pthread, for getting pthread_self()
+	"make",	-- used by java/build.lua, only if you want to invoke `gcc` or `javac` at runtime.
+	"sha2",	-- used by java/asmdex.lua
+	"stl",	-- java/blob.lua
+	"struct",	-- slowly incorporating this into the asm reader/writers
+	"template",	-- now that I'm writing java asm, template is useful.  java/nativeclass.lua
+	--"thread",	-- for tests/
 }
 generateBindings = ||{
 	{
