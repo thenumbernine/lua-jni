@@ -30,11 +30,29 @@ local toLSlashSepSemName = java_util.toLSlashSepSemName
 local toDotSepName  = java_util.toDotSepName
 
 
+-- https://en.wikipedia.org/wiki/Adler-32
+local function adler32(data, len)
+	data = ffi.cast('uint8_t*', data)
+    local a = 1
+	local b = 0
+	local MOD_ADLER = 65521
+    for index=0,len-1 do
+        a = (a + data[index]) % MOD_ADLER
+        b = (b + a) % MOD_ADLER
+    end
+    return ffi.cast('uint32_t', bit.bor(bit.lshift(b, 16), a))
+end
+
+
+-- mixup of formats of type names and object names ...
+-- array sizes split and duplicated across several unrelated data structures when pointing to the same array ...
+-- how come I get the feeling that whoever designed the .dex file format didn't have a clue what they were doing.
+
 local header_item = struct{
 	anonymous = true,
 	fields = {
 		{name='magic', type='uint8_t[4]'},
-		{name='version', type='uint8_t[4]'},
+		{name='version', type='uint32_t'},
 		{name='checksum', type='uint32_t'},
 		{name='sha1sig', type='uint8_t[20]'},
 		{name='fileSize', type='uint32_t'},
@@ -55,18 +73,89 @@ local header_item = struct{
 		{name='methodOfs', type='uint32_t'},
 		{name='numClasses', type='uint32_t'},
 		{name='classOfs', type='uint32_t'},
-		{name='numDatas', type='uint32_t'},
-		{name='dataOfs', type='uint32_t'},
+		{name='dataSize', type='uint32_t'},
+		{name='datasOfs', type='uint32_t'},
 		-- then there's supposed to be containerSize and headerOffset, but neither are present in the dex file I'm getting from android...
 	},
-	metatable = function(mt)
-	end,
 }
+
+local map_item = struct{
+	anonymous = true,
+	fields = {
+		{name='typeIndex', type='uint16_t'},
+		{name='unused', type='uint16_t'},
+		{name='count', type='uint32_t'},
+		{name='offset', type='uint32_t'},
+	},
+}
+
+local proto_id_item = struct{
+	anonymous = true,
+	fields = {
+		{name='shortyIndex', type='uint32_t'},
+		{name='returnTypeIndex', type='uint32_t'},
+		{name='argTypeListOfs', type='uint32_t'},
+	},
+}
+
+local field_id_item = struct{
+	anonymous = true,
+	fields = {
+		{name='classIndex', type='uint16_t'},	-- type index
+		{name='sigIndex', type='uint16_t'},		-- type index
+		{name='nameIndex', type='uint32_t'},	-- string index
+	},
+}
+
+local method_id_item = struct{
+	anonymous = true,
+	fields = {
+		{name='classIndex', type='uint16_t'},	-- type index
+		{name='sigIndex', type='uint16_t'},		-- proto index
+		{name='nameIndex', type='uint32_t'},	-- string index
+	},
+}
+
+local class_def_item = struct{
+	anonymous = true,
+	fields = {
+		{name='thisClassIndex', type='uint32_t'},	-- type
+		{name='accessFlags', type='uint32_t'},
+		{name='superClassIndex', type='uint32_t'},	-- type
+		{name='interfacesOfs', type='uint32_t'},
+		{name='sourceFileIndex', type='uint32_t'},	-- string
+		{name='annotationsOfs', type='uint32_t'},
+		{name='classDataOfs', type='uint32_t'},
+		{name='staticValuesOfs', type='uint32_t'},
+	},
+}
+
+-- assumes o is cdata with ctype a struct
+-- runs :fielditer() on o, flips all endian-ness fields.
+-- swaps in place, idcare
+local tmp = ffi.new'uint8_t[8]'
+local function flipEndianStruct(o)
+	for name, ctype, field in header:fielditer() do
+		assert.type(ctype, 'string')  -- or use typeofs
+		if ctype == 'int16_t'
+		or ctype == 'uint16_t'
+		or ctype == 'int32_t'
+		or ctype == 'uint32_t'
+		or ctype == 'int64_t'
+		or ctype == 'uint64_t'
+		then
+			local ptr = ffi.cast('uint8_t*', o) + ffi.offsetof(o, name)
+			local n = ffi.sizeof(ctype)
+			for i=0,n-1 do
+				tmp[i] = ptr[n-1-i]
+			end
+			o[name] = ffi.cast(ffi.typeof('$*', ffi.typeof(ctype)), tmp)[0]
+		end
+	end
+end
 
 
 local NO_INDEX = 0xffffffff
-local sizeOfProto = 3 * ffi.sizeof'uint32_t'
-local sizeOfClass = 8 * ffi.sizeof'uint32_t'
 
 local mapListTypes = table{
 	[0] = 'header_item',
@@ -1193,72 +1282,86 @@ key differences in ASMDex vs ASMClass:
 
 function JavaASMDex:readData(data)
 	local blob = ReadBlobLE(data)
-	assert.eq(blob:readString(4), 'dex\n')
-	local version = blob:readString(4)	-- 3 text chars of numbers with null term ...
---DEBUG:print('version', string.hex(version))
-	local checksum = blob:readu4()
---DEBUG:print('checksum = 0x'..bit.tohex(checksum, 8))
-	local sha1sig = blob:readString(20)
---DEBUG:print('sha1sig', string.hex(sha1sig))
-	local fileSize = blob:readu4()
---DEBUG:print('fileSize', fileSize)
-	local headerSize = blob:readu4()
---DEBUG:print('headerSize', headerSize)
-	local endianTag = blob:readu4()
---DEBUG:print('endianTag = 0x'..bit.tohex(endianTag, 8))
-	if endianTag == 0x78563412 then
-		-- then do I flip size and checksum as well?
-		blob.littleEndian = false
-	elseif endianTag == 0x12345678 then
-		-- safe
-	else
-		error('endian is a bad value: 0x'..bit.tohex(endianTag, 8)..', something else will probably go wrong.\n')
-	end
-	assert.eq(fileSize, #data, "fileSize didn't match")	-- when does size not equal #data?
 
-	local numLinks = blob:readu4()
-	local linkOfs = blob:readu4()
---DEBUG:print('link count', numLinks,'ofs', linkOfs)
-	if numLinks ~= 0 then
+	local header = blob:read(header_item)
+	assert.eq(ffi.string(header.magic, 4), 'dex\n')
+--DEBUG:print('version', bit.tohex(header.version, 8)))
+--DEBUG:print('checksum = 0x'..bit.tohex(header.checksum, 8))
+--DEBUG:print('sha1sig', string.hex(ffi.string(header.sha1sig, 20)))
+--DEBUG:print('fileSize', header.fileSize)
+--DEBUG:print('headerSize', header.headerSize)
+--DEBUG:print('endianTag = 0x'..bit.tohex(header.endianTag, 8))
+	local endianFlipped
+	if header.endianTag == 0x78563412 then
+io.stderr:write('endian flipped...\n')
+		endianFlipped = true
+error[[
+TODO
+I will want blob:read's on primitive integrals to flip endian,
+but I won't want it to flip order when reading structs
+(so that I can next call flipEndianStruct() to flip individual fields)
+or
+I could change all fields from prim to some kind of endian-ness wrapper that needs an extra read()/write() or something...
+but that'd get ugly fast...
+and
+honesty structs are only useful in a few places
+but are not useful with Uleb128's
+]]
+		-- ... then our endian-ness doesn't match our architecture so we have to flip all fields
+		flipEndianStruct(header)
+	end
+	assert.eq(header.endianTag, 0x12345678, 'endian is a bad value')
+
+	assert.eq(header.fileSize, #data, "fileSize didn't match")	-- when does size not equal #data?
+
+	-- do this after flipping endian if necessary
+	-- [=[
+	do
+		local checksumEndOfs =
+			ffi.offsetof(header_item, 'checksum')
+			+ 4 -- ffi.sizeof(header.checksum)
+		assert.eq(header.checksum, adler32(
+			blob.data.v + checksumEndOfs,
+			#blob.data - checksumEndOfs
+		))
+	end
+	--]=]
+	-- [=[
+	do
+		local sha1str = ffi.string(header.sha1sig, 20)
+		local sha1EndOfs = ffi.offsetof(header_item, 'sha1sig')
+			+ ffi.sizeof(header.sha1sig)
+		local sha1check = sha2.sha1(ffi.string(
+			blob.data.v + sha1EndOfs,
+			#blob.data - sha1EndOfs
+		))
+--DEBUG:print('sha1check', sha1check)
+		assert.len(sha1check, 40)
+		sha1check = string.unhex(sha1check)
+		assert.type(sha1check, 'string')
+		assert.len(sha1check, 20)
+		assert.eq(sha1check, sha1str)
+	end
+	--]=]
+
+	if header.numLinks ~= 0 then
 io.stderr:write('TODO support dynamically-linked .dex files\n')
 	end
 
-	local mapOfs = blob:readu4()
---DEBUG:print('map ofs', mapOfs)
-
-	local numStrings = blob:readu4()
-	local stringOfsOfs = blob:readu4()
---DEBUG:print('stringId count', numStrings, 'ofs', stringOfsOfs)
-
-	local numTypes = blob:readu4()
-	local typeOfs = blob:readu4()
---DEBUG:print('typeId count', numTypes,'ofs', typeOfs)
-
-	local numProtos = blob:readu4()
-	local protoOfs = blob:readu4()
---DEBUG:print('protoId count', numProtos,'ofs', protoOfs)
-
-	local numFields = blob:readu4()
-	local fieldOfs = blob:readu4()
---DEBUG:print('fieldId count', numFields,'ofs', fieldOfs)
-
-	local numMethods = blob:readu4()
-	local methodOfs = blob:readu4()
---DEBUG:print('methodId count', numMethods,'ofs', methodOfs)
-
-	local numClasses = blob:readu4()
-	local classOfs = blob:readu4()
---DEBUG:print('classDef count', numClasses,'ofs', classOfs)
-
-	-- wait is this used for anything, or just annotation as to where the 'extra' data of other header fields puts stuff?
-	local numDatas = blob:readu4()
-	local datasOfs = blob:readu4()
---DEBUG:print('data count', numDatas,'ofs', datasOfs)
+--DEBUG:print('map ofs', header.mapOfs)
+--DEBUG:print('stringId count', header.numStrings, 'ofs', header.stringOfsOfs)
+--DEBUG:print('typeId count', header.numTypes,'ofs', header.typeOfs)
+--DEBUG:print('protoId count', header.numProtos,'ofs', header.protoOfs)
+--DEBUG:print('fieldId count', header.numFields,'ofs', header.fieldOfs)
+--DEBUG:print('methodId count', header.numMethods,'ofs', header.methodOfs)
+--DEBUG:print('classDef count', header.numClasses,'ofs', header.classOfs)
+--DEBUG:print('datas size', header.dataSize, 'ofs', header.datasOfs)
 
 	-- header is done, read structures
 
 	local types = table()
 	self.types = types
+
 
 	-- destroys blobs.ofs
 	local function readTypeList(ofs)
@@ -1283,32 +1386,33 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	-- "This is a list of the entire contents of a file, in order."
 	-- "Additionally, the map entries must be ordered by initial offset and must not overlap."
 	-- Does one of those two statements imply it is supposed to be sorted by type?  Because the one that android is spitting out is not sorted by type...
-	if mapOfs ~= 0 then
-		blob.ofs = mapOfs
+	if header.mapOfs ~= 0 then
+		blob.ofs = header.mapOfs
 		local count = blob:readu4()
+		local mapItems = ffi.cast(ffi.typeof('$*', map_item), blob.data.v + blob.ofs)
 		for i=0,count-1 do
 			local map = {}
-			local typeIndex = blob:readu2()
-			map.type = assert.index(mapListTypes, typeIndex)
-			blob:readu2()	-- unused
-			map.count = blob:readu4()
-			map.offset = blob:readu4()
+			local entry = mapItems[i]
+			if endianFlipped then flipEndianStruct(entry) end
+			map.type = assert.index(mapListTypes, entry.typeIndex)
+			map.count = entry.count
+			map.offset = entry.offset
 --DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
 	-- string offset points to a list of uint32_t's which point to the string data
 	-- ... which start with a uleb128 prefix
-	assert.le(0, stringOfsOfs)
-	assert.le(stringOfsOfs + ffi.sizeof'uint32_t' * numStrings, fileSize)
+	assert.le(0, header.stringOfsOfs)
+	assert.le(header.stringOfsOfs + ffi.sizeof'uint32_t' * header.numStrings, header.fileSize)
 	local strings = table()
 	self.strings = strings
-	for i=0,numStrings-1 do
-		blob.ofs = stringOfsOfs + ffi.sizeof'uint32_t' * i
---DEBUG:print('stringOfsOfs', blob.ofs)
-		blob.ofs = blob:readu4()
+	local stringOfsPtr = ffi.cast('uint32_t*', blob.data.v + header.stringOfsOfs)
+	for i=0,header.numStrings-1 do
+--DEBUG:print('header.stringOfsOfs', blob.ofs)
+		blob.ofs = stringOfsPtr[i]
 --DEBUG:print('stringOfs', blob.ofs)
-		if blob.ofs < 0 or blob.ofs >= fileSize then
+		if blob.ofs < 0 or blob.ofs >= header.fileSize then
 			error("string has bad ofs: 0x"..string.hex(blob.ofs))
 		end
 		local len = blob:readUleb128()
@@ -1317,32 +1421,31 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 --DEBUG:print('string['..i..'] = '..require 'ext.tolua'(str))
 	end
 
-	assert.le(0, typeOfs)
-	assert.le(typeOfs + ffi.sizeof'uint32_t' * numTypes, fileSize)
-	blob.ofs = typeOfs
-	for i=0,numTypes-1 do
-		types[i+1] = assert.index(strings, blob:readu4()+1)
+	assert.le(0, header.typeOfs)
+	assert.le(header.typeOfs + ffi.sizeof'uint32_t' * header.numTypes, header.fileSize)
+	local typePtr = ffi.cast('uint32_t*', blob.data.v + header.typeOfs)
+	for i=0,header.numTypes-1 do
+		types[i+1] = assert.index(strings, typePtr[i]+1)
 --DEBUG:print('type['..i..'] = '..types[i+1])
 	end
 
-	assert.le(0, protoOfs)
-	assert.le(protoOfs + sizeOfProto * numProtos, fileSize)
+	assert.le(0, header.protoOfs)
+	assert.le(header.protoOfs + ffi.sizeof(proto_id_item) * header.numProtos, header.fileSize)
+	local protoPtr = ffi.cast(ffi.typeof('$*', proto_id_item), blob.data.v + header.protoOfs)
 	local protos = table()
 	self.protos = protos
-	for i=0,numProtos-1 do
-		blob.ofs = protoOfs + i * sizeOfProto
+	for i=0,header.numProtos-1 do
 		local proto = {}
+		local entry = protoPtr[i]
+		if endianFlipped then flipEndianStruct(entry) end
 		-- I don't get ShortyDescritpor ... is it redundant to returnType + args?
-		local shortyIndex = blob:readu4()
---DEBUG:print('read proto shortyIndex', shortyIndex)
-		local shorty = assert.index(strings, 1 + shortyIndex)
-		local returnTypeIndex = blob:readu4()
---DEBUG:print('read proto returnTypeIndex', returnTypeIndex)
-		local returnType = assert.index(types, 1 + returnTypeIndex)
+--DEBUG:print('read proto shortyIndex', entry.shortyIndex)
+		local shorty = assert.index(strings, 1 + entry.shortyIndex)
+--DEBUG:print('read proto returnTypeIndex', entry.returnTypeIndex)
+		local returnType = assert.index(types, 1 + entry.returnTypeIndex)
 
-		local argTypeListOfs = blob:readu4()
---DEBUG:print('read proto argTypeListOfs', argTypeListOfs)
-		local argTypes = readTypeList(argTypeListOfs)
+--DEBUG:print('read proto argTypeListOfs', entry.argTypeListOfs)
+		local argTypes = readTypeList(entry.argTypeListOfs)
 
 		-- sig but in .class format:
 		local sig = '('..(argTypes and argTypes:concat() or '')..')'..returnType
@@ -1351,80 +1454,69 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 --DEBUG:print('proto['..i..'] = '..require 'ext.tolua'(protos[i+1]))
 	end
 
-	local sizeOfField = 2*ffi.sizeof'uint32_t'
-	assert.le(0, fieldOfs)
-	assert.le(fieldOfs + sizeOfField * numFields, fileSize)
-	blob.ofs = fieldOfs
+	assert.le(0, header.fieldOfs)
+	assert.le(header.fieldOfs + ffi.sizeof(field_id_item) * header.numFields, header.fileSize)
+	local fieldPtr = ffi.cast(ffi.typeof('$*', field_id_item), blob.data.v + header.fieldOfs)
 	self.fields = table()
-	for i=0,numFields-1 do
+	for i=0,header.numFields-1 do
 		local field = {}
 		self.fields[i+1] = field
-		field.class = assert.index(types, 1 + blob:readu2())
-		field.sig = assert.index(types, 1 + blob:readu2())
-		field.name = assert.index(strings, 1 + blob:readu4())
+		local entry = fieldPtr[i]
+		if endianFlipped then flipEndianStruct(entry) end
+		field.class = assert.index(types, 1 + entry.classIndex)
+		field.sig = assert.index(types, 1 + entry.sigIndex)
+		field.name = assert.index(strings, 1 + entry.nameIndex)
 	end
 
-	assert.le(0, methodOfs)
-	assert.le(methodOfs + 2*ffi.sizeof'uint32_t' * numMethods, fileSize)
-	blob.ofs = methodOfs
+	assert.le(0, header.methodOfs)
+	assert.le(header.methodOfs + 2*ffi.sizeof'uint32_t' * header.numMethods, header.fileSize)
+	local methodPtr = ffi.cast(ffi.typeof('$*', method_id_item), blob.data.v + header.methodOfs)
 	self.methods = table()
-	for i=0,numMethods-1 do
+	for i=0,header.numMethods-1 do
 		local method = {}
+		local entry = methodPtr[i]
+		if endianFlipped then flipEndianStruct(entry) end
+--DEBUG:print('read method', entry)
 		self.methods[i+1] = method
-		local classIndex = blob:readu2()
---DEBUG:print('read method class index', classIndex)
-		method.class = assert.index(types, 1 + classIndex)
-		local protoIndex = blob:readu2()
---DEBUG:print('read method proto index', protoIndex)
-		method.sig = deepCopy(assert.index(protos, 1 + protoIndex))
-		local nameIndex = blob:readu4()
---DEBUG:print('read method name index', nameIndex)
-		method.name = assert.index(strings, 1 + nameIndex)
+		method.class = assert.index(types, 1 + entry.classIndex)
+		method.sig = deepCopy(assert.index(protos, 1 + entry.sigIndex))
+		method.name = assert.index(strings, 1 + entry.nameIndex)
 --DEBUG:print('read method['..i..'] = '..require 'ext.tolua'(method))
 	end
 
 	-- so this is interesting
 	-- an ASMDex file can be more than one class
 	-- oh well, as long as there's one ASMDex per DexLoader or whatever
-	assert.le(0, classOfs)
-	assert.le(classOfs + sizeOfClass * numClasses, fileSize)
+	assert.le(0, header.classOfs)
+	assert.le(header.classOfs + ffi.sizeof(class_def_item) * header.numClasses, header.fileSize)
+	local classPtr = ffi.cast(ffi.typeof('$*', class_def_item), blob.data.v + header.classOfs)
 	self.classes = table()
---DEBUG:print('read classOfs', classOfs)
-	for i=0,numClasses-1 do
-		blob.ofs = classOfs + i * sizeOfClass
+--DEBUG:print('read classOfs', header.classOfs)
+	for i=0,header.numClasses-1 do
 		local class = {}
 		self.classes[i+1] = class
-		local thisClassIndex = blob:readu4()
---DEBUG:print('read class thisClassIndex', thisClassIndex)
-		class.thisClass = assert.index(types, 1 + thisClassIndex)
-		local accessFlags = blob:readu4()
---DEBUG:print('read class accessFlags', accessFlags)
-		setFlagsToObj(class, accessFlags, classAccessFlags)
-		local superClassIndex = blob:readu4()
---DEBUG:print('read class superClassIndex', superClassIndex)
-		class.superClass = assert.index(types, 1 + superClassIndex)
-		local interfacesOfs = blob:readu4()
-		local sourceFileIndex = blob:readu4()
---DEBUG:print('read class sourceFileIndex', sourceFileIndex)
-		if sourceFileIndex ~= NO_INDEX then
-			class.sourceFile = assert.index(strings, 1 + sourceFileIndex)
+		local entry = classPtr[i]
+		if endianFlipped then flipEndianStruct(entry) end
+--DEBUG:print('read class', entry)
+		class.thisClass = assert.index(types, 1 + entry.thisClassIndex)
+		setFlagsToObj(class, entry.accessFlags, classAccessFlags)
+		class.superClass = assert.index(types, 1 + entry.superClassIndex)
+		if entry.sourceFileIndex ~= NO_INDEX then
+			class.sourceFile = assert.index(strings, 1 + entry.sourceFileIndex)
 		end
-		local annotationsOfs = blob:readu4()
-		local classDataOfs = blob:readu4()
-		local staticValueOfs = blob:readu4()
 
 		-- done reading classdef, read its properties:
 
-		if interfacesOfs ~= 0 then
-			class.interfaces = readTypeList(interfacesOfs)
+		if entry.interfacesOfs ~= 0 then
+			class.interfaces = readTypeList(entry.interfacesOfs)
 		end
 
-		if annotationsOfs ~= 0 then
+		if entry.annotationsOfs ~= 0 then
 			io.stderr:write'TODO annotationsOfs\n'
 		end
 
-		if classDataOfs ~= 0 then
-			blob.ofs = classDataOfs
+		if entry.classDataOfs ~= 0 then
+			blob.ofs = entry.classDataOfs
 --DEBUG:print('reading class data offset from 0x'..bit.tohex(blob.ofs, 8))
 			local numStaticFields = blob:readUleb128()
 			local numInstanceFields = blob:readUleb128()
@@ -1460,7 +1552,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 					local codeOfs = blob:readUleb128()
 					assert.le(0, codeOfs)
-					assert.lt(codeOfs, fileSize)
+					assert.lt(codeOfs, header.fileSize)
 
 					if codeOfs ~= 0 then
 						local push = blob.ofs	-- save for later since we're in the middle of decoding classDataOfs
@@ -1563,8 +1655,8 @@ io.stderr:write'!!! TODO !!! debugInfoOfs\n'
 			readMethods(numVirtualMethods)
 		end
 
-		if staticValueOfs ~= 0 then
-			io.stderr:write'TODO staticValueOfs\n'
+		if entry.staticValuesOfs ~= 0 then
+			io.stderr:write'TODO staticValuesOfs\n'
 		end
 
 --DEBUG:print('class['..i..'] = '..require 'ext.tolua'(class))
@@ -1642,19 +1734,6 @@ io.stderr:write'!!! TODO !!! debugInfoOfs\n'
 end
 
 -------------------------------- WRITING --------------------------------
-
--- https://en.wikipedia.org/wiki/Adler-32
-local function adler32(data, len)
-	data = ffi.cast('uint8_t*', data)
-    local a = 1
-	local b = 0
-	local MOD_ADLER = 65521
-    for index=0,len-1 do
-        a = (a + data[index]) % MOD_ADLER
-        b = (b + a) % MOD_ADLER
-    end
-    return bit.bor(bit.lshift(b, 16), a)
-end
 
 function JavaASMDex:compile()
 	-- *) traversal fields and methods and method code
@@ -1944,9 +2023,9 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		else
 			class.sourceFileIndex = NO_INDEX
 		end
-		-- then annotations
+		-- then annotationsOfs
 		-- then classDataOfs
-		-- then staticValueOfs
+		-- then staticValuesOfs
 
 		-- classes will need # static and # non-static fields
 		-- and # direct (aka static|private|ctor) and # non-direct methods
@@ -2012,7 +2091,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	blob:writeu4(0)
 
 	local datasOfs = #blob
-	blob:writeu4(0)	-- numDatas
+	blob:writeu4(0)	-- dataSize
 	blob:writeu4(0)	-- datasOfs
 
 	-- fill in header size
@@ -2107,7 +2186,7 @@ local startOfs = #blob
 		blob:writeu4(0)	-- fill in annotation-offset later
 		blob:writeu4(0)	-- fill in data-offset later
 		blob:writeu4(0)	-- fill in static-value-offset later
-assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
+assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 	end
 
 	-- keep track of where the headers structures end
@@ -2146,7 +2225,12 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		end
 		-- now replace all proto type list indexes with offsets
 		for i=0,#self.protos-1 do
-			local protoArgTypeListPtr = ffi.cast('uint32_t*', blob.data.v + protoDefOfs + 8 + sizeOfProto * i)
+			local protoArgTypeListPtr = ffi.cast('uint32_t*',
+				blob.data.v
+				+ protoDefOfs
+				+ ffi.offsetof(proto_id_item, 'argTypeListOfs')
+				+ ffi.sizeof(proto_id_item) * i
+			)
 			if protoArgTypeListPtr[0] ~= 0 then
 --DEBUG:local from = protoArgTypeListPtr[0]
 				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
@@ -2155,7 +2239,11 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		end
 		-- now replace all class interfaceIndexes
 		for i=0,#self.classes-1 do
-			local classInterfaceTypeListPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 12 + sizeOfClass * i)
+			local classInterfaceTypeListPtr = ffi.cast('uint32_t*',
+				blob.data.v
+				+ classDefOfs
+				+ ffi.offsetof(class_def_item, 'interfacesOfs')
+				+ ffi.sizeof(class_def_item) * i)
 			if classInterfaceTypeListPtr[0] ~= 0 then
 --DEBUG:local from = classInterfaceTypeListPtr[0]
 				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
@@ -2269,7 +2357,11 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 		then
 			classDataCount = classDataCount + 1
 			-- change the class data offset to here
-			local classDataPtr = ffi.cast('uint32_t*', blob.data.v + classDefOfs + 24 + (classIndex-1) * sizeOfClass)
+			local classDataPtr = ffi.cast('uint32_t*',
+				blob.data.v
+				+ classDefOfs
+				+ ffi.offsetof(class_def_item, 'classDataOfs')
+				+ ffi.sizeof(class_def_item) * (classIndex-1))
 --DEBUG:local from = classDataPtr[0]
 			classDataPtr[0] = #blob
 --DEBUG:print('changing classDataPtr from', from, 'to', #blob)
