@@ -10,6 +10,8 @@ local table = require 'ext.table'
 local string = require 'ext.string'
 local sha2 = require 'sha2'
 
+local JavaASM = require 'java.asm'
+
 local java_blob = require 'java.blob'
 local ReadBlobLE = java_blob.ReadBlobLE
 local WriteBlobLE = java_blob.WriteBlobLE
@@ -1131,11 +1133,8 @@ local opForInstName = table.map(InstrClassesForOp, function(cl, op)
 	return op, cl.name
 end)
 
-local JavaASMDex = class()
+local JavaASMDex = JavaASM:subclass()
 JavaASMDex.__name = 'JavaASMDex'
-
--- matching JavaASMClass
-JavaASMDex.lineComment = '#'
 
 --[[
 similar as JavaASMClass
@@ -1148,28 +1147,10 @@ key differences in ASMDex vs ASMClass:
 - the instruction sets are different
 - optional attributes differ
 --]]
-function JavaASMDex:init(args)
-	if type(args) == 'string' then
-		self:readData(args)	-- assume its raw data
-	elseif type(args) == 'nil' then
-	elseif type(args) == 'table' then
-		self:fromArgs(args)
-
-	else
-		error("idk how to init this")
-	end
-end
 
 
 -------------------------------- READING --------------------------------
 
-
--- static ctor
-function JavaASMDex:fromFile(filename)
-	local o = JavaASMDex()
-	o:readData((assert(path(filename):read())))
-	return o
-end
 
 
 function JavaASMDex:readData(data)
@@ -1627,33 +1608,6 @@ local function adler32(data, len)
         b = (b + a) % MOD_ADLER
     end
     return bit.bor(bit.lshift(b, 16), a)
-end
-
-function JavaASMDex:fromArgs(args)
-	for k,v in pairs(args) do
-		self[k] = v
-	end
-
-	-- while we're here, prepare / validate args:
-	for _,method in ipairs(self.methods) do
-		-- parse method.code if it is instructions
-		if type(method.code) == 'string' then
-
-			-- argument validation:
-			-- do this here or upon ctor?
-			method.code = string.split(string.trim(method.code), '\n')
-				:mapi(function(line)
-					return string.trim(line)
-				end)
-				:filteri(function(line)
-					return line:sub(1, #self.lineComment) ~= self.lineComment
-				end)
-				:mapi(function(line)
-					return string.split(line, '%s+')
-				end)
-
-		end
-	end
 end
 
 function JavaASMDex:compile()
