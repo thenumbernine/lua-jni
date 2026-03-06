@@ -993,7 +993,7 @@ JavaASMClass.__name = 'JavaASMClass'
 
 -- ; is a popular asm comment syntax, right?
 -- yeah but it's also a part of java method syntax
--- meaning either space should be part of the comment as well, i.e. ';%s', 
+-- meaning either space should be part of the comment as well, i.e. ';%s',
 -- or we should use another character...
 JavaASMClass.lineComment = '#'
 
@@ -2035,7 +2035,7 @@ function JavaASMClass:fromAsm(code)
 					interface = 'isInterface',
 					abstract = 'isAbstract',
 				}, part, 'unknown class access-flag')] = true
-			end	
+			end
 		end
 		do
 			local classDef = line:match'^%.class%s+(.-)$'	-- .class
@@ -2072,11 +2072,11 @@ function JavaASMClass:fromAsm(code)
 			local fieldDef = line:match'^%.field%s+(.-)$'	--- .field
 			if fieldDef then
 				local field = {}
-				local parts = string.split(fieldDef, '%s+')	
+				local parts = string.split(fieldDef, '%s+')
 				if parts[#parts-1] == '=' then
 					local value = parts:remove()
 					parts:remove()
-					
+
 					-- convert value into a constant entry here
 					if value == 'true' then
 						-- wait how are bool constants stored?
@@ -2102,7 +2102,7 @@ function JavaASMClass:fromAsm(code)
 							-- treat it as a string
 							local rest = value:match'^"(.*)"$'
 							if not rest then
-								error('expected boolean, number or "string"') 
+								error('expected boolean, number or "string"')
 							end
 							-- unescape
 							rest = require 'ext.fromlua'(value)
@@ -2134,7 +2134,7 @@ function JavaASMClass:fromAsm(code)
 			local methodDef = line:match'^%.method%s+(.-)$'	--- .method
 			if methodDef then
 				local method = {}
-				local parts = string.split(methodDef, '%s+')	
+				local parts = string.split(methodDef, '%s+')
 				method.sig = assert(parts:remove(), "expected sig")
 				method.name = assert(parts:remove(), "expected name")
 				if method.name == '<init>' then method.isConstructor = true end	-- dalvik flag
@@ -2151,7 +2151,7 @@ function JavaASMClass:fromAsm(code)
 					}, part, 'unknown method access-flag')] = true
 				end
 				args.methods = args.methods or table()
-				args.methods:insert(method)		
+				args.methods:insert(method)
 				currentMethod = method
 				goto lineDone
 			end
@@ -2178,7 +2178,50 @@ function JavaASMClass:fromAsm(code)
 			-- parse instructions as line contents
 			-- TODO types, like field values
 			-- for now I require type indicators preceding the instruction
+
+			--[[
 			local parts = string.split(line, '%s+')
+			--]]
+			-- [[
+			local parts = table()
+			while line ~= '' do
+				if line:match'^"' then
+					-- TODO read and skip escaped quotes ...
+					local searchStart = 1
+					while true do
+						local closeIndex = line:find('"', searchStart, true)
+						if line:sub(closeIndex-1,closeIndex-1) == '\\' then
+							-- escaped, keep going
+							searchStart = closeIndex+1
+						else
+							assert(line:sub(closeIndex+1, closeIndex+1) == ''
+								or line:sub(closeIndex+1, closeIndex+1):match'%s',
+								"got an ill-formatted string with trailing characters")
+							-- not escaped, close
+							parts:insert(require 'ext.fromlua'(
+								line:sub(1, closeIndex)
+							))
+							line = string.trim(line:sub(closeIndex+1))
+							break
+						end
+					end
+				else
+					-- not a string, assume its a literal
+					-- TODO in here, parse out numbers
+					local first, rest = line:match'^(%S+)%s+(.*)$'
+					if not first then
+						-- then we're at the last token
+						parts:insert(line)
+						break
+					end
+					if first then
+						parts:insert(first)
+						line = rest
+					end
+				end
+			end
+			--]]
+
 			assert.index(opForInstName, parts[1], "got an unknown instruction")
 			currentMethod.code = currentMethod.code or table()
 			currentMethod.code:insert(parts)
