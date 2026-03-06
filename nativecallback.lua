@@ -51,15 +51,12 @@ function M:run(env)
 			superClass = 'java.lang.Object',
 			methods={
 				{	-- needs a ctor? even though it's never used?
-					isConstructor = true,
 					isPublic = true,
 					name = '<init>',
 					sig = '()V',
-					maxRegs = 1,
-					regsIn = 1,
-					regsOut = 1,
 					code = [[
-invoke-direct java.lang.Object <init> ()V
+; 'this' is already on the stack ...
+invoke-direct java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
 return-void
 ]],
 				},
@@ -78,9 +75,9 @@ return-void
 .class public super <?=newClassName?>
 .super java.lang.Object
 .method public <init> ()V
-	aload_0
-	invokespecial java.lang.Object <init> ()V
-	return
+	aload_0		; push 'this'
+	invokespecial java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
+	return		; aka return-void ... should I try to match up the syntaxes?
 .end method
 .method public static native <?=runMethodName?> <?=runMethodSig?>
 .end method

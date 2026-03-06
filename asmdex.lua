@@ -133,7 +133,7 @@ local function readregopt(s, default)
 end
 
 
--- TODO TODO TODO 
+-- TODO TODO TODO
 -- in .class jasmin asm, locals are still just numbers unless you use ".var" (which I do not yet support)
 -- should I convert that to some sort of default 'v'-prefix like dalvik registers?
 -- or should I give up on the 'v' prefix of dalvik and just use numbers here as well?
@@ -1716,6 +1716,19 @@ function JavaASMDex:compile()
 		end
 	end
 
+	-- should I do this, or require the caller to do it?
+	-- auto-detect <init> and <clinit>
+	for _,method in ipairs(self.methods) do
+		if method.name == '<init>' then
+			method.isConstructor = true
+			method.isStatic = false
+		end
+		if method.name == '<clinit>' then
+			method.isConstructor = true
+			method.isStatic = true
+		end
+	end
+
 	self.strings = table()
 	self.types = table()
 	self.protos = table()
@@ -1862,17 +1875,24 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	-- do code later so methods stay in-order with methodBlobs
 	for i,method in ipairs(self.methods) do
 		if method.code then
+			-- statics have no 'this'
+			-- except <clinit> which is static|ctor which has ... something?  the class?
+			-- so I guess consturctors are ctor but ~static ?
+			-- and ctor-static (i.e. <clinit>) has a regsin=0 but regsout=1?
+			local isStaticNonCtor = method.isStatic and not method.isConstructor
+
 			local sig = splitMethodJNISig(method.sig)
-			method.inferredRegsIn = 
+--DEBUG:print(method.name, 'sig', require 'ext.tolua'(sig))
+			method.inferredRegsIn =
 				(method.isStatic and 0 or 1)
 				+ (sig:sub(2)	-- skip return type
 					:mapi(function(jnisigi)
 						return (jnisigi == 'J' or jnisigi == 'D') and 2 or 1
 					end):sum() or 0)
-			method.inferredRegsOut = 
-				(method.isStatic and 0 or 1)
+			method.inferredRegsOut =
+				(isStaticNonCtor and 0 or 1)
 				+ (
-					(sig[1] == 'J' or sig[1] == 'D') and 2 
+					(sig[1] == 'J' or sig[1] == 'D') and 2
 					or sig[1] == 'V' and 0
 					or 1
 				)
@@ -1881,7 +1901,11 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 				method.inferredRegsIn,
 				method.inferredRegsOut
 			)
-			
+
+--DEBUG:print('maxRegs vs inferred', method.maxRegs, method.inferredMaxRegs)
+--DEBUG:print('regsIn vs inferred', method.regsIn, method.inferredRegsIn)
+--DEBUG:print('regsOut vs inferred', method.regsOut, method.inferredRegsOut)
+
 			local cblob = WriteBlobLE()
 			for _,inst in ipairs(method.code) do
 				local lo = assert.index(opForInstName, inst[1])
@@ -2150,9 +2174,9 @@ assert.eq(startOfs + sizeOfClass, #blob)	-- TODO structs ...
 			codeItemCount = codeItemCount + 1
 			-- save for later for class data
 			method.codeOfs = #blob
-			blob:writeu2(method.maxRegs or 0)
-			blob:writeu2(method.regsIn or 0)
-			blob:writeu2(method.regsOut or 0)
+			blob:writeu2(method.maxRegs or method.inferredMaxRegs)
+			blob:writeu2(method.regsIn or method.inferredRegsIn)
+			blob:writeu2(method.regsOut or method.inferredRegsOut)
 			blob:writeu2(method.tries and #method.tries or 0)
 			blob:writeu4(0)	-- debugInfoOfs
 			blob:writeu4(bit.rshift(#method.codeData, 1))	-- instructions size in uint16_t's
