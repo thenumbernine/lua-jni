@@ -1136,6 +1136,9 @@ end)
 local JavaASMDex = JavaASM:subclass()
 JavaASMDex.__name = 'JavaASMDex'
 
+JavaASMDex.InstrClassesForOp =  InstrClassesForOp
+JavaASMDex.opForInstName =  opForInstName
+
 --[[
 similar as JavaASMClass
 key differences in ASMDex vs ASMClass:

@@ -992,6 +992,9 @@ end)
 local JavaASMClass = JavaASM:subclass()
 JavaASMClass.__name = 'JavaASMClass'
 
+JavaASMClass.InstrClassesForOp =  InstrClassesForOp
+JavaASMClass.opForInstName =  opForInstName
+
 
 -------------------------------- READING --------------------------------
 

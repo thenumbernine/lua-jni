@@ -1,7 +1,9 @@
 -- I have enough common stuff between ASMDex and ASMClass that I'll just put it here...
 local class = require 'ext.class'
-local path = require 'ext.path'
+local table = require 'ext.table'
+local assert = require 'ext.assert'
 local string = require 'ext.string'
+local path = require 'ext.path'
 
 local JavaASM = class()
 
@@ -68,6 +70,91 @@ function JavaASM:_defineClass(env, ...)
 	return env:_defineClass(self, ...)
 end
 
+
+local function tokenToValue(value)
+-- TODO use this for data in instructions
+-- TODO .value writing should be compatible between .class and .dex
+	-- convert value into a constant entry here
+	if value == 'true' then
+		-- wait how are bool constants stored?
+		return {tag='int', value=1}
+	end
+	if value == 'false' then
+		return {tag='int', value=0}
+	end
+	if value:match'L$' then
+		local rest = value:match'^(.*)L$'
+		assert(tonumber(rest))
+		-- as a string?
+		-- TODO how to parse int64_t here...
+		return {tag='long', value=rest}
+	end
+
+	local num = tonumber(value)
+	if num then
+		if value:find'%.' then
+			return {tag='float', value=value}
+		else
+			return {tag='int', value=value}
+		end
+	end
+
+	-- not a constant, assume strings already handled
+	-- so fail
+	return nil
+end
+
+-- split line into tokens
+local function tokenizeLine(line)
+	--[[ lazy way
+	return string.split(line, '%s+')
+	--]]
+	-- [[ better?
+	local parts = table()
+	while line ~= '' do
+		if line:match'^"' then
+			-- TODO read and skip escaped quotes ...
+			local searchStart = 1
+			while true do
+				local closeIndex = line:find('"', searchStart, true)
+				if line:sub(closeIndex-1,closeIndex-1) == '\\' then
+					-- escaped, keep going
+					searchStart = closeIndex+1
+				else
+					assert(line:sub(closeIndex+1, closeIndex+1) == ''
+						or line:sub(closeIndex+1, closeIndex+1):match'%s',
+						"got an ill-formatted string with trailing characters")
+					-- not escaped, close
+					local value = require 'ext.fromlua'(
+						line:sub(1, closeIndex)
+					)
+
+					parts:insert{tag='string', value=value}
+
+					line = string.trim(line:sub(closeIndex+1))
+					break
+				end
+			end
+		else
+			-- not a string, assume its a literal
+			-- TODO in here, parse out numbers
+			local first, rest = line:match'^(%S+)%s+(.*)$'
+			if not first then
+				line = tokenToValue(line) or line
+				-- then we're at the last token
+				parts:insert(line)
+				break
+			end
+			if first then
+				first = tokenToValue(first) or first
+				parts:insert(first)
+				line = rest
+			end
+		end
+	end
+	return parts
+	--]]
+end
 
 -- ok here's my attempt at an asm code for java
 -- I'll model it somewhat like jasmin: https://jasmin.sourceforge.net/guide.html
@@ -136,48 +223,14 @@ function JavaASM:fromAsm(code)
 			local fieldDef = line:match'^%.field%s+(.-)$'	--- .field
 			if fieldDef then
 				local field = {}
-				
+
 -- TODO use line tokenizer below that notices quotes
 				local parts = string.split(fieldDef, '%s+')
 
 				if parts[#parts-1] == '=' then
 					local value = parts:remove()
 					parts:remove()
-
--- TODO use this for data in instructions
--- TODO .value writing should be compatible between .class and .dex
-					-- convert value into a constant entry here
-					if value == 'true' then
-						-- wait how are bool constants stored?
-						field.value = {tag='int', value=1}
-					elseif value == 'false' then
-						field.value = {tag='int', value=0}
-					elseif value:match'L$' then
-						local rest = value:match'^(.*)L$'
-						assert(tonumber(rest))
-						-- as a string?
-						-- TODO how to parse int64_t here...
-						field.value = {tag='long', value=rest}
-					else
-						local num = tonumber(value)
-						if num then
-							if value:find'%.' then
-								field.value = {tag='float', value=value}
-							else
-								field.value = {tag='int', value=value}
-							end
-						else
-							-- make sure it's got quotes here
-							-- treat it as a string
-							local rest = value:match'^"(.*)"$'
-							if not rest then
-								error('expected boolean, number or "string"')
-							end
-							-- unescape
-							rest = require 'ext.fromlua'(value)
-							field.value = {tag='string', value=rest}
-						end
-					end
+					field.value = value
 				end
 				field.sig = assert(parts:remove(), "expected field signature")
 				field.name = assert(parts:remove(), "expected field name")
@@ -248,50 +301,9 @@ function JavaASM:fromAsm(code)
 			-- TODO types, like field values
 			-- for now I require type indicators preceding the instruction
 
-			--[[
-			local parts = string.split(line, '%s+')
-			--]]
-			-- [[
-			local parts = table()
-			while line ~= '' do
-				if line:match'^"' then
-					-- TODO read and skip escaped quotes ...
-					local searchStart = 1
-					while true do
-						local closeIndex = line:find('"', searchStart, true)
-						if line:sub(closeIndex-1,closeIndex-1) == '\\' then
-							-- escaped, keep going
-							searchStart = closeIndex+1
-						else
-							assert(line:sub(closeIndex+1, closeIndex+1) == ''
-								or line:sub(closeIndex+1, closeIndex+1):match'%s',
-								"got an ill-formatted string with trailing characters")
-							-- not escaped, close
-							parts:insert(require 'ext.fromlua'(
-								line:sub(1, closeIndex)
-							))
-							line = string.trim(line:sub(closeIndex+1))
-							break
-						end
-					end
-				else
-					-- not a string, assume its a literal
-					-- TODO in here, parse out numbers
-					local first, rest = line:match'^(%S+)%s+(.*)$'
-					if not first then
-						-- then we're at the last token
-						parts:insert(line)
-						break
-					end
-					if first then
-						parts:insert(first)
-						line = rest
-					end
-				end
-			end
-			--]]
+			local parts = tokenizeLine(line)
 
-			assert.index(opForInstName, parts[1], "got an unknown instruction")
+			assert.index(self.opForInstName, parts[1], "got an unknown instruction")
 			currentMethod.code = currentMethod.code or table()
 			currentMethod.code:insert(parts)
 			goto lineDone
