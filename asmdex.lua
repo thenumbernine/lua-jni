@@ -90,6 +90,7 @@ local map_item = struct{
 		{name='offset', type='uint32_t'},
 	},
 }
+local map_item_ptr = ffi.typeof('$*', map_item)
 
 local proto_id_item = struct{
 	anonymous = true,
@@ -100,6 +101,7 @@ local proto_id_item = struct{
 		{name='argTypeListOfs', type='uint32_t'},
 	},
 }
+local proto_id_item_ptr = ffi.typeof('$*', proto_id_item)
 
 local field_id_item = struct{
 	anonymous = true,
@@ -110,6 +112,7 @@ local field_id_item = struct{
 		{name='nameIndex', type='uint32_t'},	-- string index
 	},
 }
+local field_id_item_ptr = ffi.typeof('$*', field_id_item)
 
 local method_id_item = struct{
 	anonymous = true,
@@ -120,6 +123,7 @@ local method_id_item = struct{
 		{name='nameIndex', type='uint32_t'},	-- string index
 	},
 }
+local method_id_item_ptr = ffi.typeof('$*', method_id_item)
 
 local class_def_item = struct{
 	anonymous = true,
@@ -135,6 +139,7 @@ local class_def_item = struct{
 		{name='staticValuesOfs', type='uint32_t'},
 	},
 }
+local class_def_item_ptr = ffi.typeof('$*', class_def_item)
 
 -- just the header of code_item until its first variable-length array
 local code_item = struct{
@@ -1419,7 +1424,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	if header.mapOfs ~= 0 then
 		blob.ofs = header.mapOfs
 		local count = blob:readu4()
-		local mapItems = ffi.cast(ffi.typeof('$*', map_item), blob.data.v + blob.ofs)
+		local mapItems = ffi.cast(map_item_ptr, blob.data.v + blob.ofs)
 		self.map = table()
 		for i=0,count-1 do
 			local map = {}
@@ -1464,7 +1469,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 	assert.le(0, header.protoOfs)
 	assert.le(header.protoOfs + ffi.sizeof(proto_id_item) * header.numProtos, header.fileSize)
-	local protoPtr = ffi.cast(ffi.typeof('$*', proto_id_item), blob.data.v + header.protoOfs)
+	local protoPtr = ffi.cast(proto_id_item_ptr, blob.data.v + header.protoOfs)
 	local protos = table()
 	self.protos = protos
 	for i=0,header.numProtos-1 do
@@ -1489,7 +1494,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 	assert.le(0, header.fieldOfs)
 	assert.le(header.fieldOfs + ffi.sizeof(field_id_item) * header.numFields, header.fileSize)
-	local fieldPtr = ffi.cast(ffi.typeof('$*', field_id_item), blob.data.v + header.fieldOfs)
+	local fieldPtr = ffi.cast(field_id_item_ptr, blob.data.v + header.fieldOfs)
 	self.fields = table()
 	for i=0,header.numFields-1 do
 		local field = {}
@@ -1503,7 +1508,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 	assert.le(0, header.methodOfs)
 	assert.le(header.methodOfs + 2*ffi.sizeof'uint32_t' * header.numMethods, header.fileSize)
-	local methodPtr = ffi.cast(ffi.typeof('$*', method_id_item), blob.data.v + header.methodOfs)
+	local methodPtr = ffi.cast(method_id_item_ptr, blob.data.v + header.methodOfs)
 	self.methods = table()
 	for i=0,header.numMethods-1 do
 		local method = {}
@@ -1522,7 +1527,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 	-- oh well, as long as there's one ASMDex per DexLoader or whatever
 	assert.le(0, header.classOfs)
 	assert.le(header.classOfs + ffi.sizeof(class_def_item) * header.numClasses, header.fileSize)
-	local classPtr = ffi.cast(ffi.typeof('$*', class_def_item), blob.data.v + header.classOfs)
+	local classPtr = ffi.cast(class_def_item_ptr, blob.data.v + header.classOfs)
 	self.classes = table()
 --DEBUG:print('read classOfs', header.classOfs)
 	for i=0,header.numClasses-1 do
@@ -2083,9 +2088,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
 	end
 
--- [==[ with structs
 
-	-- [===[
 	blob:write(header_item{
 		magic = "dex\n",
 		version = 0x393330,	-- little endian
@@ -2103,24 +2106,6 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	})
 assert.eq(#blob, ffi.sizeof(header_item))
 
-	--]===]
-	--[===[
-	blob:write(header_item())
-	assert.eq(#blob, ffi.sizeof(header_item))
-	local header = ffi.cast(ffi.typeof('$*', header_item), blob.data.v)
-	-- valid until you resize teh blob again ...
-	ffi.copy(header.magic, 'dex\n', 4)
-	header.version = 0x393330
-	header.headerSize = ffi.sizeof(header_item)
-	header.endianTag = 0x12345678
-	header.numStrings = #self.strings
-	header.numTypes = #self.types
-	header.numProtos = #self.protos
-	header.numFields = #self.fieldBlobs
-	header.numMethods = #self.methodBlobs
-	header.numClasses = #self.classes
-	--]===]
-
 	local checksumOfs = ffi.offsetof(header_item, 'checksum')
 	local sha1Ofs = ffi.offsetof(header_item, 'sha1sig')
 	local fileSizeOfs = ffi.offsetof(header_item, 'fileSize')
@@ -2133,117 +2118,6 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	local classOfs = ffi.offsetof(header_item, 'classOfs')
 	local dataSizeOfs = ffi.offsetof(header_item, 'dataSize')
 
-
---]==]
---[==[ without
-
-	blob:writeString('dex\n')
-	blob:writeString(self.version or '\x30\x33\x39\0')
-
-	local checksumOfs = #blob
-	blob:writeu4(0)	-- space for checksum, write it once we're finished
-
-	local sha1Ofs = #blob
-	blob:writeString(('\0'):rep(20))	-- space for sha1, write it once we're finished
-
-	-- ... or not, or make a blob for everything but the header.  would that work or would i have to factor in offsets to every struct's offsets i wrote?
-	local fileSizeOfs = #blob
-	blob:writeu4(0)	-- space for file size, write it once we're finished
-
-	local headerSizeOfs = #blob
-	blob:writeu4(0)	-- space for header size
-
-	blob:writeu4(0x12345678)	-- endian tag
-	blob:writeu4(0)		-- num links
-	blob:writeu4(0)		-- link ofs
-
-	local mapOfsOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.strings)
-	local stringOfsOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.types)
-	local typeOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.protos)
-	local protoOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.fieldBlobs)
-	local fieldOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.methodBlobs)
-	local methodOfs = #blob
-	blob:writeu4(0)
-
-	blob:writeu4(#self.classes)
-	local classOfs = #blob
-	blob:writeu4(0)
-
-	local dataSizeOfs = #blob
-	blob:writeu4(0)	-- dataSize
-	blob:writeu4(0)	-- datasOfs
-
-	-- fill in header size
-	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = #blob
-
---[[
-
-new way header_info struct write:
-00000000  64 65 78 0a 30 33 39 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  dex.039.........................
-00000020  00 00 00 00 70 00 00 00  78 56 34 12 00 00 00 00  00 00 00 00 00 00 00 00  0e 00 00 00 00 00 00 00  ....p...xV4.....................
-00000040  06 00 00 00 00 00 00 00  03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  05 00 00 00 00 00 00 00  ................................
-00000060  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
-checksumOfs	8
-sha1Ofs	12
-fileSizeOfs	32
-mapOfsOfs	52
-stringOfsOfs	60
-typeOfs	68
-protoOfs	76
-fieldOfs	84
-methodOfs	92
-classOfs	100
-
-
-old way:
-00000000  64 65 78 0a 30 33 39 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  dex.039.........................
-00000020  00 00 00 00 70 00 00 00  78 56 34 12 00 00 00 00  00 00 00 00 00 00 00 00  0e 00 00 00 00 00 00 00  ....p...xV4.....................
-00000040  06 00 00 00 00 00 00 00  03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  05 00 00 00 00 00 00 00  ................................
-00000060  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
-checksumOfs	8
-sha1Ofs	12
-fileSizeOfs	32
-mapOfsOfs	52
-stringOfsOfs	60
-typeOfs	68
-protoOfs	76
-fieldOfs	84
-methodOfs	92
-classOfs	100
---]]
---]==]
-print('header so far')
-print(string.hexdump(blob.data:dataToStr()))
-print('checksumOfs', checksumOfs)
-print('sha1Ofs', sha1Ofs)
-print('fileSizeOfs', fileSizeOfs)
-print('mapOfsOfs', mapOfsOfs)
-print('stringOfsOfs', stringOfsOfs)
-print('typeOfs', typeOfs)
-print('protoOfs', protoOfs)
-print('fieldOfs', fieldOfs)
-print('methodOfs', methodOfs)
-print('classOfs', classOfs)
-print('dataSizeOfs', dataSizeOfs)
-
-
-
---do return blob:compile() end
 
 	local stringOfs
 	if #self.strings > 0 then
