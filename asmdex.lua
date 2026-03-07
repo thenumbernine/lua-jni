@@ -1977,48 +1977,12 @@ function JavaASMDex:compile()
 		end
 	end
 
-	-------- prelim traversal:
-	-- map prototype signatures to cached tables of their members
-	-- so I don't have to parse them over and over again
+	-- define this before traverser
 	local protoPropsForSig = {}
-	traverse{
-		string = function(visit, str) end,
-		type = function(visit, typestr) end,
-		typelist = function(visit, typeStrs) end,
-		proto = function(visit, sigstr)
-			local protoProps = protoPropsForSig[sigstr]
-			if protoProps then return end
-
-			local sig = splitMethodJNISig(sigstr)
-			if not sig then error("failed to convert sigstr "..sigstr) end
-
-			protoProps = {}
-			protoProps.shorty = sig:mapi(function(sigi)
-				return #sigi > 1 and 'L' or sigi
-			end):concat()
-			protoProps.returnType = sig:remove(1)
-			protoProps.argTypes = sig
-			protoPropsForSig[sigstr] = protoProps
-		end,
-		field = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:type(sig)
-		end,
-		method = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:proto(sig)
-		end,
-	}
-
-	-------- first we accumulate our unique strings
-	
-	local strings = table()
-	traverse{
-		string = function(visit, str)
-			addUnique(strings, assert.type(str, 'string'))
-		end,
+	-- traverse from each type's table into its nested tables etc
+	local function nothing() end
+	local traverser = {
+		string = nothing,	-- end-point, does nothing
 		type = function(visit, typestr)
 			visit:string(typestr)
 		end,
@@ -2045,7 +2009,40 @@ function JavaASMDex:compile()
 			visit:string(name)
 			visit:proto(sig)
 		end,
+
 	}
+
+	-------- prelim traversal:
+	-- map prototype signatures to cached tables of their members
+	-- so I don't have to parse them over and over again
+	traverse(table.union({}, traverser, {
+		type = nothing,
+		typelist = nothing,
+		proto = function(visit, sigstr)
+			local protoProps = protoPropsForSig[sigstr]
+			if protoProps then return end
+
+			local sig = splitMethodJNISig(sigstr)
+			if not sig then error("failed to convert sigstr "..sigstr) end
+
+			protoProps = {}
+			protoProps.shorty = sig:mapi(function(sigi)
+				return #sigi > 1 and 'L' or sigi
+			end):concat()
+			protoProps.returnType = sig:remove(1)
+			protoProps.argTypes = sig
+			protoPropsForSig[sigstr] = protoProps
+		end,
+	}))
+
+	-------- first we accumulate our unique strings
+	
+	local strings = table()
+	-- now override traverser fields one at a time as we process each type ... and sort it ... and maybe write it ...
+	traverser.string = function(visit, str)
+		addUnique(strings, assert.type(str, 'string'))
+	end
+	traverse(traverser)
 
 	-- sort strings for no reason except to jump through hoops Google added
 	strings:sort()
@@ -2077,36 +2074,11 @@ function JavaASMDex:compile()
 	-------- next we build our types, and ignore strings
 
 	local types = table()
-	traverse{
-		string = function(visit, str) end,	-- done for now
-		type = function(visit, typestr)
-			addUnique(types, findString(typestr))
-		end,
-		-- all same as above, TODO subclass
-		typelist = function(visit, typeStrs)
-			if typeStrs then
-				for _,typeStr in ipairs(typeStrs) do
-					visit:type(typeStr)
-				end
-			end
-		end,
-		proto = function(visit, sigstr)
-			local protoProps = protoPropsForSig[sigstr]
-			visit:string(protoProps.shorty)
-			visit:type(protoProps.returnType)
-			visit:typelist(protoProps.argTypes)
-		end,
-		field = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:type(sig)
-		end,
-		method = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:proto(sig)
-		end,
-	}
+	traverser.string = nothing	-- done for now
+	traverser.type = function(visit, typestr)
+		addUnique(types, findString(typestr))
+	end
+	traverse(traverser)
 
 	types:sort()	-- sort because Google
 
@@ -2139,33 +2111,14 @@ function JavaASMDex:compile()
 	end
 
 	local typeLists = table()
-	traverse{
-		string = function(visit, str) end,	-- done for now
-		type = function(visit, typestr) end,	-- done for now
-		typelist = function(visit, typeStrs)
-			-- add as a blob, I think its safe, I think I wont have to later come back and modify its contents
-			if not typeStrs then return end
-			if #typeStrs == 0 then return end
-			addUnique(typeLists, encodeTypeList(typeStrs))
-		end,
-		-- the rest is superclass'd
-		proto = function(visit, sigstr)
-			local protoProps = protoPropsForSig[sigstr]
-			visit:string(protoProps.shorty)
-			visit:type(protoProps.returnType)
-			visit:typelist(protoProps.argTypes)
-		end,
-		field = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:type(sig)
-		end,
-		method = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:proto(sig)
-		end,
-	}
+	traverser.type = nothing	-- done for now
+	traverser.typelist = function(visit, typeStrs)
+		-- add as a blob, I think its safe, I think I wont have to later come back and modify its contents
+		if not typeStrs then return end
+		if #typeStrs == 0 then return end
+		addUnique(typeLists, encodeTypeList(typeStrs))
+	end
+	traverse(traverser)
 
 	-- 1-based except for nil/empty lists are 0
 	-- return as an index for now, convert to offset later.
@@ -2191,25 +2144,11 @@ function JavaASMDex:compile()
 	end
 
 	local protos = table()
-	traverse{
-		string = function(visit, str) end,	-- done for now
-		type = function(visit, typestr) end,	-- done for now
-		typelist = function(visit, typeStrs) end,	-- done for now
-		proto = function(visit, sigstr)
-			addUnique(protos, encodeProtoType(sigstr))
-		end,
-		-- the rest is superclass'd
-		field = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:type(sig)
-		end,
-		method = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:proto(sig)
-		end,
-	}
+	traverser.typelist = nothing
+	traverser.proto = function(visit, sigstr)
+		addUnique(protos, encodeProtoType(sigstr))
+	end
+	traverse(traverser)
 
 	protos:sort(function(a,b)
 		-- "This list must be sorted in return-type (by type_id index) major order,"
@@ -2254,21 +2193,11 @@ function JavaASMDex:compile()
 	-- dex lumps in internal and external references all in the same structure
 	-- so fieldWrites will be that
 	local fieldWrites = table()
-	traverse{
-		string = function(visit, str) end,			-- done for now
-		type = function(visit, typestr) end,		-- done for now
-		typelist = function(visit, typeStrs) end,	-- done for now
-		proto = function(visit, sigstr) end,		-- done for now
-		field = function(visit, class, name, sig)
-			addUnique(fieldWrites, encodeField(class, name, sig))
-		end,
-		-- the rest is superclass'd
-		method = function(visit, class, name, sig)
-			visit:type(class)
-			visit:string(name)
-			visit:proto(sig)
-		end,
-	}
+	traverser.proto = nothing
+	traverser.field = function(visit, class, name, sig)
+		addUnique(fieldWrites, encodeField(class, name, sig))
+	end
+	traverse(traverser)
 
 	fieldWrites:sort(function(a,b)
 		-- "This list must be sorted, 
@@ -2317,16 +2246,11 @@ function JavaASMDex:compile()
 	end
 
 	local methodWrites = table()
-	traverse{
-		string = function(visit, str) end,			-- done for now
-		type = function(visit, typestr) end,		-- done for now
-		typelist = function(visit, typeStrs) end,	-- done for now
-		proto = function(visit, sigstr) end,		-- done for now
-		field = function(visit, class, name, sig) end,	-- done for now
-		method = function(visit, class, name, sig)
-			addUnique(methodWrites, encodeMethod(class, name, sig))
-		end,
-	}
+	traverser.field = nothing
+	traverser.method = function(visit, class, name, sig)
+		addUnique(methodWrites, encodeMethod(class, name, sig))
+	end
+	traverse(traverser)
 	
 	methodWrites:sort(function(a,b)
 		-- "This list must be sorted, 
@@ -2390,9 +2314,9 @@ function JavaASMDex:compile()
 			})
 		end
 	end
-
-
 	align(4)
+
+
 	---------------- HEADER END, DATA BEGIN ---------------- 
 
 
