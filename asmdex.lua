@@ -228,7 +228,7 @@ local function instPushString(inst, stringIndex, asm)
 	inst:insert(str)
 end
 local function instReadString(inst, index, asm)
-	return (asm.addString(inst[index]))
+	return (asm.findString(inst[index]))
 end
 
 local function instPushType(inst, typeIndex, asm)
@@ -239,7 +239,7 @@ local function instPushType(inst, typeIndex, asm)
 	inst:insert(typ)
 end
 local function instReadType(inst, index, asm)
-	return (asm.addString(inst[index]))
+	return (asm.findString(inst[index]))
 end
 
 local function instPushProto(inst, protoIndex, asm)
@@ -250,7 +250,7 @@ local function instPushProto(inst, protoIndex, asm)
 	inst:insert(proto)
 end
 local function instReadProto(inst, index, asm)
-	return (asm.addProto(inst[index]))
+	return (asm.findProto(inst[index]))
 end
 
 local function instPushField(inst, fieldIndex, asm)
@@ -263,7 +263,7 @@ local function instPushField(inst, fieldIndex, asm)
 	inst:insert(field.sig)
 end
 local function instReadField(inst, index, asm)
-	return (asm.addField(inst[index], inst[index+1], inst[index+2]))
+	return (asm.findField(inst[index], inst[index+1], inst[index+2]))
 end
 
 local function instPushMethod(inst, methodIndex, asm)
@@ -282,7 +282,7 @@ local function instReadMethod(inst, index, asm)
 	then
 		error("instruction needs args "..index..'-'..(index+2)..': '..require'ext.tolua'(inst))
 	end
-	return (asm.addMethod(inst[index], inst[index+1], inst[index+2]))
+	return (asm.findMethod(inst[index], inst[index+1], inst[index+2]))
 end
 
 
@@ -312,6 +312,7 @@ end
 local Instr = class()
 Instr.insert = table.insert
 Instr.append = table.append
+function Instr:traverse(visit) end	-- accumulate any unique constants, ... before we have to sort them ... and then re-visit them all again to get their correct indexes ... fucking stupid Google ...
 
 local Instr10x = Instr:subclass()
 function Instr10x:read(hi, blob, asm)
@@ -448,6 +449,9 @@ end
 function Instr21c_string:maxRegs()
 	return readreg(self[2]) + 1
 end
+function Instr21c_string:traverse(visit)
+	visit:string(self[3])
+end
 
 local Instr21c_type = Instr:subclass()
 function Instr21c_type:read(hi, blob, asm)
@@ -461,6 +465,9 @@ end
 function Instr21c_type:maxRegs()
 	return readreg(self[2]) + 1
 end
+function Instr21c_string:traverse(visit)
+	visit:type(self[3])
+end
 
 local Instr21c_field = Instr:subclass()
 function Instr21c_field:read(hi, blob, asm)
@@ -470,6 +477,9 @@ end
 function Instr21c_field:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
 	blob:writeu2(instReadField(self, 3, asm))
+end
+function Instr21c_field:traverse(visit)
+	visit:field(self[3], self[4], self[5])
 end
 
 local Instr21c_field_1 = Instr21c_field:subclass()
@@ -518,6 +528,9 @@ end
 function Instr22c_type:maxRegs()
 	return math.max(readreg(self[2]), readreg(self[3])) + 1
 end
+function Instr22c_type:traverse(visit)
+	visit:type(self[4])
+end
 
 local Instr22c_field = Instr:subclass()
 function Instr22c_field:read(hi, blob, asm)
@@ -531,6 +544,9 @@ function Instr22c_field:write(blob, asm)
 		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
 	))
 	blob:writeu2(instReadField(self, 4, asm))
+end
+function Instr22c_field:traverse(visit)
+	visit:field(self[4], self[5], self[6])
 end
 
 local Instr22c_field_1 = Instr22c_field:subclass()
@@ -684,6 +700,9 @@ end
 function Instr21c_method:maxRegs()
 	return readreg(self[2]) + 1
 end
+function Instr21c_method:traverse(visit)
+	visit:method(self[3], self[4], self[5])
+end
 
 local Instr21c_proto = Instr:subclass()
 function Instr21c_proto:read(hi, blob, asm)
@@ -696,6 +715,9 @@ function Instr21c_proto:write(blob, asm)
 end
 function Instr21c_proto:maxRegs()
 	return readreg(self[2]) + 1
+end
+function Instr21c_proto:traverse(visit)
+	visit:proto(self[3])
 end
 
 local Instr32x = Instr:subclass()
@@ -747,10 +769,13 @@ function Instr31c_string:read(hi, blob, asm)
 end
 function Instr31c_string:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
-	blob:writeu4(instReadString(inst3, 3, asm))
+	blob:writeu4(instReadString(self, 3, asm))
 end
 function Instr31c_string:maxRegs()
 	return readreg(self[2]) + 1
+end
+function Instr31c_string:traverse(visit)
+	visit:string(self[3])
 end
 
 local Instr35c_type = Instr:subclass()
@@ -803,6 +828,9 @@ function Instr35c_type:maxRegs()
 		readregopt(self[8], -1)
 	) + 1
 end
+function Instr35c_type:traverse(visit)
+	visit:type(self[3])
+end
 
 local Instr35c_method = Instr:subclass()
 function Instr35c_method:read(hi, blob, asm)
@@ -853,6 +881,9 @@ function Instr35c_method:maxRegs()
 		readregopt(self[9], -1)
 	) + 1
 end
+function Instr35c_method:traverse(visit)
+	visit:method(self[2], self[3], self[4])
+end
 
 local Instr3rc_type = Instr:subclass()
 function Instr3rc_type:read(hi, blob, asm)
@@ -869,6 +900,9 @@ end
 function Instr3rc_type:maxRegs()
 	return readreg(self[4]) + 1
 end
+function Instr3rc_type:traverse(visit)
+	visit:type(self[3])
+end
 
 local Instr3rc_method = Instr:subclass()
 function Instr3rc_method:read(hi, blob, asm)
@@ -879,11 +913,14 @@ function Instr3rc_method:read(hi, blob, asm)
 end
 function Instr3rc_method:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
-	blob:writeu2(instReadType(self, 3, asm))
-	blob:writeu2(readreg(self[4]))
+	blob:writeu2(instReadMethod(self, 3, asm))
+	blob:writeu2(readreg(self[6]))
 end
 function Instr3rc_method:maxRegs()
-	return math.max(readreg(self[2]), readreg(self[3])) + 1
+	return math.max(readreg(self[2]), readreg(self[6])) + 1
+end
+function Instr3rc_method:traverse(visit)
+	return visit:method(self[3], self[4], self[5])
 end
 
 local Instr31t = Instr:subclass()
@@ -992,6 +1029,10 @@ function Instr45cc:maxRegs()
 		readregopt(self[9], -1)
 	) + 1
 end
+function Instr45cc:traverse(visit)
+	visit:method(self[2], self[3], self[4])
+	visit:proto(self[11])
+end
 
 local Instr4rcc = Instr:subclass()
 function Instr4rcc:read(hi, blob, asm)
@@ -1016,6 +1057,10 @@ function Instr4rcc:write(blob, asm)
 end
 function Instr4rcc:maxRegs()
 	return readreg(self[6]) + 1
+end
+function Instr4rcc:traverse(visit)
+	visit:method(self[3], self[4], self[5])
+	visit:proto(self[8])
 end
 
 local Instr51l_double = Instr:subclass()
@@ -1436,7 +1481,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			map.count = entry.count
 			map.offset = entry.offset
 			self.map:insert(map)
---DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
+print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -1854,173 +1899,501 @@ function JavaASMDex:compile()
 		end
 	end
 
-	self.strings = table()
-	self.types = table()
-	self.protos = table()
-	self.typeLists = table()
 
-	-- table of blobs of converted fields that will either come from .fields which are local to this function, or from field references in instructions
-	self.fieldBlobs = table()
+
+	self.map = table()
+	self.map:insert{type='header_item', count=1, offset=0}
+
+	-- ok now all constants are accounted for ... start writing
+	local blob = WriteBlobLE()
+
+	local function align(n)
+		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
+	end
+
+	-- write header here, come back later and change it over and over again, because Google
+	blob:write(header_item{
+		magic = "dex\n",
+		version = 0x393330,
+		-- skip checksum
+		-- skip sha1sig
+		-- skip fileSize
+		headerSize = ffi.sizeof(header_item),
+		endianTag = 0x12345678,
+	})
+
+
+	-------- alright now we accumulate unique tables that we must later sort, 
+	-- we build tables one at a time i guess to keep ourselves from needing to go back and modify references once we sort tables ...
+
+	-- just returns the index, nil if fails
+	local function findUnique(arr, data)
+		local index = table.find(arr, data)
+		if index then return index-1 end
+		return nil, "failed to find"
+	end
 
 	-- return 0-based index into our list of unique values
 	local function addUnique(arr, data)
-		for i=1,#arr do
-			if arr[i] == data then return i-1 end
-		end
+		local index = findUnique(arr, data)
+		if index then return index end
 		arr:insert(data)
 		return #arr-1
 	end
 
-	-- return 0-based index into strings
-	local function addString(str)
-		assert.type(str, 'string')
-		-- ultimately strings will be preceded by a uleb128 of the length
-		-- but equality is the same with the original so dont convert just yet
-		local stringIndex = addUnique(self.strings, str)
---DEBUG:print('adding string', stringIndex, str)
-		return stringIndex
-	end
-	self.addString = addString
+	local function traverse(visit)
+		-- traverse fields for strings ...
+		for _,field in ipairs(self.fields) do
+			visit:field(field.class, field.name, field.sig)
+		end
 
-	-- return 0-based index into types
-	local function addType(str)
-		assert.type(str, 'string')
+		-- traverse methods for strings
+		for _,method in ipairs(self.methods) do
+			visit:method(method.class, method.name, method.sig)
+			if method.code then
+				for _,inst in ipairs(method.code) do
+					local lo = assert.index(opForInstName, inst[1])
+					local instrClass = assert.index(InstrClassesForOp, lo)
+					setmetatable(inst, instrClass)
+					inst:traverse(visit)
+				end
+			end
+			if method.tries then
+				for _,try in ipairs(method.tries) do
+					for _,addrPair in ipairs(try) do
+						visit:type(addrPair.type)
+					end
+				end
+			end
+		end
 		
-		local w = WriteBlobLE()
-		local stringIndex = addString(str)
-		w:writeu4(stringIndex)
-		
-		local b = w:compile()
-		local typeIndex = addUnique(self.types, b)
---DEBUG:print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strings[stringIndex+1])
-		return typeIndex
+		for _,class in ipairs(self.classes) do
+			visit:type(class.thisClass)
+			visit:type(class.superClass)
+			visit:typelist(class.interfaces)
+			if class.sourceFile then
+				visit:string(class.sourceFile)
+			end
+		end
 	end
-	self.addType = addType
 
-	-- returns 0 when the offset should be 0,
-	-- otherwise returns a 1-based index into the type lists
-	local function addTypeList(typeStrs)
-		if not typeStrs then return 0 end
-		if #typeStrs == 0 then return 0 end	-- 0 means 0
+	-------- first we accumulate our unique strings
+	
+	self.strings = table()
+	traverse{
+		string = function(visit, str)
+			addUnique(self.strings, assert.type(str, 'string'))
+		end,
+		type = function(visit, typestr)
+			visit:string(typestr)
+		end,
+		typelist = function(visit, typeStrs)
+			if typeStrs then
+				for _,typeStr in ipairs(typeStrs) do
+					visit:type(typeStr)
+				end
+			end
+		end,
+		proto = function(visit, sigstr)
+			assert.type(sigstr, 'string')
+			local sig = splitMethodJNISig(sigstr)
+			if not sig then error("failed to convert sigstr "..sigstr) end
+			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
+			visit:type(table.remove(sig, 1))	-- returnType
+			visit:typelist(sig)
+		end,
+		field = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:type(sig)
+		end,
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
+	-- sort strings for no reason except to jump through stupid hoops Google added just to be stupid.
+	self.strings:sort()
+
+	-- might as well write them out, they aren't going anywhere
+	if #self.strings > 0 then
+		align(4)
+		-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numStrings = #self.strings
+		header.stringOfsOfs = #blob
+		self.map:insert{type='string_id_item', offset=#blob, count=#self.strings}
+		-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
+		-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
+		--  then the offsets to string data comes much much later in the file.
+		--  maybe in the "support data" section?
+		-- write placeholders for offsets,
+		-- fill them in later when we write the string data
+		for i=0,#self.strings-1 do
+			blob:writeu4(0)
+		end
+	end
+
+	local function findString(s) 
+		return assert(findUnique(self.strings, s))
+	end
+	self.findString = findString
+
+	-------- next we build our types, and ignore strings
+
+	self.types = table()
+	traverse{
+		string = function(visit, str) end,	-- done for now
+		type = function(visit, typestr)
+			addUnique(self.types, findString(typestr))
+		end,
+		-- all same as above, TODO subclass
+		typelist = function(visit, typeStrs)
+			if typeStrs then
+				for _,typeStr in ipairs(typeStrs) do
+					visit:type(typeStr)
+				end
+			end
+		end,
+		proto = function(visit, sigstr)
+			assert.type(sigstr, 'string')
+			local sig = splitMethodJNISig(sigstr)
+			if not sig then error("failed to convert sigstr "..sigstr) end
+			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
+			visit:type(table.remove(sig, 1))	-- returnType
+			visit:typelist(sig)
+		end,
+		field = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:type(sig)
+		end,
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
+	self.types:sort()	-- sort because Google is fucking stupid
+
+	-- fill in the type offsets
+	if #self.types > 0 then
+		align(4)
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numTypes = #self.types
+		header.typeOfs = #blob
+		self.map:insert{type='type_id_item', offset=#blob, count=#self.types}
+		for i,stringIndex in ipairs(self.types) do
+			blob:writeu4(stringIndex)
+		end
+	end
+
+	local function findType(typestr)
+		local typeStrIndex = findString(typestr)
+		return findUnique(self.types, typeStrIndex)
+	end
+
+	-------- now build type lists, ignore types and strings
+
+	local function encodeTypeList(typeStrs)
 		local w = WriteBlobLE()
 		w:writeu4(#typeStrs)
 		for _,typeStr in ipairs(typeStrs) do
-			w:writeu2(addType(typeStr))
+			w:writeu2(findType(typeStr))
 		end
-		-- return 1-based index to-be-replaced later
-		local b = w:compile()
-		local typeListIndex = addUnique(self.typeLists, b)
---DEBUG:print('adding type list index '..typeListIndex..' '..string.hex(b)..' from '..require 'ext.tolua'(typeStrs))
-		return 1+typeListIndex
+		return w:compile()
 	end
 
-	-- return 0-based index into protos
-	-- TODO TODO TODO
-	-- Google is so fucking stupid
-	-- You can't just build a unique list,
-	-- you have to **SORT IT** by 1) return type and then 2) type list index
-	-- THAT FORCES YOU TO COLLECT ALL PROTOS FROM ALL SOURCES, THEN SORT THE LIST, THEN GO BACK AND REWRITE EVERY REFERNCE INTO THE PROTO TABLE
-	local protoRefs = table()
-	local function addProto(sigstr)
---DEBUG:print('addProto', sigstr)
-		assert(sigstr)
-		-- sig is jni encoded signature string, so "(args args args) return type" no spaces
+	self.typeLists = table()
+	traverse{
+		string = function(visit, str) end,	-- done for now
+		type = function(visit, typestr) end,	-- done for now
+		typelist = function(visit, typeStrs)
+			-- add as a blob, I think its safe, I think I wont have to later come back and modify its contents
+			if not typeStrs then return end
+			if #typeStrs == 0 then return end
+			addUnique(self.typeLists, encodeTypeList(typeStrs))
+		end,
+		-- the rest is superclass'd
+		proto = function(visit, sigstr)
+			assert.type(sigstr, 'string')
+			local sig = splitMethodJNISig(sigstr)
+			if not sig then error("failed to convert sigstr "..sigstr) end
+			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
+			visit:type(table.remove(sig, 1))	-- returnType
+			visit:typelist(sig)
+		end,
+		field = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:type(sig)
+		end,
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
+	-- 1-based except for nil/empty lists are 0
+	-- return as an index for now, convert to offset later.
+	local function findTypeList(typeStrs)
+		if not typeStrs then return 0 end
+		if #typeStrs == 0 then return 0 end
+		return 1+findUnique(self.typeLists, encodeTypeList(typeStrs))
+	end
+
+	-- BUT DONT WRITE THEM YET WHAT WERE YOU THINKING YOU IDIOT, DID YOU THINK THE PEOPLE AT GOOGLE HAD ANY COMMON SENSE, THEY DONT!
+	-- no, we gotta put it aside and put it in the "data" section later.
+
+	-------- now build the prototypes.
+	-- maybe I can do this in the same pass as the type lists?
+
+	local function encodeProtoType(sigstr)
+		assert.type(sigstr, 'string')
 		local sig = splitMethodJNISig(sigstr)
-		assert(sig, "failed to convert sigstr "..require 'ext.tolua'(sigstr))
---DEBUG:print('from', sigstr, 'to', require 'ext.tolua'(sig))
-
-		local shorts = sig:mapi(function(sigi)
-			return #sigi > 1 and 'L' or sigi
-		end)
-
-		local w = WriteBlobLE()
-		local shorty = shorts:concat()
-		local shortyIndex = addString(shorty)
---DEBUG:print('adding proto shorty', shorty, 'index', shortyIndex)
-		w:writeu4(shortyIndex)
-
-		local returnType = table.remove(sig, 1)
-		local returnTypeIndex = addType(returnType)
---DEBUG:print('adding proto returnType', returnType, 'index', returnTypeIndex)
-		w:writeu4(returnTypeIndex)
-
-		local argTypeListIndex = addTypeList(sig)
---DEBUG:print('adding proto argTypeListIndex', argTypeListIndex, require 'ext.tolua'(sig))
-		-- notice, the args get stoerd in a a separate list later
-		-- so i'll save them in another list
-		-- and in place of an offset, i'll just save that list's index for now...
-		w:writeu4(argTypeListIndex)
-
-		local b = w:compile()
-		local protoIndex = addUnique(self.protos, b)
---DEBUG:print('adding proto', protoIndex, string.hex(b), 'for sig', sigstr)
-		
-		-- later sort proto list, and rewrite this location to the remapped proto index
-		-- this is called from 
-		-- ... instrReadProto, which writes a uint16_t ...
-		--	... which is called from instruction build, from classdef codedef
-		-- ... addMethod, also uint16_t
-		--	... which comes from method serialization.
-		-- at least Google isn't so retarded that they write their proto refs in different prim types, which would make the job of rewriting after remapping that much more difficult.
-		-- BUT HOLD MY BEER FUCKING RETARDS
-		-- you need the code to be serialized already
-		-- so the blob ofs of serialized code is dif from the main file blob ofs
-		--  so this wont work either
-
-		return protoIndex
+		if not sig then error("failed to convert sigstr "..sigstr) end
+		return proto_id_item{
+			shortyIndex = findString(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat()),
+			returnTypeIndex = findType(table.remove(sig, 1)),
+			argTypeListOfs = findTypeList(sig),
+		}
 	end
-	self.addProto = addProto
 
-	-- be sure to only call this after processing fields
-	-- not that it matters?
-	local function addField(class, name, sig)
-		local w = WriteBlobLE()
-		w:writeu2(addType(class))
-		w:writeu2(addType(sig))
-		w:writeu4(addString(name))
-		return addUnique(self.fieldBlobs, w:compile())
+	self.protos = table()
+	traverse{
+		string = function(visit, str) end,	-- done for now
+		type = function(visit, typestr) end,	-- done for now
+		typelist = function(visit, typeStrs) end,	-- done for now
+		proto = function(visit, sigstr)
+			addUnique(self.protos, encodeProtoType(sigstr))
+		end,
+		-- the rest is superclass'd
+		field = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:type(sig)
+		end,
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
+	self.protos:sort(function(a,b)
+		-- "This list must be sorted in return-type (by type_id index) major order,"
+		if a.returnTypeIndex ~= b.returnTypeIndex then
+			return a.returnTypeIndex < b.returnTypeIndex
+		end
+		-- "and then by argument list (lexicographic ordering, individual arguments ordered by type_id index)."
+		-- uh ... what?
+		return a.argTypeListOfs < b.argTypeListOfs
+	end)
+
+	-- and write it while you're here
+	-- mind you we will have to go back and modify it to update to the argTypeListOfs whereever we write that list 
+	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
+	if #self.protos > 0 then
+		align(4)
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numProtos = #self.protos
+		header.protoOfs = #blob
+		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
+		for i,proto in ipairs(self.protos) do
+			blob:write(proto)
+		end
 	end
-	self.addField = addField
 
-	-- extract out unique fields here first to keep fields in-order
+	local function findProto(sigstr)
+		return findUnique(self.protos, encodeProtoType(sigstr))
+	end
+	self.findProto = findProto
+
+	-------- now build the fields.
+
+	local function encodeField(cass, name, sig)
+		return field_id_item{
+			classIndex = findType(class),
+			sigIndex = findType(sig),
+			nameIndex = findString(name),
+		}
+	end
+
+	-- .fields is the ctor requested fields
+	-- dex lumps in internal and external references all in the same structure
+	-- so fieldWrites will be that
+	self.fieldWrites = table()
+	traverse{
+		string = function(visit, str) end,			-- done for now
+		type = function(visit, typestr) end,		-- done for now
+		typelist = function(visit, typeStrs) end,	-- done for now
+		proto = function(visit, sigstr) end,		-- done for now
+		field = function(visit, class, name, sig)
+			addUnique(self.fieldWrites, encodeField(class, name, sig))
+		end,
+		-- the rest is superclass'd
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
+	self.fieldWrites:sort(function(a,b)
+		-- "This list must be sorted, 
+		--  where the defining type (by type_id index) is the major order,
+		--  field name (by string_id index) is the intermediate order,
+		--  and type (by type_id index) is the minor order."
+		if a.classIndex ~= b.classIndex then return a.classIndex < b.classIndex end
+		if a.nameIndex ~= b.nameIndex then return a.nameIndex < b.nameIndex end
+		return a.sigIndex < b.sigIndex
+	end)
+
+	-- write fields
+	if #self.fieldWrites > 0 then
+		align(4)
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numFields = #self.fieldWrites
+		header.fieldOfs = #blob
+		self.map:insert{type='field_id_item', offset=#blob, count=#self.fieldWrites}
+		for i,field in ipairs(self.fieldWrites) do
+			blob:write(field)
+		end
+	end
+
+	local function findField(class, name, sig)
+		return findUnique(self.fieldWrites, encodeField(class, name, sig))
+	end
+	self.findField = findField
+
+	-- mapping from 1-based fieldWriteIndex to fields for later
+	self.fieldWritesToOrigs = {}	-- key = field write index 0-based, value = self.fields object
 	for _,field in ipairs(self.fields) do
-		addField(field.class, field.name, field.sig)
+		self.fieldWritesToOrigs[1+findField(field.class, field.name, field.sig)] = field
+
+		-- might as well build access flags here too
 		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
 	end
 
-	self.methodBlobs = table()
-	local function addMethod(class, name, sig)
-		local w = WriteBlobLE()
-		local classIndex = addType(class)
-		w:writeu2(classIndex)
---DEBUG:print('adding method with sig', sig)
-		local protoIndex = addProto(sig)
-		w:writeu2(protoIndex)
-		local nameIndex = addString(name)
-		w:writeu4(nameIndex)
-		local b = w:compile()
-		local methodIndex = addUnique(self.methodBlobs, b)
---DEBUG:print('adding method '..methodIndex..' = '..string.hex(b), class, classIndex, sig, protoIndex, name, nameIndex)
-		return methodIndex
+	-------- now build methods
+
+	local function encodeMethod(class, name, sig)
+		return method_id_item{
+			classIndex = findType(class),
+			sigIndex = findProto(sig),
+			nameIndex = findString(name),
+		}
 	end
-	self.addMethod = addMethod
 
--- add methods first so they can be unique first and 1-1 with themselves
---DEBUG:print('checking '..#self.methods..' for writing')
-	for i,method in ipairs(self.methods) do
---DEBUG:print('starting method #'..(i-1)..', #methodBlobs', #self.methodBlobs)
---DEBUG:print('checking method '..i..' = '..require'ext.tolua'(method))
-		method.methodIndex = addMethod(method.class, method.name, method.sig)
---DEBUG:print('checking method '..(i-1)..' =', method.class, method.name, method.sig, 'index', method.methodIndex)
-assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
+	self.methodWrites = table()
+	traverse{
+		string = function(visit, str) end,			-- done for now
+		type = function(visit, typestr) end,		-- done for now
+		typelist = function(visit, typeStrs) end,	-- done for now
+		proto = function(visit, sigstr) end,		-- done for now
+		field = function(visit, class, name, sig) end,	-- done for now
+		method = function(visit, class, name, sig)
+			addUnique(self.methodWrites, encodeMethod(class, name, sig))
+		end,
+	}
+	
+	self.methodWrites:sort(function(a,b)
+		-- "This list must be sorted, 
+		--  where the defining type (by type_id index) is the major order,
+		--  method name (by string_id index) is the intermediate order,
+		--  and method prototype (by proto_id index) is the minor order."
+		if a.classIndex ~= b.classIndex then return a.classIndex < b.classIndex end
+		if a.nameIndex ~= b.nameIndex then return a.nameIndex < b.nameIndex end
+		return a.sigIndex < b.sigIndex
+	end)
 
-		-- the rest goes in the method's extra info
+	-- fill in methods
+	if #self.methodWrites > 0 then
+		align(4)
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numMethods = #self.methodWrites
+		header.methodOfs = #blob
+		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodWrites}
+		for i,method in ipairs(self.methodWrites) do
+			blob:write(method)
+		end
+	end
+	
+	local function findMethod(class, name, sig)
+		return findUnique(self.methodWrites, encodeMethod(class, name, sig))
+	end
+	self.findMethod = findMethod
+
+	-- mapping from 1-based methodWriteIndex to methods for later
+	self.methodWritesToOrigs = {}
+	for _,method in ipairs(self.methods) do
+		self.methodWritesToOrigs[1+findMethod(method.class, method.name, method.sig)] = method
+	
+		-- might as well build access flags here too
 		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
 	end
 
-	-- do code later so methods stay in-order with methodBlobs
-	for i,method in ipairs(self.methods) do
-		if method.code then
+	-------- classdefs
+
+	-- sort ... so that super/subclasses are in order of definition.
+	-- ... just assume it's already sorted.
+	do
+		assert.gt(#self.classes, 0) 	-- otherwise why are we here...
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.numClasses = #self.classes
+		header.classOfs = #blob
+		self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
+		align(4)
+		for _,class in ipairs(self.classes) do
+			blob:write(class_def_item{
+				thisClassIndex = findType(class.thisClass),
+				accessFlags = getFlagsFromObj(class, classAccessFlags),
+				superClassIndex = findType(class.superClass),
+				interfacesOfs = findTypeList(class.interfaces),	-- remap from typelist index to offset later ...
+				sourceFileIndex = class.sourceFile
+					and findString(class.sourceFile)
+					or NO_INDEX,
+				-- ... fill in annotation-offset later
+				-- ... fill in data-offset later
+				-- ... fill in static-value-offset later
+			})
+		end
+	end
+
+
+	align(4)
+	---------------- HEADER END, DATA BEGIN ---------------- 
+
+
+	-- keep track of where the headers structures end
+	-- and where the support data begins
+	do
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+		header.datasOfs = #blob
+	end
+
+
+	-------- code items
+	-- per-method, pointed from class_data_item, but the rest of class_data_item comes later I guess
+
+	-- do these have to go in some kind of order?
+	-- probably in order of written methods ...
+	-- at least write out code here:
+	local codeItemOfs = #blob
+	local codeItemCount = 0
+	for methodWriteIndex,methodWrite in ipairs(self.methodWrites) do
+		local method = self.methodWritesToOrigs[methodWriteIndex]
+		if method
+		and method.code 
+		then
+			align(4)
+			-- save codeOfs for later for class data
+			method.codeOfs = #blob
+
 			-- statics have no 'this'
 			-- except <clinit> which is static|ctor which has ... something?  the class?
 			-- so I guess consturctors are ctor but ~static ?
@@ -2052,6 +2425,9 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 --DEBUG:print('regsIn vs inferred', method.regsIn, method.inferredRegsIn)
 --DEBUG:print('regsOut vs inferred', method.regsOut, method.inferredRegsOut)
 
+			-- traverse yet again,
+			-- this time get the inferred max regs
+			-- and build the code blob
 			local cblob = WriteBlobLE()
 			for _,inst in ipairs(method.code) do
 				local lo = assert.index(opForInstName, inst[1])
@@ -2060,263 +2436,27 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 				cblob:writeu1(lo)
 				inst:write(cblob, self)
 				method.inferredMaxRegs = math.max(method.inferredMaxRegs, inst:maxRegs())
-				assert.eq(0, bit.band(#cblob, 1))
 			end
-			method.codeData = cblob:compile()
-		end
+			assert.eq(0, bit.band(#cblob, 1))
+			local codeData = cblob:compile()
 
-		if method.tries then
-			for _,try in ipairs(method.tries) do
-				for _,addrPair in ipairs(try) do
-					addrPair.typeIndex = addType(addrPair.type)
-				end
-			end
-		end
-	end
---DEBUG:print('came up with '..#self.methodBlobs..' unique method signatures')
-
-
-	-- now to extract out uniques from classes, fields, methods, methods.code
-	for _,class in ipairs(self.classes) do
-		class.thisClassIndex = addType(class.thisClass)
---DEBUG:print('adding class thisClass', class.thisClass, class.thisClassIndex)
-		class.accessFlags = getFlagsFromObj(class, classAccessFlags)
---DEBUG:print('adding class accessFlags', class.accessFlags)
-		class.superClassIndex = addType(class.superClass)
---DEBUG:print('adding class superclass', class.superClass, class.superClassIndex)
-		class.interfaceIndex = addTypeList(class.interfaces)
-		if class.sourceFile then
-			class.sourceFileIndex = addString(class.sourceFile)
-		else
-			class.sourceFileIndex = NO_INDEX
-		end
-		-- then annotationsOfs
-		-- then classDataOfs
-		-- then staticValuesOfs
-
-		-- classes will need # static and # non-static fields
-		-- and # direct (aka static|private|ctor) and # non-direct methods
-	end
-
-	
-
-	-- okeey first past, got the code, but more importantly ...
-	-- ... we have collected all our unique types and strings
-	-- now THROW THIS AWAY BECAUSE GOOGLE IS FUCKING STUPID
-	-- and then we sort all those types / protos / etc.
-	-- and THEN WE REDO EVERYTHING AGAIN to get the correct sorted indexes.
-
-
-	self.map = table()
-	self.map:insert{type='header_item', count=1, offset=0}
-
-	-- ok now all constants are accounted for ... start writing
-	local blob = WriteBlobLE()
-
-	local function align(n)
-		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
-	end
-
-
-	blob:write(header_item{
-		magic = "dex\n",
-		version = 0x393330,
-		-- skip checksum
-		-- skip sha1sig
-		-- skip fileSize
-		headerSize = ffi.sizeof(header_item),
-		endianTag = 0x12345678,
-		numStrings = #self.strings,
-		numTypes = #self.types,
-		numProtos = #self.protos,
-		numFields = #self.fieldBlobs,
-		numMethods = #self.methodBlobs,
-		numClasses = #self.classes,
-	})
-
-	if #self.strings > 0 then
-		align(4)
-		-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
-		ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs = #blob
-		self.map:insert{type='string_id_item', offset=#blob, count=#self.strings}
-		-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
-		-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
-		--  then the offsets to string data comes much much later in the file.
-		--  maybe in the "support data" section?
-		-- write placeholders for offsets,
-		-- fill them in later when we write the string data
-		for i=0,#self.strings-1 do
-			blob:writeu4(0)
-		end
-	end
-
-	-- fill in the type offsets
-	if #self.types > 0 then
-		align(4)
-		ffi.cast(header_item_ptr, blob.data.v).typeOfs = #blob
-		self.map:insert{type='type_id_item', offset=#blob, count=#self.types}
-		for i,typeData in ipairs(self.types) do
-			assert.len(typeData, 4)	-- should be already serialized
-			blob:writeString(typeData)
-		end
-	end
-
-	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
-	if #self.protos > 0 then
-		align(4)
-		ffi.cast(header_item_ptr, blob.data.v).protoOfs = #blob
-		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
-		for i,proto in ipairs(self.protos) do
-			-- proto+8 is the args offset, which will need to be replaced later
-			assert.len(proto, 12)
-			blob:writeString(proto)
-		end
-	end
-
-	-- fill in fields
-	if #self.fieldBlobs > 0 then
-		align(4)
-		ffi.cast(header_item_ptr, blob.data.v).fieldOfs = #blob
-		self.map:insert{type='field_id_item', offset=#blob, count=#self.fieldBlobs}
-		for i,field in ipairs(self.fieldBlobs) do
-			assert.len(field, 8)
-			blob:writeString(field)
-		end
-	end
-
-	-- fill in methods
-	if #self.methodBlobs > 0 then
-		align(4)
-		ffi.cast(header_item_ptr, blob.data.v).methodOfs = #blob
-		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodBlobs}
-		for i,method in ipairs(self.methodBlobs) do
---DEBUG:print('writing method', i-1, require 'ext.string'.hex(method))
-			assert.len(method, 8)
-			blob:writeString(method)
-		end
-	end
-
-	-- fill in classdata
-	assert.gt(#self.classes, 0) 	-- otherwise why are we here...
-	align(4)
---DEBUG:print('write classDataOfs', #blob)
-	ffi.cast(header_item_ptr, blob.data.v).classOfs = #blob
-	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
-	local classDefOfs = #blob
-	for i,class in ipairs(self.classes) do
-		local item = class_def_item{
-			thisClassIndex = class.thisClassIndex,
-			accessFlags = class.accessFlags,
-			superClassIndex = class.superClassIndex,
-			interfacesOfs = class.interfaceIndex,	-- remap from typelist index to offset later ...
-			sourceFileIndex = class.sourceFileIndex,
-			-- ... fill in annotation-offset later
-			-- ... fill in data-offset later
-			-- ... fill in static-value-offset later
-		}
-		-- endian-flip now only if nobody in the future is going to write to this,
-		-- and I think someone is still going to...
-		blob:write(item)
-	end
-
-	-- keep track of where the headers structures end
-	-- and where the support data begins
-	local datasStartOfs = #blob
-
-	-- TODO fill in call sites here
-	-- align(4)
-
-	-- TODO fill in method handles here
-	-- align(4)
-
-	-- now fill in extra data ...
-
-	-- after writing everything else, cirrrrcle back and fill in 'stringOfs' and write the string data into 'stringOfs'
-	if #self.strings > 0 then
-		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
-		for i,s in ipairs(self.strings) do
-			-- notice this ptr could go bad after any blob:write's
-			local stringOfsPtr = ffi.cast('uint32_t*', 
-				blob.data.v 
-				+ ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs
-			)
---DEBUG:local from = stringOfsPtr[i-1]
-			stringOfsPtr[i-1] = #blob
---DEBUG:print('changing string data item from', from, 'to', #blob)
-			blob:writeUleb128(#s)
-			blob:writeString(s)
-			-- and all strings are null-term'd one extra byte past their reported lenght I guess, so that in-file they can act as pascal strings or C strings?
-			-- is everything in a .dex file needlessly redundant and bloated?
-			blob:writeu1(0)
-		end
-	end
-
-	-- now fill in proto def type lists
-	if #self.typeLists > 0 then
-		align(4)
-		self.map:insert{type='type_list', offset=#blob, count=#self.typeLists}
-		local typeListOfs = table()
-		for i,typeList in ipairs(self.typeLists) do
---DEBUG:print('writing typeList ofs', #blob, 'data', string.hex(typeList))
-			typeListOfs[i] = #blob
-			blob:writeString(typeList)
-		end
-		-- now replace all proto type list indexes with offsets
-		for i=0,#self.protos-1 do
-			local protoPtr = ffi.cast(
-				proto_id_item_ptr,
-				blob.data.v
-				+ ffi.cast(header_item_ptr, blob.data.v).protoOfs
-			) + i
-			
-			if protoPtr.argTypeListOfs ~= 0 then
---DEBUG:local from = protoPtr.argTypeListOfs
-				protoPtr.argTypeListOfs = assert.index(typeListOfs, protoPtr.argTypeListOfs)
---DEBUG:print('changing proto['..i..'].argTypeListOfs from', from, 'to', protoPtr.argTypeListOfs)
-			end
-		end
-		-- now replace all class interfaceIndexes
-		for i=0,#self.classes-1 do
-			local classDefPtr = ffi.cast(
-				class_def_item_ptr,
-				blob.data.v
-				+ ffi.cast(header_item_ptr, blob.data.v).classOfs
-			) + i
-			if classDefPtr.interfacesOfs ~= 0 then
---DEBUG:local from = classDefPtr.interfacesOfs
-				classDefPtr.interfacesOfs = assert.index(typeListOfs, classDefPtr.interfacesOfs)
---DEBUG:print('changing classInterfaceTypeListPtr from', from, 'to', classDefPtr.interfacesOfs)
-			end
-		end
-	end
-
-	-- now fill in the class data's method data's instruction data ... 
-	-- ... before I fill in the method data's code offset as a uleb128 
-	-- ... which is going to vary based on its size...
-	align(4)
-	local codeItemOfs = #blob
-	local codeItemCount = 0
-	-- I've asseretd method == self.methods[method.methodIndex+1]
-	for _,method in ipairs(self.methods) do
-		if method.codeData then
 			codeItemCount = codeItemCount + 1
-			-- save for later for class data
-			method.codeOfs = #blob
+	
 			local codeItem = code_item{
 				maxRegs = method.maxRegs or method.inferredMaxRegs,
 				regsIn = method.regsIn or method.inferredRegsIn,
 				regsOut = method.regsOut or method.inferredRegsOut,
 				numTries = method.tries and #method.tries or 0,
 				debugInfoOfs = 0,
-				instSize = bit.rshift(#method.codeData, 1),	-- instructions size in uint16_t's
+				instSize = bit.rshift(#codeData, 1),	-- instructions size in uint16_t's
 			}
 			if endianFlipped then flipEndianStruct(codeItem) end
 			blob:write(codeItem)
-
-			blob:writeString(method.codeData)
-
+			blob:writeString(codeData)
+			
 			if bit.band(3, #blob) == 2 then blob:writeu2(0) end
 			assert.eq(bit.band(3, #blob), 0, "#blob supposed to be 4-byte aligned")
+		
 
 			if method.tries then
 				for _,try in ipairs(method.tries) do
@@ -2334,7 +2474,8 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 --DEBUG:print('changing try.handlerOfsOfs from', from, 'to',ptr[0])
 					blob:writeSleb128(try.catchAllAddr and -#try or #try)
 					for i,addrPair in ipairs(try) do
-						blob:writeUleb128(addrPair.typeIndex)
+						local typeIndex = findType(addrPair.type)
+						blob:writeUleb128(typeIndex)
 						blob:writeUleb128(addrPair.addr)
 					end
 					if try.catchAllAddr then
@@ -2344,14 +2485,68 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 			end
 		end
 	end
-
-	align(4)
-	-- if we wrote anything, insert a map entry
 	if codeItemCount > 0 then
-		self.map:insert{type='code_item', offset=codeItemOfs, count=codeItemCount }
+		self.map:insert{type='code_item', offset=codeItemOfs, count=codeItemCount}
 	end
 
-	-- now fill in class data
+	-------- debug_item_info ... nah
+
+	-------- type lists (finally)
+
+	if #self.typeLists > 0 then
+		align(4)
+		self.map:insert{type='type_list', offset=#blob, count=#self.typeLists}
+	
+		local typeListOfs = table()
+		for i,typeList in ipairs(self.typeLists) do
+--DEBUG:print('writing typeList ofs', #blob, 'data', string.hex(typeList))
+			typeListOfs[i] = #blob
+			blob:writeString(typeList)
+		end
+		-- now replace all proto type list indexes with offsets
+		for i=0,#self.protos-1 do
+			local protoPtr = ffi.cast(
+				proto_id_item_ptr,
+				blob.data.v + ffi.cast(header_item_ptr, blob.data.v).protoOfs
+			) + i
+			if protoPtr.argTypeListOfs ~= 0 then
+				protoPtr.argTypeListOfs = assert.index(typeListOfs, protoPtr.argTypeListOfs)
+			end
+		end
+		-- now replace all class interfacesOfs typelist index with offset
+		for i=0,#self.classes-1 do
+			local classDefPtr = ffi.cast(
+				class_def_item_ptr,
+				blob.data.v
+				+ ffi.cast(header_item_ptr, blob.data.v).classOfs
+			) + i
+			if classDefPtr.interfacesOfs ~= 0 then
+				classDefPtr.interfacesOfs = assert.index(typeListOfs, classDefPtr.interfacesOfs)
+			end
+		end
+	end
+
+	-------- string data
+
+	if #self.strings > 0 then
+		align(4)
+		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
+		for i,s in ipairs(self.strings) do
+			-- notice this ptr could go bad after any blob:write's
+			local stringOfsPtr = ffi.cast('uint32_t*', 
+				blob.data.v 
+				+ ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs
+			)
+			stringOfsPtr[i-1] = #blob
+			blob:writeUleb128(#s)
+			blob:writeString(s)
+			blob:writeu1(0)		-- null term all strings
+		end
+	end
+
+	-------- now class_data_item
+
+	align(4)
 	local classDataOfs = #blob
 	local classDataCount = 0
 	for classIndex,class in ipairs(self.classes) do
@@ -2359,15 +2554,17 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		-- collect all fields that are static vs instance
 		local staticFieldIndexes = table()	-- 1-based
 		local instanceFieldIndexes = table()	-- 1-based
-		for i,field in ipairs(self.fields) do
-			if field.class == class.thisClass
+		for fieldWriteIndex=1,#self.fieldWrites do
+			local field = self.fieldWritesToOrigs[fieldWriteIndex]
+			if field
+			and field.class == class.thisClass
 			and field.accessFlags
 			and field.accessFlags ~= 0
 			then
 				if field.isStatic then
-					staticFieldIndexes:insert(i)
+					staticFieldIndexes:insert(fieldWriteIndex)
 				else
-					instanceFieldIndexes:insert(i)
+					instanceFieldIndexes:insert(fieldWriteIndex)
 				end
 			end
 		end
@@ -2375,9 +2572,10 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		-- collect all methods that are direct vs virtual
 		local directMethodIndexes = table() 	-- 1-based
 		local virtualMethodIndexes = table()	-- 1-based
---DEBUG:print('class data checking '..#self.methods..' methods')
-		for i,method in ipairs(self.methods) do
-			if method.class == class.thisClass
+		for methodWriteIndex=1,#self.methodWrites do
+			local method = self.methodWritesToOrigs[methodWriteIndex]
+			if method
+			and method.class == class.thisClass
 			and (
 				(method.accessFlags and method.accessFlags ~= 0)
 				or (method.codeOfs and method.codeOfs ~= 0)
@@ -2386,11 +2584,9 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 				or method.isPrivate
 				or method.isConstructor
 				then
---DEBUG:print('class data adding method '..i..' to direct')
-					directMethodIndexes:insert(i)
+					directMethodIndexes:insert(methodWriteIndex)
 				else
---DEBUG:print('class data adding method '..i..' to virtual')
-					virtualMethodIndexes:insert(i)
+					virtualMethodIndexes:insert(methodWriteIndex)
 				end
 			end
 		end
@@ -2402,14 +2598,11 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		then
 			classDataCount = classDataCount + 1
 			-- change the class data offset to here
-			local classDataPtr = ffi.cast('uint32_t*',
+			local classDefPtr = ffi.cast(class_def_item_ptr,
 				blob.data.v
-				+ classDefOfs
-				+ ffi.offsetof(class_def_item, 'classDataOfs')
-				+ ffi.sizeof(class_def_item) * (classIndex-1))
---DEBUG:local from = classDataPtr[0]
-			classDataPtr[0] = #blob
---DEBUG:print('changing classDataPtr from', from, 'to', #blob)
+				+ ffi.cast(header_item_ptr, blob.data.v).classOfs
+			) + (classIndex-1)
+			classDefPtr.classDataOfs =  #blob
 
 			blob:writeUleb128(#staticFieldIndexes)
 			blob:writeUleb128(#instanceFieldIndexes)
@@ -2447,13 +2640,15 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		self.map:insert{type='class_data_item', offset=classDataOfs, count=classDataCount}
 	end
 
-	-- TODO link data last?
-
 	-- the dex files I'm looking at will have a single empty entry for annotations ... 
 	-- ... even if every class def has annotation ofs set to 0 ...
 	align(4)
 	self.map:insert{type='annotation_set_item', offset=#blob, count=1}
 	blob:writeu4(0)
+
+
+	-- TODO link data last?
+
 
 	-- only after everything, write the map data
 	-- thats the order that I am seeing .dex files made
@@ -2482,19 +2677,11 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	-- don't touch it anymore
 	-- now we fill in header info pertaining to the whole file
 
-	local header = ffi.cast(header_item_ptr, blob.data.v)
-
 	-- finally write the data section,
 	-- which starts after the header's tables and ends here
---DEBUG:local from = header.datasOfs
-	header.datasOfs = datasStartOfs
---DEBUG:print('changing datasStart from', from, 'to', header.datasOfs)
---DEBUG:local from = header.dataSize
-	header.dataSize = #blob - datasStartOfs
---DEBUG:print('changing datasOfs from', from, 'to', header.dataSize)
---DEBUG:local from = header.fileSize
+	local header = ffi.cast(header_item_ptr, blob.data.v)
+	header.dataSize = #blob - header.datasOfs
 	header.fileSize = #blob
---DEBUG:print('changing fileSize from', from, 'to', header.fileSize)
 
 	-- now that header offsets are filled out and everything is done but checksums,
 	-- flip header endian-ness
