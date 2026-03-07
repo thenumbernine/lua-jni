@@ -36,7 +36,7 @@ print()
 
 local asmDex = JavaASMDex(dexBC)
 print('JavaASMDex:')
-print(require'ext.tolua'(asmDex))
+print(require'ext.tolua'(asmDex))	-- original bytecode's lua structure
 print()
 
 local bytes = asmDex:compile()
@@ -46,7 +46,7 @@ print()
 
 print('2nd read into JavaASMDex:')
 local try2 = JavaASMDex(bytes)
-print(require'ext.tolua'(try2))
+print(require'ext.tolua'(try2))		-- write #1 bytecode's lua structure
 print()
 
 local bytes2 = try2:compile()

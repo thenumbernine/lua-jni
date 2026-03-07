@@ -50,6 +50,7 @@ end
 
 local header_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='magic', type='uint8_t[4]'},
 		{name='version', type='uint32_t'},
@@ -81,6 +82,7 @@ local header_item = struct{
 
 local map_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='typeIndex', type='uint16_t'},
 		{name='unused', type='uint16_t'},
@@ -91,6 +93,7 @@ local map_item = struct{
 
 local proto_id_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='shortyIndex', type='uint32_t'},
 		{name='returnTypeIndex', type='uint32_t'},
@@ -100,6 +103,7 @@ local proto_id_item = struct{
 
 local field_id_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='classIndex', type='uint16_t'},	-- type index
 		{name='sigIndex', type='uint16_t'},		-- type index
@@ -109,6 +113,7 @@ local field_id_item = struct{
 
 local method_id_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='classIndex', type='uint16_t'},	-- type index
 		{name='sigIndex', type='uint16_t'},		-- proto index
@@ -118,6 +123,7 @@ local method_id_item = struct{
 
 local class_def_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='thisClassIndex', type='uint32_t'},	-- type
 		{name='accessFlags', type='uint32_t'},
@@ -133,6 +139,7 @@ local class_def_item = struct{
 -- just the header of code_item until its first variable-length array
 local code_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='maxRegs', type='uint16_t'},
 		{name='regsIn', type='uint16_t'},
@@ -145,6 +152,7 @@ local code_item = struct{
 
 local try_item = struct{
 	anonymous = true,
+	tostringFields = true,
 	fields = {
 		{name='startAddr', type='uint32_t'},
 		{name='instSize', type='uint16_t'},
@@ -1412,13 +1420,16 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		blob.ofs = header.mapOfs
 		local count = blob:readu4()
 		local mapItems = ffi.cast(ffi.typeof('$*', map_item), blob.data.v + blob.ofs)
+		self.map = table()
 		for i=0,count-1 do
 			local map = {}
 			local entry = mapItems[i]
+--DEBUG:print('map src '..i..' = '..entry)			
 			if endianFlipped then flipEndianStruct(entry) end
 			map.type = assert.index(mapListTypes, entry.typeIndex)
 			map.count = entry.count
 			map.offset = entry.offset
+			self.map:insert(map)
 --DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
@@ -1534,7 +1545,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		end
 
 		if entry.annotationsOfs ~= 0 then
-			io.stderr:write'TODO annotationsOfs\n'
+			io.stderr:write'!!! TODO !!! annotationsOfs\n'
 		end
 
 		if entry.classDataOfs ~= 0 then
@@ -1715,11 +1726,6 @@ io.stderr:write'!!! TODO !!! debugInfoOfs\n'
 	end
 --]]
 
-	-- these are now baked into instructions, no longer needed
-	self.protos = nil
-	self.strings = nil
-	self.types = nil
-
 	-- if we are in a one-class file then merge classes[1] with root and remove .class from all fields and methods (cuz its redundant anwaysy)
 	if #self.classes == 1 then
 		local classname = self.classes[1].thisClass
@@ -1755,6 +1761,14 @@ io.stderr:write'!!! TODO !!! debugInfoOfs\n'
 		end
 		self.classes = nil
 	end
+
+	--[[ these are now baked into instructions, no longer needed
+	-- but keep them around for debugging
+	self.protos = nil
+	self.strings = nil
+	self.types = nil
+	self.map = nil
+	--]]
 
 	-- and at this point our .dex structure will match our .class structure
 end
@@ -2069,11 +2083,11 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		blob:writeString(('\0'):rep((n - (#blob % n)) % n))
 	end
 
---[==[ with structs
+-- [==[ with structs
 
-	--[===[
+	-- [===[
 	blob:write(header_item{
-		--magic = "dex\n",
+		magic = "dex\n",
 		version = 0x393330,	-- little endian
 		-- skip checksum
 		-- skip sha1sig
@@ -2090,7 +2104,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 assert.eq(#blob, ffi.sizeof(header_item))
 
 	--]===]
-	-- [===[
+	--[===[
 	blob:write(header_item())
 	assert.eq(#blob, ffi.sizeof(header_item))
 	local header = ffi.cast(ffi.typeof('$*', header_item), blob.data.v)
@@ -2117,11 +2131,11 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	local fieldOfs = ffi.offsetof(header_item, 'fieldOfs')
 	local methodOfs = ffi.offsetof(header_item, 'methodOfs')
 	local classOfs = ffi.offsetof(header_item, 'classOfs')
-	local datasOfs = ffi.offsetof(header_item, 'datasOfs')
+	local dataSizeOfs = ffi.offsetof(header_item, 'dataSize')
 
 
 --]==]
--- [==[ without
+--[==[ without
 
 	blob:writeString('dex\n')
 	blob:writeString(self.version or '\x30\x33\x39\0')
@@ -2170,13 +2184,64 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	local classOfs = #blob
 	blob:writeu4(0)
 
-	local datasOfs = #blob
+	local dataSizeOfs = #blob
 	blob:writeu4(0)	-- dataSize
 	blob:writeu4(0)	-- datasOfs
 
 	-- fill in header size
 	ffi.cast('uint32_t*', blob.data.v + headerSizeOfs)[0] = #blob
+
+--[[
+
+new way header_info struct write:
+00000000  64 65 78 0a 30 33 39 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  dex.039.........................
+00000020  00 00 00 00 70 00 00 00  78 56 34 12 00 00 00 00  00 00 00 00 00 00 00 00  0e 00 00 00 00 00 00 00  ....p...xV4.....................
+00000040  06 00 00 00 00 00 00 00  03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  05 00 00 00 00 00 00 00  ................................
+00000060  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
+checksumOfs	8
+sha1Ofs	12
+fileSizeOfs	32
+mapOfsOfs	52
+stringOfsOfs	60
+typeOfs	68
+protoOfs	76
+fieldOfs	84
+methodOfs	92
+classOfs	100
+
+
+old way:
+00000000  64 65 78 0a 30 33 39 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  dex.039.........................
+00000020  00 00 00 00 70 00 00 00  78 56 34 12 00 00 00 00  00 00 00 00 00 00 00 00  0e 00 00 00 00 00 00 00  ....p...xV4.....................
+00000040  06 00 00 00 00 00 00 00  03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  05 00 00 00 00 00 00 00  ................................
+00000060  01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
+checksumOfs	8
+sha1Ofs	12
+fileSizeOfs	32
+mapOfsOfs	52
+stringOfsOfs	60
+typeOfs	68
+protoOfs	76
+fieldOfs	84
+methodOfs	92
+classOfs	100
+--]]
 --]==]
+print('header so far')
+print(string.hexdump(blob.data:dataToStr()))
+print('checksumOfs', checksumOfs)
+print('sha1Ofs', sha1Ofs)
+print('fileSizeOfs', fileSizeOfs)
+print('mapOfsOfs', mapOfsOfs)
+print('stringOfsOfs', stringOfsOfs)
+print('typeOfs', typeOfs)
+print('protoOfs', protoOfs)
+print('fieldOfs', fieldOfs)
+print('methodOfs', methodOfs)
+print('classOfs', classOfs)
+print('dataSizeOfs', dataSizeOfs)
+
+
 
 --do return blob:compile() end
 
@@ -2480,12 +2545,20 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 		end
 	end
 	if classDataCount > 0 then
-		self.map:insert{type='class_data_item', offset=classDataOfs, count=classDataCount }
+		self.map:insert{type='class_data_item', offset=classDataOfs, count=classDataCount}
 	end
 
 	-- TODO link data last?
 
+	-- the dex files I'm looking at will have a single empty entry for annotations ... 
+	-- ... even if every class def has annotation ofs set to 0 ...
+	align(4)
+	self.map:insert{type='annotation_set_item', offset=#blob, count=1}
+	blob:writeu4(0)
+
 	-- only after everything, write the map data
+	-- thats the order that I am seeing .dex files made
+	-- but notice, this means map_item is not sorted by type_order, since map_list is midway down the type order ...
 	if #self.map > 0 then	-- should always be true
 		align(4)
 		self.map:insert{type='map_list', offset=#blob, count=1}
@@ -2504,11 +2577,11 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 
 	-- finally write the data section,
 	-- which starts after the header's tables and ends here
-	local ptr = ffi.cast('uint32_t*', blob.data.v + datasOfs)
+	local ptr = ffi.cast('uint32_t*', blob.data.v + dataSizeOfs)
 --DEBUG:local from = ptr[0]
 	ptr[0] = datasStartOfs
 --DEBUG:print('changing datasStart from', from, 'to', ptr[0])
-	local ptr = ffi.cast('uint32_t*', blob.data.v + datasOfs + 4)
+	local ptr = ffi.cast('uint32_t*', blob.data.v + dataSizeOfs + 4)
 --DEBUG:local from = ptr[0]
 	ptr[0] = #blob - datasStartOfs
 --DEBUG:print('changing datasOfs from', from, 'to', ptr[0])
