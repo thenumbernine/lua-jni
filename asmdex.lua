@@ -2014,10 +2014,10 @@ function JavaASMDex:compile()
 
 	-------- first we accumulate our unique strings
 	
-	self.strings = table()
+	local strings = table()
 	traverse{
 		string = function(visit, str)
-			addUnique(self.strings, assert.type(str, 'string'))
+			addUnique(strings, assert.type(str, 'string'))
 		end,
 		type = function(visit, typestr)
 			visit:string(typestr)
@@ -2048,39 +2048,39 @@ function JavaASMDex:compile()
 	}
 
 	-- sort strings for no reason except to jump through hoops Google added
-	self.strings:sort()
+	strings:sort()
 
 	-- might as well write them out, they aren't going anywhere
-	if #self.strings > 0 then
+	if #strings > 0 then
 		align(4)
 		-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
 		local header = ffi.cast(header_item_ptr, blob.data.v)
-		header.numStrings = #self.strings
+		header.numStrings = #strings
 		header.stringOfsOfs = #blob
-		self.map:insert{type='string_id_item', offset=#blob, count=#self.strings}
+		self.map:insert{type='string_id_item', offset=#blob, count=#strings}
 		-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
 		-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
 		--  then the offsets to string data comes much much later in the file.
 		--  maybe in the "support data" section?
 		-- write placeholders for offsets,
 		-- fill them in later when we write the string data
-		for i=0,#self.strings-1 do
+		for i=0,#strings-1 do
 			blob:writeu4(0)
 		end
 	end
 
 	local function findString(s) 
-		return assert(findUnique(self.strings, s))
+		return assert(findUnique(strings, s))
 	end
 	self.findString = findString
 
 	-------- next we build our types, and ignore strings
 
-	self.types = table()
+	local types = table()
 	traverse{
 		string = function(visit, str) end,	-- done for now
 		type = function(visit, typestr)
-			addUnique(self.types, findString(typestr))
+			addUnique(types, findString(typestr))
 		end,
 		-- all same as above, TODO subclass
 		typelist = function(visit, typeStrs)
@@ -2108,23 +2108,23 @@ function JavaASMDex:compile()
 		end,
 	}
 
-	self.types:sort()	-- sort because Google
+	types:sort()	-- sort because Google
 
 	-- fill in the type offsets
-	if #self.types > 0 then
+	if #types > 0 then
 		align(4)
 		local header = ffi.cast(header_item_ptr, blob.data.v)
-		header.numTypes = #self.types
+		header.numTypes = #types
 		header.typeOfs = #blob
-		self.map:insert{type='type_id_item', offset=#blob, count=#self.types}
-		for i,stringIndex in ipairs(self.types) do
+		self.map:insert{type='type_id_item', offset=#blob, count=#types}
+		for i,stringIndex in ipairs(types) do
 			blob:writeu4(stringIndex)
 		end
 	end
 
 	local function findType(typestr)
 		local typeStrIndex = findString(typestr)
-		return findUnique(self.types, typeStrIndex)
+		return findUnique(types, typeStrIndex)
 	end
 
 	-------- now build type lists, ignore types and strings
@@ -2138,7 +2138,7 @@ function JavaASMDex:compile()
 		return w:compile()
 	end
 
-	self.typeLists = table()
+	local typeLists = table()
 	traverse{
 		string = function(visit, str) end,	-- done for now
 		type = function(visit, typestr) end,	-- done for now
@@ -2146,7 +2146,7 @@ function JavaASMDex:compile()
 			-- add as a blob, I think its safe, I think I wont have to later come back and modify its contents
 			if not typeStrs then return end
 			if #typeStrs == 0 then return end
-			addUnique(self.typeLists, encodeTypeList(typeStrs))
+			addUnique(typeLists, encodeTypeList(typeStrs))
 		end,
 		-- the rest is superclass'd
 		proto = function(visit, sigstr)
@@ -2172,7 +2172,7 @@ function JavaASMDex:compile()
 	local function findTypeList(typeStrs)
 		if not typeStrs then return 0 end
 		if #typeStrs == 0 then return 0 end
-		return 1+findUnique(self.typeLists, encodeTypeList(typeStrs))
+		return 1+findUnique(typeLists, encodeTypeList(typeStrs))
 	end
 
 	-- BUT DONT WRITE THEM YET WHAT WERE YOU THINKING YOU IDIOT, DID YOU THINK THE PEOPLE AT GOOGLE HAD ANY COMMON SENSE, THEY DONT!
@@ -2190,13 +2190,13 @@ function JavaASMDex:compile()
 		}
 	end
 
-	self.protos = table()
+	local protos = table()
 	traverse{
 		string = function(visit, str) end,	-- done for now
 		type = function(visit, typestr) end,	-- done for now
 		typelist = function(visit, typeStrs) end,	-- done for now
 		proto = function(visit, sigstr)
-			addUnique(self.protos, encodeProtoType(sigstr))
+			addUnique(protos, encodeProtoType(sigstr))
 		end,
 		-- the rest is superclass'd
 		field = function(visit, class, name, sig)
@@ -2211,7 +2211,7 @@ function JavaASMDex:compile()
 		end,
 	}
 
-	self.protos:sort(function(a,b)
+	protos:sort(function(a,b)
 		-- "This list must be sorted in return-type (by type_id index) major order,"
 		if a.returnTypeIndex ~= b.returnTypeIndex then
 			return a.returnTypeIndex < b.returnTypeIndex
@@ -2224,19 +2224,19 @@ function JavaASMDex:compile()
 	-- and write it while you're here
 	-- mind you we will have to go back and modify it to update to the argTypeListOfs whereever we write that list 
 	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
-	if #self.protos > 0 then
+	if #protos > 0 then
 		align(4)
 		local header = ffi.cast(header_item_ptr, blob.data.v)
-		header.numProtos = #self.protos
+		header.numProtos = #protos
 		header.protoOfs = #blob
-		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
-		for i,proto in ipairs(self.protos) do
+		self.map:insert{type='proto_id_item', offset=#blob, count=#protos}
+		for i,proto in ipairs(protos) do
 			blob:write(proto)
 		end
 	end
 
 	local function findProto(sigstr)
-		return findUnique(self.protos, encodeProtoType(sigstr))
+		return findUnique(protos, encodeProtoType(sigstr))
 	end
 	self.findProto = findProto
 
@@ -2253,14 +2253,14 @@ function JavaASMDex:compile()
 	-- .fields is the ctor requested fields
 	-- dex lumps in internal and external references all in the same structure
 	-- so fieldWrites will be that
-	self.fieldWrites = table()
+	local fieldWrites = table()
 	traverse{
 		string = function(visit, str) end,			-- done for now
 		type = function(visit, typestr) end,		-- done for now
 		typelist = function(visit, typeStrs) end,	-- done for now
 		proto = function(visit, sigstr) end,		-- done for now
 		field = function(visit, class, name, sig)
-			addUnique(self.fieldWrites, encodeField(class, name, sig))
+			addUnique(fieldWrites, encodeField(class, name, sig))
 		end,
 		-- the rest is superclass'd
 		method = function(visit, class, name, sig)
@@ -2270,7 +2270,7 @@ function JavaASMDex:compile()
 		end,
 	}
 
-	self.fieldWrites:sort(function(a,b)
+	fieldWrites:sort(function(a,b)
 		-- "This list must be sorted, 
 		--  where the defining type (by type_id index) is the major order,
 		--  field name (by string_id index) is the intermediate order,
@@ -2281,26 +2281,26 @@ function JavaASMDex:compile()
 	end)
 
 	-- write fields
-	if #self.fieldWrites > 0 then
+	if #fieldWrites > 0 then
 		align(4)
 		local header = ffi.cast(header_item_ptr, blob.data.v)
-		header.numFields = #self.fieldWrites
+		header.numFields = #fieldWrites
 		header.fieldOfs = #blob
-		self.map:insert{type='field_id_item', offset=#blob, count=#self.fieldWrites}
-		for i,field in ipairs(self.fieldWrites) do
+		self.map:insert{type='field_id_item', offset=#blob, count=#fieldWrites}
+		for i,field in ipairs(fieldWrites) do
 			blob:write(field)
 		end
 	end
 
 	local function findField(class, name, sig)
-		return findUnique(self.fieldWrites, encodeField(class, name, sig))
+		return findUnique(fieldWrites, encodeField(class, name, sig))
 	end
 	self.findField = findField
 
 	-- mapping from 1-based fieldWriteIndex to fields for later
-	self.fieldWritesToOrigs = {}	-- key = field write index 0-based, value = self.fields object
+	local fieldWritesToOrigs = {}	-- key = field write index 0-based, value = self.fields object
 	for _,field in ipairs(self.fields) do
-		self.fieldWritesToOrigs[1+findField(field.class, field.name, field.sig)] = field
+		fieldWritesToOrigs[1+findField(field.class, field.name, field.sig)] = field
 
 		-- might as well build access flags here too
 		field.accessFlags = getFlagsFromObj(field, fieldAccessFlags)
@@ -2316,7 +2316,7 @@ function JavaASMDex:compile()
 		}
 	end
 
-	self.methodWrites = table()
+	local methodWrites = table()
 	traverse{
 		string = function(visit, str) end,			-- done for now
 		type = function(visit, typestr) end,		-- done for now
@@ -2324,11 +2324,11 @@ function JavaASMDex:compile()
 		proto = function(visit, sigstr) end,		-- done for now
 		field = function(visit, class, name, sig) end,	-- done for now
 		method = function(visit, class, name, sig)
-			addUnique(self.methodWrites, encodeMethod(class, name, sig))
+			addUnique(methodWrites, encodeMethod(class, name, sig))
 		end,
 	}
 	
-	self.methodWrites:sort(function(a,b)
+	methodWrites:sort(function(a,b)
 		-- "This list must be sorted, 
 		--  where the defining type (by type_id index) is the major order,
 		--  method name (by string_id index) is the intermediate order,
@@ -2339,26 +2339,26 @@ function JavaASMDex:compile()
 	end)
 
 	-- fill in methods
-	if #self.methodWrites > 0 then
+	if #methodWrites > 0 then
 		align(4)
 		local header = ffi.cast(header_item_ptr, blob.data.v)
-		header.numMethods = #self.methodWrites
+		header.numMethods = #methodWrites
 		header.methodOfs = #blob
-		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodWrites}
-		for i,method in ipairs(self.methodWrites) do
+		self.map:insert{type='method_id_item', offset=#blob, count=#methodWrites}
+		for i,method in ipairs(methodWrites) do
 			blob:write(method)
 		end
 	end
 	
 	local function findMethod(class, name, sig)
-		return findUnique(self.methodWrites, encodeMethod(class, name, sig))
+		return findUnique(methodWrites, encodeMethod(class, name, sig))
 	end
 	self.findMethod = findMethod
 
 	-- mapping from 1-based methodWriteIndex to methods for later
-	self.methodWritesToOrigs = {}
+	local methodWritesToOrigs = {}
 	for _,method in ipairs(self.methods) do
-		self.methodWritesToOrigs[1+findMethod(method.class, method.name, method.sig)] = method
+		methodWritesToOrigs[1+findMethod(method.class, method.name, method.sig)] = method
 	
 		-- might as well build access flags here too
 		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
@@ -2412,8 +2412,8 @@ function JavaASMDex:compile()
 	-- at least write out code here:
 	local codeItemOfs = #blob
 	local codeItemCount = 0
-	for methodWriteIndex,methodWrite in ipairs(self.methodWrites) do
-		local method = self.methodWritesToOrigs[methodWriteIndex]
+	for methodWriteIndex,methodWrite in ipairs(methodWrites) do
+		local method = methodWritesToOrigs[methodWriteIndex]
 		if method
 		and method.code 
 		then
@@ -2521,19 +2521,19 @@ function JavaASMDex:compile()
 
 	-------- type lists (finally)
 
-	if #self.typeLists > 0 then
+	if #typeLists > 0 then
 		align(4)
-		self.map:insert{type='type_list', offset=#blob, count=#self.typeLists}
+		self.map:insert{type='type_list', offset=#blob, count=#typeLists}
 	
 		local typeListOfs = table()
-		for i,typeList in ipairs(self.typeLists) do
+		for i,typeList in ipairs(typeLists) do
 --DEBUG:print('writing typeList '..(i-1)..' ofs', #blob, 'data', string.hex(typeList))
 			typeListOfs[i] = #blob
 			blob:writeString(typeList)
 			align(4)		-- must be 4-byte-aligned *between* typelist entries...
 		end
 		-- now replace all proto type list indexes with offsets
-		for i=0,#self.protos-1 do
+		for i=0,#protos-1 do
 			local protoPtr = ffi.cast(
 				proto_id_item_ptr,
 				blob.data.v + ffi.cast(header_item_ptr, blob.data.v).protoOfs
@@ -2557,10 +2557,10 @@ function JavaASMDex:compile()
 
 	-------- string data
 
-	if #self.strings > 0 then
+	if #strings > 0 then
 		align(4)
-		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
-		for i,s in ipairs(self.strings) do
+		self.map:insert{type='string_data_item', offset=#blob, count=#strings}
+		for i,s in ipairs(strings) do
 			-- notice this ptr could go bad after any blob:write's
 			local stringOfsPtr = ffi.cast('uint32_t*', 
 				blob.data.v 
@@ -2583,8 +2583,8 @@ function JavaASMDex:compile()
 		-- collect all fields that are static vs instance
 		local staticFieldIndexes = table()	-- 1-based
 		local instanceFieldIndexes = table()	-- 1-based
-		for fieldWriteIndex=1,#self.fieldWrites do
-			local field = self.fieldWritesToOrigs[fieldWriteIndex]
+		for fieldWriteIndex=1,#fieldWrites do
+			local field = fieldWritesToOrigs[fieldWriteIndex]
 			if field
 			and field.class == class.thisClass
 			and field.accessFlags
@@ -2601,8 +2601,8 @@ function JavaASMDex:compile()
 		-- collect all methods that are direct vs virtual
 		local directMethodIndexes = table() 	-- 1-based
 		local virtualMethodIndexes = table()	-- 1-based
-		for methodWriteIndex=1,#self.methodWrites do
-			local method = self.methodWritesToOrigs[methodWriteIndex]
+		for methodWriteIndex=1,#methodWrites do
+			local method = methodWritesToOrigs[methodWriteIndex]
 			if method
 			and method.class == class.thisClass
 			and (
