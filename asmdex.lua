@@ -1977,6 +1977,41 @@ function JavaASMDex:compile()
 		end
 	end
 
+	-------- prelim traversal:
+	-- map prototype signatures to cached tables of their members
+	-- so I don't have to parse them over and over again
+	local protoPropsForSig = {}
+	traverse{
+		string = function(visit, str) end,
+		type = function(visit, typestr) end,
+		typelist = function(visit, typeStrs) end,
+		proto = function(visit, sigstr)
+			local protoProps = protoPropsForSig[sigstr]
+			if protoProps then return end
+
+			local sig = splitMethodJNISig(sigstr)
+			if not sig then error("failed to convert sigstr "..sigstr) end
+
+			protoProps = {}
+			protoProps.shorty = sig:mapi(function(sigi)
+				return #sigi > 1 and 'L' or sigi
+			end):concat()
+			protoProps.returnType = sig:remove(1)
+			protoProps.argTypes = sig
+			protoPropsForSig[sigstr] = protoProps
+		end,
+		field = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:type(sig)
+		end,
+		method = function(visit, class, name, sig)
+			visit:type(class)
+			visit:string(name)
+			visit:proto(sig)
+		end,
+	}
+
 	-------- first we accumulate our unique strings
 	
 	self.strings = table()
@@ -1995,12 +2030,10 @@ function JavaASMDex:compile()
 			end
 		end,
 		proto = function(visit, sigstr)
-			assert.type(sigstr, 'string')
-			local sig = splitMethodJNISig(sigstr)
-			if not sig then error("failed to convert sigstr "..sigstr) end
-			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
-			visit:type(table.remove(sig, 1))	-- returnType
-			visit:typelist(sig)
+			local protoProps = protoPropsForSig[sigstr]
+			visit:string(protoProps.shorty)
+			visit:type(protoProps.returnType)
+			visit:typelist(protoProps.argTypes)
 		end,
 		field = function(visit, class, name, sig)
 			visit:type(class)
@@ -2058,12 +2091,10 @@ function JavaASMDex:compile()
 			end
 		end,
 		proto = function(visit, sigstr)
-			assert.type(sigstr, 'string')
-			local sig = splitMethodJNISig(sigstr)
-			if not sig then error("failed to convert sigstr "..sigstr) end
-			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
-			visit:type(table.remove(sig, 1))	-- returnType
-			visit:typelist(sig)
+			local protoProps = protoPropsForSig[sigstr]
+			visit:string(protoProps.shorty)
+			visit:type(protoProps.returnType)
+			visit:typelist(protoProps.argTypes)
 		end,
 		field = function(visit, class, name, sig)
 			visit:type(class)
@@ -2119,12 +2150,10 @@ function JavaASMDex:compile()
 		end,
 		-- the rest is superclass'd
 		proto = function(visit, sigstr)
-			assert.type(sigstr, 'string')
-			local sig = splitMethodJNISig(sigstr)
-			if not sig then error("failed to convert sigstr "..sigstr) end
-			visit:string(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat())	-- "shorty"
-			visit:type(table.remove(sig, 1))	-- returnType
-			visit:typelist(sig)
+			local protoProps = protoPropsForSig[sigstr]
+			visit:string(protoProps.shorty)
+			visit:type(protoProps.returnType)
+			visit:typelist(protoProps.argTypes)
 		end,
 		field = function(visit, class, name, sig)
 			visit:type(class)
@@ -2153,13 +2182,11 @@ function JavaASMDex:compile()
 	-- maybe I can do this in the same pass as the type lists?
 
 	local function encodeProtoType(sigstr)
-		assert.type(sigstr, 'string')
-		local sig = splitMethodJNISig(sigstr)
-		if not sig then error("failed to convert sigstr "..sigstr) end
+		local protoProps = protoPropsForSig[sigstr]
 		return proto_id_item{
-			shortyIndex = findString(sig:mapi(function(sigi) return #sigi > 1 and 'L' or sigi end):concat()),
-			returnTypeIndex = findType(table.remove(sig, 1)),
-			argTypeListOfs = findTypeList(sig),
+			shortyIndex = findString(protoProps.shorty),
+			returnTypeIndex = findType(protoProps.returnType),
+			argTypeListOfs = findTypeList(protoProps.argTypes),
 		}
 	end
 
@@ -2400,19 +2427,20 @@ function JavaASMDex:compile()
 			-- and ctor-static (i.e. <clinit>) has a regsin=0 but regsout=1?
 			local isStaticNonCtor = method.isStatic and not method.isConstructor
 
-			local sig = splitMethodJNISig(method.sig)
+			local protoProps = protoPropsForSig[method.sig]
+			local returnType = protoProps.returnType
+
 --DEBUG:print(method.name, 'sig', require 'ext.tolua'(sig))
 			method.inferredRegsIn =
 				(method.isStatic and 0 or 1)
-				+ (sig:sub(2)	-- skip return type
-					:mapi(function(jnisigi)
+				+ (protoProps.argTypes:mapi(function(jnisigi)
 						return (jnisigi == 'J' or jnisigi == 'D') and 2 or 1
 					end):sum() or 0)
 			method.inferredRegsOut =
 				(isStaticNonCtor and 0 or 1)
 				+ (
-					(sig[1] == 'J' or sig[1] == 'D') and 2
-					or sig[1] == 'V' and 0
+					(returnType == 'J' or returnType == 'D') and 2
+					or returnType == 'V' and 0
 					or 1
 				)
 
