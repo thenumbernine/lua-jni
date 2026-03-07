@@ -45,30 +45,20 @@ function M:run(env)
 	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
 	if env._usingDex then
 		local JavaASMDex = require 'java.asmdex'
-		asmClass = JavaASMDex{
-			isPublic = true,
-			thisClass = newClassName,
-			superClass = 'java.lang.Object',
-			methods={
-				{	-- needs a ctor? even though it's never used?
-					isPublic = true,
-					name = '<init>',
-					sig = '()V',
-					code = [[
-; 'this' is already on the stack ...
-invoke-direct java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
-return-void
-]],
-				},
-				{
-					isNative = true,
-					isPublic = true,
-					isStatic = true,
-					name = M.runMethodName,
-					sig = M.runMethodSig,
-				},
-			},
-		}
+		asmClass = JavaASMDex:fromAsm(template[[
+.class public <?=newClassName?>	; no super? what does that do again?
+.super java.lang.Object
+.method public <init> ()V
+	; 'this' is already on the stack ...
+	invoke-direct java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
+	return-void
+.end method
+.method public static native <?=runMethodName?> <?=runMethodSig?>
+]],		{
+			newClassName = newClassName,
+			runMethodName = M.runMethodName,
+			runMethodSig = M.runMethodSig,
+		})
 	else
 		local JavaASMClass = require 'java.asmclass'
 		asmClass = JavaASMClass:fromAsm(template([[
