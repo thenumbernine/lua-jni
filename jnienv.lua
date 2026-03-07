@@ -579,8 +579,8 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 				return false
 			end
 		end
---DEBUG:print('(arg:_instanceof(sig))', (arg:_instanceof(sig)))
-		return (arg:_instanceof(sig))
+--DEBUG:print('(arg:instanceof(sig))', (arg:instanceof(sig)))
+		return (arg:instanceof(sig))
 	elseif t == 'string' then
 		if isPrimitive[sig] then
 			return false

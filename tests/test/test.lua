@@ -126,7 +126,7 @@ print('Test:test()', Test:test())
 
 print('Test:_super()', Test:_super())
 
-print('testObj instanceof Object', testObj:_instanceof(J.Object))
+print('testObj instanceof Object', testObj:instanceof(J.Object))
 local testObjAsObject = testObj:_cast(J.Object)
 print('(Object)testObj', testObjAsObject)
 local testObjAsObjectAsTest = testObjAsObject:_cast(Test)

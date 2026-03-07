@@ -112,6 +112,8 @@ end
 -- call this after creating JavaClass to fill its reflection contents
 -- TODO this is using getFields and getMethods
 -- should I use getDeclaredFields and getDeclaredMethods ?
+--	yes, because that can get private ones as well, and then I can change their accessibility at runtime.
+--  and also I can better calculate subclass distance for better calculating correct overload signature to use.
 -- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env

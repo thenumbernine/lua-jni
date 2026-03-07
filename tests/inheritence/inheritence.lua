@@ -105,14 +105,14 @@ print('a', a)
 print('b', b)	-- error
 print('c', c)
 
-print('a instanceof TestInheritenceA', a:_instanceof(TestInheritenceA))
-print('a instanceof TestInheritenceB', a:_instanceof(TestInheritenceB))
-print('a instanceof TestInheritenceC', a:_instanceof(TestInheritenceC))
+print('a instanceof TestInheritenceA', a:instanceof(TestInheritenceA))
+print('a instanceof TestInheritenceB', a:instanceof(TestInheritenceB))
+print('a instanceof TestInheritenceC', a:instanceof(TestInheritenceC))
 
-print('b instanceof TestInheritenceA', b:_instanceof(TestInheritenceA))
-print('b instanceof TestInheritenceB', b:_instanceof(TestInheritenceB))
-print('b instanceof TestInheritenceC', b:_instanceof(TestInheritenceC))
+print('b instanceof TestInheritenceA', b:instanceof(TestInheritenceA))
+print('b instanceof TestInheritenceB', b:instanceof(TestInheritenceB))
+print('b instanceof TestInheritenceC', b:instanceof(TestInheritenceC))
 
-print('c instanceof TestInheritenceA', c:_instanceof(TestInheritenceA))
-print('c instanceof TestInheritenceB', c:_instanceof(TestInheritenceB))
-print('c instanceof TestInheritenceC', c:_instanceof(TestInheritenceC))
+print('c instanceof TestInheritenceA', c:instanceof(TestInheritenceA))
+print('c instanceof TestInheritenceB', c:instanceof(TestInheritenceB))
+print('c instanceof TestInheritenceC', c:instanceof(TestInheritenceC))

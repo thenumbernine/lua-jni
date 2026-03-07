@@ -1475,7 +1475,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 		for i=0,count-1 do
 			local map = {}
 			local entry = mapItems[i]
---DEBUG:print('map src '..i..' = '..entry)			
+--DEBUG:print('map src '..i..' = '..entry)
 			if endianFlipped then flipEndianStruct(entry) end
 			map.type = assert.index(mapListTypes, entry.typeIndex)
 			map.count = entry.count
@@ -1923,7 +1923,7 @@ function JavaASMDex:compile()
 	})
 
 
-	-------- alright now we accumulate unique tables that we must later sort, 
+	-------- alright now we accumulate unique tables that we must later sort,
 	-- we build tables one at a time i guess to keep ourselves from needing to go back and modify references once we sort tables ...
 
 	-- just returns the index, nil if fails
@@ -1966,7 +1966,7 @@ function JavaASMDex:compile()
 				end
 			end
 		end
-		
+
 		for _,class in ipairs(self.classes) do
 			visit:type(class.thisClass)
 			visit:type(class.superClass)
@@ -2036,7 +2036,7 @@ function JavaASMDex:compile()
 	}))
 
 	-------- first we accumulate our unique strings
-	
+
 	local strings = table()
 	-- now override traverser fields one at a time as we process each type ... and sort it ... and maybe write it ...
 	traverser.string = function(visit, str)
@@ -2066,7 +2066,7 @@ function JavaASMDex:compile()
 		end
 	end
 
-	local function findString(s) 
+	local function findString(s)
 		return assert(findUnique(strings, s))
 	end
 	self.findString = findString
@@ -2161,7 +2161,7 @@ function JavaASMDex:compile()
 	end)
 
 	-- and write it while you're here
-	-- mind you we will have to go back and modify it to update to the argTypeListOfs whereever we write that list 
+	-- mind you we will have to go back and modify it to update to the argTypeListOfs whereever we write that list
 	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
 	if #protos > 0 then
 		align(4)
@@ -2200,7 +2200,7 @@ function JavaASMDex:compile()
 	traverse(traverser)
 
 	fieldWrites:sort(function(a,b)
-		-- "This list must be sorted, 
+		-- "This list must be sorted,
 		--  where the defining type (by type_id index) is the major order,
 		--  field name (by string_id index) is the intermediate order,
 		--  and type (by type_id index) is the minor order."
@@ -2251,9 +2251,9 @@ function JavaASMDex:compile()
 		addUnique(methodWrites, encodeMethod(class, name, sig))
 	end
 	traverse(traverser)
-	
+
 	methodWrites:sort(function(a,b)
-		-- "This list must be sorted, 
+		-- "This list must be sorted,
 		--  where the defining type (by type_id index) is the major order,
 		--  method name (by string_id index) is the intermediate order,
 		--  and method prototype (by proto_id index) is the minor order."
@@ -2273,7 +2273,7 @@ function JavaASMDex:compile()
 			blob:write(method)
 		end
 	end
-	
+
 	local function findMethod(class, name, sig)
 		return findUnique(methodWrites, encodeMethod(class, name, sig))
 	end
@@ -2283,7 +2283,7 @@ function JavaASMDex:compile()
 	local methodWritesToOrigs = {}
 	for _,method in ipairs(self.methods) do
 		methodWritesToOrigs[1+findMethod(method.class, method.name, method.sig)] = method
-	
+
 		-- might as well build access flags here too
 		method.accessFlags = getFlagsFromObj(method, methodAccessFlags)
 	end
@@ -2317,7 +2317,7 @@ function JavaASMDex:compile()
 	align(4)
 
 
-	---------------- HEADER END, DATA BEGIN ---------------- 
+	---------------- HEADER END, DATA BEGIN ----------------
 
 
 	-- keep track of where the headers structures end
@@ -2339,7 +2339,7 @@ function JavaASMDex:compile()
 	for methodWriteIndex,methodWrite in ipairs(methodWrites) do
 		local method = methodWritesToOrigs[methodWriteIndex]
 		if method
-		and method.code 
+		and method.code
 		then
 			align(4)
 			-- save codeOfs for later for class data
@@ -2393,7 +2393,7 @@ function JavaASMDex:compile()
 			local codeData = cblob:compile()
 
 			codeItemCount = codeItemCount + 1
-	
+
 			local codeItem = code_item{
 				maxRegs = method.maxRegs or method.inferredMaxRegs,
 				regsIn = method.regsIn or method.inferredRegsIn,
@@ -2405,10 +2405,10 @@ function JavaASMDex:compile()
 			if endianFlipped then flipEndianStruct(codeItem) end
 			blob:write(codeItem)
 			blob:writeString(codeData)
-			
+
 			if bit.band(3, #blob) == 2 then blob:writeu2(0) end
 			assert.eq(bit.band(3, #blob), 0, "#blob supposed to be 4-byte aligned")
-		
+
 
 			if method.tries then
 				for _,try in ipairs(method.tries) do
@@ -2448,7 +2448,7 @@ function JavaASMDex:compile()
 	if #typeLists > 0 then
 		align(4)
 		self.map:insert{type='type_list', offset=#blob, count=#typeLists}
-	
+
 		local typeListOfs = table()
 		for i,typeList in ipairs(typeLists) do
 --DEBUG:print('writing typeList '..(i-1)..' ofs', #blob, 'data', string.hex(typeList))
@@ -2486,8 +2486,8 @@ function JavaASMDex:compile()
 		self.map:insert{type='string_data_item', offset=#blob, count=#strings}
 		for i,s in ipairs(strings) do
 			-- notice this ptr could go bad after any blob:write's
-			local stringOfsPtr = ffi.cast('uint32_t*', 
-				blob.data.v 
+			local stringOfsPtr = ffi.cast('uint32_t*',
+				blob.data.v
 				+ ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs
 			)
 			stringOfsPtr[i-1] = #blob
@@ -2593,7 +2593,7 @@ function JavaASMDex:compile()
 		self.map:insert{type='class_data_item', offset=classDataOfs, count=classDataCount}
 	end
 
-	-- the dex files I'm looking at will have a single empty entry for annotations ... 
+	-- the dex files I'm looking at will have a single empty entry for annotations ...
 	-- ... even if every class def has annotation ofs set to 0 ...
 	align(4)
 	self.map:insert{type='annotation_set_item', offset=#blob, count=1}

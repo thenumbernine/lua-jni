@@ -135,12 +135,13 @@ function JavaObject:_javaToString()
 	--]]
 end
 
-function JavaObject:_instanceof(classTo)
+-- TODO maybe I can call this 'instanceof' anyways since its a reserved-word in Java ...
+function JavaObject:instanceof(classTo)
 	return self:_getClass():_isAssignableFrom(classTo)
 end
 
 function JavaObject:_cast(classTo)
-	local can, classTo = self:_instanceof(classTo)
+	local can, classTo = self:instanceof(classTo)
 	if not can then return end
 	return JavaObject{
 		env = self._env,

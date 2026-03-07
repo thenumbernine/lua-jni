@@ -139,7 +139,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl = obj:_getClass()` = get class
 
-- `bool = obj:_instanceof(classTo)` = tests if it can cast, returns boolean.
+- `bool = obj:instanceof(classTo)` = tests if it can cast, returns boolean.
 
 - `castObj = obj:_cast(classTo)` = cast obj to class `classTo`.  Accepts a JavaClass, a string for a classpath, or a cdata of a jclass.
 
@@ -403,8 +403,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
 - Add fields to JavaClass, JavaField, and JavaMethod.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ...
-- make a full `.javasm` parser for JavaASMClass.
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...
 - JavaObject `.this` and `.super` for nonvirtual qualified lookup wrapper.
-- string-reading and type-inference in text-based assembler
-- redo asmclass and asmdex with lua-struct, but redo lua-struct to be anonymous-friendly, `__new`-friendly, and therefore `ffi.typeof`-friendly...
+- type-inference in text-based assembler
