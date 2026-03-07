@@ -2134,12 +2134,10 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	end
 
 	-- fill in protos ... notice, proto arg lists probably go in that generic data clump
-	local protoDefOfs
 	if #self.protos > 0 then
 		align(4)
 		ffi.cast(header_item_ptr, blob.data.v).protoOfs = #blob
 		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
-		protoDefOfs = #blob
 		for i,proto in ipairs(self.protos) do
 			-- proto+8 is the args offset, which will need to be replaced later
 			assert.len(proto, 12)
@@ -2178,21 +2176,19 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
 	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
-local startOfs = #blob
---DEBUG:print('writing class thisClassIndex', class.thisClassIndex)
-		blob:writeu4(class.thisClassIndex)
---DEBUG:print('writing class accessFlags', class.accessFlags)
-		blob:writeu4(class.accessFlags)
---DEBUG:print('writing class superClassIndex', class.superClassIndex)
-		blob:writeu4(class.superClassIndex)
---DEBUG:print('writing class interfaceIndex', class.interfaceIndex)
-		blob:writeu4(class.interfaceIndex)	-- fill in interface-offset later
---DEBUG:print('writing class sourceFileIndex', class.sourceFileIndex)
-		blob:writeu4(class.sourceFileIndex)
-		blob:writeu4(0)	-- fill in annotation-offset later
-		blob:writeu4(0)	-- fill in data-offset later
-		blob:writeu4(0)	-- fill in static-value-offset later
-assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
+		local item = class_def_item{
+			thisClassIndex = class.thisClassIndex,
+			accessFlags = class.accessFlags,
+			superClassIndex = class.superClassIndex,
+			interfacesOfs = class.interfaceIndex,	-- remap from typelist index to offset later ...
+			sourceFileIndex = class.sourceFileIndex,
+			-- ... fill in annotation-offset later
+			-- ... fill in data-offset later
+			-- ... fill in static-value-offset later
+		}
+		-- endian-flip now only if nobody in the future is going to write to this,
+		-- and I think someone is still going to...
+		blob:write(item)
 	end
 
 	-- keep track of where the headers structures end
@@ -2236,29 +2232,29 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 		end
 		-- now replace all proto type list indexes with offsets
 		for i=0,#self.protos-1 do
-			local protoArgTypeListPtr = ffi.cast('uint32_t*',
+			local protoPtr = ffi.cast(
+				proto_id_item_ptr,
 				blob.data.v
-				+ protoDefOfs
-				+ ffi.offsetof(proto_id_item, 'argTypeListOfs')
-				+ ffi.sizeof(proto_id_item) * i
-			)
-			if protoArgTypeListPtr[0] ~= 0 then
---DEBUG:local from = protoArgTypeListPtr[0]
-				protoArgTypeListPtr[0] = assert.index(typeListOfs, protoArgTypeListPtr[0])
---DEBUG:print('changing protoArgTypeListPtr from', from, 'to', protoArgTypeListPtr[0])
+				+ ffi.cast(header_item_ptr, blob.data.v).protoOfs
+			) + i
+			
+			if protoPtr.argTypeListOfs ~= 0 then
+--DEBUG:local from = protoPtr.argTypeListOfs
+				protoPtr.argTypeListOfs = assert.index(typeListOfs, protoPtr.argTypeListOfs)
+--DEBUG:print('changing proto['..i..'].argTypeListOfs from', from, 'to', protoPtr.argTypeListOfs)
 			end
 		end
 		-- now replace all class interfaceIndexes
 		for i=0,#self.classes-1 do
-			local classInterfaceTypeListPtr = ffi.cast('uint32_t*',
+			local classDefPtr = ffi.cast(
+				class_def_item_ptr,
 				blob.data.v
-				+ classDefOfs
-				+ ffi.offsetof(class_def_item, 'interfacesOfs')
-				+ ffi.sizeof(class_def_item) * i)
-			if classInterfaceTypeListPtr[0] ~= 0 then
---DEBUG:local from = classInterfaceTypeListPtr[0]
-				classInterfaceTypeListPtr[0] = assert.index(typeListOfs, classInterfaceTypeListPtr[0])
---DEBUG:print('changing classInterfaceTypeListPtr from', from, 'to', classInterfaceTypeListPtr[0])
+				+ ffi.cast(header_item_ptr, blob.data.v).classOfs
+			) + i
+			if classDefPtr.interfacesOfs ~= 0 then
+--DEBUG:local from = classDefPtr.interfacesOfs
+				classDefPtr.interfacesOfs = assert.index(typeListOfs, classDefPtr.interfacesOfs)
+--DEBUG:print('changing classInterfaceTypeListPtr from', from, 'to', classDefPtr.interfacesOfs)
 			end
 		end
 	end
@@ -2273,12 +2269,17 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 			codeItemCount = codeItemCount + 1
 			-- save for later for class data
 			method.codeOfs = #blob
-			blob:writeu2(method.maxRegs or method.inferredMaxRegs)
-			blob:writeu2(method.regsIn or method.inferredRegsIn)
-			blob:writeu2(method.regsOut or method.inferredRegsOut)
-			blob:writeu2(method.tries and #method.tries or 0)
-			blob:writeu4(0)	-- debugInfoOfs
-			blob:writeu4(bit.rshift(#method.codeData, 1))	-- instructions size in uint16_t's
+			local codeItem = code_item{
+				maxRegs = method.maxRegs or method.inferredMaxRegs,
+				regsIn = method.regsIn or method.inferredRegsIn,
+				regsOut = method.regsOut or method.inferredRegsOut,
+				numTries = method.tries and #method.tries or 0,
+				debugInfoOfs = 0,
+				instSize = bit.rshift(#method.codeData, 1),	-- instructions size in uint16_t's
+			}
+			if endianFlipped then flipEndianStruct(codeItem) end
+			blob:write(codeItem)
+
 			blob:writeString(method.codeData)
 
 			if bit.band(3, #blob) == 2 then blob:writeu2(0) end
