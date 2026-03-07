@@ -1685,7 +1685,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						end
 
 						if debugInfoOfs ~= 0 then
-io.stderr:write'!!! TODO !!! debugInfoOfs\n'
+io.stderr:write('!!! TODO !!! debugInfoOfs '..debugInfoOfs..'\n')
 						end
 
 						blob.ofs = push
@@ -2092,7 +2092,7 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 
 	blob:write(header_item{
 		magic = "dex\n",
-		version = 0x393330,	-- little endian
+		version = 0x393330,
 		-- skip checksum
 		-- skip sha1sig
 		-- skip fileSize
@@ -2105,30 +2105,18 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		numMethods = #self.methodBlobs,
 		numClasses = #self.classes,
 	})
-assert.eq(#blob, ffi.sizeof(header_item))
 
-	local mapOfsOfs = ffi.offsetof(header_item, 'mapOfs')
-	local stringOfsOfs = ffi.offsetof(header_item, 'stringOfsOfs')
-	local typeOfs = ffi.offsetof(header_item, 'typeOfs')
-	local protoOfs = ffi.offsetof(header_item, 'protoOfs')
-	local fieldOfs = ffi.offsetof(header_item, 'fieldOfs')
-	local methodOfs = ffi.offsetof(header_item, 'methodOfs')
-	local classOfs = ffi.offsetof(header_item, 'classOfs')
-	local dataSizeOfs = ffi.offsetof(header_item, 'dataSize')
-
-
-	local stringOfs
 	if #self.strings > 0 then
 		align(4)
 		-- fill in the string-offset-to-offsets location ... which is redundantly the header size as well ...
-		ffi.cast('uint32_t*', blob.data.v + stringOfsOfs)[0] = #blob
+		ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs = #blob
 		self.map:insert{type='string_id_item', offset=#blob, count=#self.strings}
 		-- after header comes string_id_list ... i'm guessing that means first the offsets to string data, next the string data itself?
 		-- looks like from the dex file i'm reading that the offsets-to-offsets come first,
 		--  then the offsets to string data comes much much later in the file.
 		--  maybe in the "support data" section?
-		stringOfs = #blob
-		-- write placeholders for offsets
+		-- write placeholders for offsets,
+		-- fill them in later when we write the string data
 		for i=0,#self.strings-1 do
 			blob:writeu4(0)
 		end
@@ -2137,7 +2125,7 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	-- fill in the type offsets
 	if #self.types > 0 then
 		align(4)
-		ffi.cast('uint32_t*', blob.data.v + typeOfs)[0] = #blob
+		ffi.cast(header_item_ptr, blob.data.v).typeOfs = #blob
 		self.map:insert{type='type_id_item', offset=#blob, count=#self.types}
 		for i,typeData in ipairs(self.types) do
 			assert.len(typeData, 4)	-- should be already serialized
@@ -2149,7 +2137,7 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	local protoDefOfs
 	if #self.protos > 0 then
 		align(4)
-		ffi.cast('uint32_t*', blob.data.v + protoOfs)[0] = #blob
+		ffi.cast(header_item_ptr, blob.data.v).protoOfs = #blob
 		self.map:insert{type='proto_id_item', offset=#blob, count=#self.protos}
 		protoDefOfs = #blob
 		for i,proto in ipairs(self.protos) do
@@ -2162,7 +2150,7 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	-- fill in fields
 	if #self.fieldBlobs > 0 then
 		align(4)
-		ffi.cast('uint32_t*', blob.data.v + fieldOfs)[0] = #blob
+		ffi.cast(header_item_ptr, blob.data.v).fieldOfs = #blob
 		self.map:insert{type='field_id_item', offset=#blob, count=#self.fieldBlobs}
 		for i,field in ipairs(self.fieldBlobs) do
 			assert.len(field, 8)
@@ -2173,7 +2161,7 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	-- fill in methods
 	if #self.methodBlobs > 0 then
 		align(4)
-		ffi.cast('uint32_t*', blob.data.v + methodOfs)[0] = #blob
+		ffi.cast(header_item_ptr, blob.data.v).methodOfs = #blob
 		self.map:insert{type='method_id_item', offset=#blob, count=#self.methodBlobs}
 		for i,method in ipairs(self.methodBlobs) do
 --DEBUG:print('writing method', i-1, require 'ext.string'.hex(method))
@@ -2186,7 +2174,7 @@ assert.eq(#blob, ffi.sizeof(header_item))
 	assert.gt(#self.classes, 0) 	-- otherwise why are we here...
 	align(4)
 --DEBUG:print('write classDataOfs', #blob)
-	ffi.cast('uint32_t*', blob.data.v + classOfs)[0] = #blob
+	ffi.cast(header_item_ptr, blob.data.v).classOfs = #blob
 	self.map:insert{type='class_def_item', offset=#blob, count=#self.classes}
 	local classDefOfs = #blob
 	for i,class in ipairs(self.classes) do
@@ -2223,9 +2211,13 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 	if #self.strings > 0 then
 		self.map:insert{type='string_data_item', offset=#blob, count=#self.strings}
 		for i,s in ipairs(self.strings) do
-			local ptr = ffi.cast('uint32_t*', blob.data.v + stringOfs + 4 * (i-1))
---DEBUG:local from = ptr[0]
-			ptr[0] = #blob
+			-- notice this ptr could go bad after any blob:write's
+			local stringOfsPtr = ffi.cast('uint32_t*', 
+				blob.data.v 
+				+ ffi.cast(header_item_ptr, blob.data.v).stringOfsOfs
+			)
+--DEBUG:local from = stringOfsPtr[i-1]
+			stringOfsPtr[i-1] = #blob
 --DEBUG:print('changing string data item from', from, 'to', #blob)
 			blob:writeUleb128(#s)
 			blob:writeString(s)
@@ -2441,12 +2433,14 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 --DEBUG:print('changing mapOfs from', from, 'to', #blob)
 		blob:writeu4(#self.map)
 		for _,entry in ipairs(self.map) do
-			blob:write(map_item{
+			local item = map_item{
 				typeIndex = assert.index(mapListTypeForName, entry.type),
 				unused = 0,
 				count = entry.count,
 				offset = entry.offset,
-			})
+			}
+			if endianFlipped then flipEndianStruct(item) end
+			blob:write(item)
 		end
 	end
 
@@ -2467,6 +2461,10 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 --DEBUG:local from = header.fileSize
 	header.fileSize = #blob
 --DEBUG:print('changing fileSize from', from, 'to', header.fileSize)
+
+	-- now that header offsets are filled out and everything is done but checksums,
+	-- flip header endian-ness
+	if endianFlipped then flipEndianStruct(header) end
 
 	-- now sha1 checksum TODO
 	local sha1Ofs = ffi.offsetof(header_item, 'sha1sig')
