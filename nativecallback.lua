@@ -50,7 +50,10 @@ function M:run(env)
 .super java.lang.Object
 .method public <init> ()V
 	# 'this' is already on the stack ...
-	invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
+	#invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
+	# TODO I don't yet translate classnames of invokes ...
+	#  so you have to use .dex preferred L//; format
+	invoke-direct Ljava/lang/Object; <init> ()V	# call ((java.lang.Object)this).<init>()
 	return-void
 .end method
 .method public static native <?=runMethodName?> <?=runMethodSig?>
