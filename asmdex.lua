@@ -312,7 +312,7 @@ end
 local Instr = class()
 Instr.insert = table.insert
 Instr.append = table.append
-function Instr:traverse(visit) end	-- accumulate any unique constants, ... before we have to sort them ... and then re-visit them all again to get their correct indexes ... fucking stupid Google ...
+function Instr:traverse(visit) end	-- accumulate any unique constants, ... before we have to sort them ... and then re-visit them all again to get their correct indexes ... smh
 
 local Instr10x = Instr:subclass()
 function Instr10x:read(hi, blob, asm)
@@ -465,7 +465,7 @@ end
 function Instr21c_type:maxRegs()
 	return readreg(self[2]) + 1
 end
-function Instr21c_string:traverse(visit)
+function Instr21c_type:traverse(visit)
 	visit:type(self[3])
 end
 
@@ -1463,7 +1463,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 
 	-- wait is this redundant to the subsequent structures?
 	-- or is this the equivalent of the old "constants" table in .class files?
-	-- it's redundant.  and stupid.
+	-- it's redundant.
 	-- "This is a list of the entire contents of a file, in order."
 	-- "Additionally, the map entries must be ordered by initial offset and must not overlap."
 	-- Does one of those two statements imply it is supposed to be sorted by type?  Because the one that android is spitting out is not sorted by type...
@@ -1481,7 +1481,7 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 			map.count = entry.count
 			map.offset = entry.offset
 			self.map:insert(map)
-print('map['..i..'] = '..require 'ext.tolua'(map))
+--DEBUG:print('map['..i..'] = '..require 'ext.tolua'(map))
 		end
 	end
 
@@ -2014,7 +2014,7 @@ function JavaASMDex:compile()
 		end,
 	}
 
-	-- sort strings for no reason except to jump through stupid hoops Google added just to be stupid.
+	-- sort strings for no reason except to jump through hoops Google added
 	self.strings:sort()
 
 	-- might as well write them out, they aren't going anywhere
@@ -2077,7 +2077,7 @@ function JavaASMDex:compile()
 		end,
 	}
 
-	self.types:sort()	-- sort because Google is fucking stupid
+	self.types:sort()	-- sort because Google
 
 	-- fill in the type offsets
 	if #self.types > 0 then
@@ -2499,9 +2499,10 @@ function JavaASMDex:compile()
 	
 		local typeListOfs = table()
 		for i,typeList in ipairs(self.typeLists) do
---DEBUG:print('writing typeList ofs', #blob, 'data', string.hex(typeList))
+--DEBUG:print('writing typeList '..(i-1)..' ofs', #blob, 'data', string.hex(typeList))
 			typeListOfs[i] = #blob
 			blob:writeString(typeList)
+			align(4)		-- must be 4-byte-aligned *between* typelist entries...
 		end
 		-- now replace all proto type list indexes with offsets
 		for i=0,#self.protos-1 do
