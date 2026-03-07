@@ -30,8 +30,16 @@ local dexBC = assert(dexfn:read())
 print(dexfn)
 print()
 
+-------- first file
+
 print('original bytecode:')
-print(string.hexdump(dexBC, 48))
+print(string.hexdump(dexBC, 16))
+print()
+
+print'dexdump'
+io.stdout:flush()
+os.exec(toolsDir/'dexdump'..' '..dexfn..' 2>&1')
+io.stdout:flush()
 print()
 
 local asmDex = JavaASMDex(dexBC)
@@ -39,20 +47,46 @@ print('JavaASMDex:')
 print(require'ext.tolua'(asmDex))	-- original bytecode's lua structure
 print()
 
+-------- second file
+
 local bytes = asmDex:compile()
 print'recompiled bytecode:'
-print(string.hexdump(bytes, 48))
+print(string.hexdump(bytes, 16))
 print()
+
+local tmp = path'tmp.dex'
+tmp:write(bytes)
+print'dexdump'
+io.stdout:flush()
+os.exec(toolsDir/'dexdump'..' '..tmp..' 2>&1')
+io.stdout:flush()
+print()
+tmp:remove()
 
 print('2nd read into JavaASMDex:')
 local try2 = JavaASMDex(bytes)
 print(require'ext.tolua'(try2))		-- write #1 bytecode's lua structure
 print()
 
+-------- third file
+
 local bytes2 = try2:compile()
 print'2nd recompiled bytecode:'
-print(string.hexdump(bytes2, 48))
+print(string.hexdump(bytes2, 16))
 if bytes ~= bytes2 then error("recompile didn't match first compile") end
+
+tmp:write(bytes2)
+print'dexdump'
+io.stdout:flush()
+os.exec(toolsDir/'dexdump'..' '..tmp..' 2>&1')
+io.stdout:flush()
+print()
+tmp:remove()
+
+print('2nd recompiled into JavaASMDex:')
+local try3 = JavaASMDex(bytes2)
+print(require'ext.tolua'(try3))		-- write #1 bytecode's lua structure
+
 
 -- TODO here use java-asm's validator to spit out stuff about it
 -- TODO maybe here too use javap to spit out stuff about it

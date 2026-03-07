@@ -1885,9 +1885,11 @@ function JavaASMDex:compile()
 	-- return 0-based index into types
 	local function addType(str)
 		assert.type(str, 'string')
+		
 		local w = WriteBlobLE()
 		local stringIndex = addString(str)
 		w:writeu4(stringIndex)
+		
 		local b = w:compile()
 		local typeIndex = addUnique(self.types, b)
 --DEBUG:print('adding type '..typeIndex..' = '..string.hex(b)..' to string '..self.strings[stringIndex+1])
@@ -1913,6 +1915,12 @@ function JavaASMDex:compile()
 	end
 
 	-- return 0-based index into protos
+	-- TODO TODO TODO
+	-- Google is so fucking stupid
+	-- You can't just build a unique list,
+	-- you have to **SORT IT** by 1) return type and then 2) type list index
+	-- THAT FORCES YOU TO COLLECT ALL PROTOS FROM ALL SOURCES, THEN SORT THE LIST, THEN GO BACK AND REWRITE EVERY REFERNCE INTO THE PROTO TABLE
+	local protoRefs = table()
 	local function addProto(sigstr)
 --DEBUG:print('addProto', sigstr)
 		assert(sigstr)
@@ -1946,6 +1954,19 @@ function JavaASMDex:compile()
 		local b = w:compile()
 		local protoIndex = addUnique(self.protos, b)
 --DEBUG:print('adding proto', protoIndex, string.hex(b), 'for sig', sigstr)
+		
+		-- later sort proto list, and rewrite this location to the remapped proto index
+		-- this is called from 
+		-- ... instrReadProto, which writes a uint16_t ...
+		--	... which is called from instruction build, from classdef codedef
+		-- ... addMethod, also uint16_t
+		--	... which comes from method serialization.
+		-- at least Google isn't so retarded that they write their proto refs in different prim types, which would make the job of rewriting after remapping that much more difficult.
+		-- BUT HOLD MY BEER FUCKING RETARDS
+		-- you need the code to be serialized already
+		-- so the blob ofs of serialized code is dif from the main file blob ofs
+		--  so this wont work either
+
 		return protoIndex
 	end
 	self.addProto = addProto
@@ -2077,6 +2098,13 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		-- and # direct (aka static|private|ctor) and # non-direct methods
 	end
 
+	
+
+	-- okeey first past, got the code, but more importantly ...
+	-- ... we have collected all our unique types and strings
+	-- now THROW THIS AWAY BECAUSE GOOGLE IS FUCKING STUPID
+	-- and then we sort all those types / protos / etc.
+	-- and THEN WE REDO EVERYTHING AGAIN to get the correct sorted indexes.
 
 
 	self.map = table()
@@ -2217,6 +2245,9 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 --DEBUG:print('changing string data item from', from, 'to', #blob)
 			blob:writeUleb128(#s)
 			blob:writeString(s)
+			-- and all strings are null-term'd one extra byte past their reported lenght I guess, so that in-file they can act as pascal strings or C strings?
+			-- is everything in a .dex file needlessly redundant and bloated?
+			blob:writeu1(0)
 		end
 	end
 
@@ -2259,7 +2290,9 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 		end
 	end
 
-	-- now fill in the class data's method data's instruction data ... before I fill in the method data's code offset as a uleb128 which is going to vary based on its size...
+	-- now fill in the class data's method data's instruction data ... 
+	-- ... before I fill in the method data's code offset as a uleb128 
+	-- ... which is going to vary based on its size...
 	align(4)
 	local codeItemOfs = #blob
 	local codeItemCount = 0

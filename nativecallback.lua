@@ -46,11 +46,11 @@ function M:run(env)
 	if env._usingDex then
 		local JavaASMDex = require 'java.asmdex'
 		asmClass = JavaASMDex:fromAsm(template[[
-.class public <?=newClassName?>	; no super? what does that do again?
+.class public <?=newClassName?>	# no super? what does that do again?
 .super java.lang.Object
 .method public <init> ()V
-	; 'this' is already on the stack ...
-	invoke-direct java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
+	# 'this' is already on the stack ...
+	invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
 	return-void
 .end method
 .method public static native <?=runMethodName?> <?=runMethodSig?>
@@ -65,9 +65,9 @@ function M:run(env)
 .class public super <?=newClassName?>
 .super java.lang.Object
 .method public <init> ()V
-	aload_0		; push 'this'
-	invokespecial java.lang.Object <init> ()V	; call ((java.lang.Object)this).<init>()
-	return		; aka return-void ... should I try to match up the syntaxes?
+	aload_0		# push 'this'
+	invokespecial java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
+	return		# aka return-void ... should I try to match up the syntaxes?
 .end method
 .method public static native <?=runMethodName?> <?=runMethodSig?>
 .end method
