@@ -79,6 +79,7 @@ local header_item = struct{
 		-- then there's supposed to be containerSize and headerOffset, but neither are present in the dex file I'm getting from android...
 	},
 }
+local header_item_ptr = ffi.typeof('$*', header_item)
 
 local map_item = struct{
 	anonymous = true,
@@ -2106,9 +2107,6 @@ assert.eq(method.methodIndex+1, i, "did you insert two matching methods?")
 	})
 assert.eq(#blob, ffi.sizeof(header_item))
 
-	local checksumOfs = ffi.offsetof(header_item, 'checksum')
-	local sha1Ofs = ffi.offsetof(header_item, 'sha1sig')
-	local fileSizeOfs = ffi.offsetof(header_item, 'fileSize')
 	local mapOfsOfs = ffi.offsetof(header_item, 'mapOfs')
 	local stringOfsOfs = ffi.offsetof(header_item, 'stringOfsOfs')
 	local typeOfs = ffi.offsetof(header_item, 'typeOfs')
@@ -2210,6 +2208,7 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 	end
 
 	-- keep track of where the headers structures end
+	-- and where the support data begins
 	local datasStartOfs = #blob
 
 	-- TODO fill in call sites here
@@ -2436,48 +2435,51 @@ assert.eq(startOfs + ffi.sizeof(class_def_item), #blob)	-- TODO structs ...
 	if #self.map > 0 then	-- should always be true
 		align(4)
 		self.map:insert{type='map_list', offset=#blob, count=1}
-		local ptr = ffi.cast('uint32_t*', blob.data.v + mapOfsOfs)
---DEBUG:local from = ptr[0]
-		ptr[0] = #blob
+		local header = ffi.cast(header_item_ptr, blob.data.v)
+--DEBUG:local from = header.mapOfs
+		header.mapOfs = #blob
 --DEBUG:print('changing mapOfs from', from, 'to', #blob)
 		blob:writeu4(#self.map)
 		for _,entry in ipairs(self.map) do
-			blob:writeu2((assert.index(mapListTypeForName, entry.type)))
-			blob:writeu2(0)	-- unused
-			blob:writeu4(entry.count)
-			blob:writeu4(entry.offset)
+			blob:write(map_item{
+				typeIndex = assert.index(mapListTypeForName, entry.type),
+				unused = 0,
+				count = entry.count,
+				offset = entry.offset,
+			})
 		end
 	end
 
+	-- now the entirety of blob.data is done
+	-- don't touch it anymore
+	-- now we fill in header info pertaining to the whole file
+
+	local header = ffi.cast(header_item_ptr, blob.data.v)
+
 	-- finally write the data section,
 	-- which starts after the header's tables and ends here
-	local ptr = ffi.cast('uint32_t*', blob.data.v + dataSizeOfs)
---DEBUG:local from = ptr[0]
-	ptr[0] = datasStartOfs
---DEBUG:print('changing datasStart from', from, 'to', ptr[0])
-	local ptr = ffi.cast('uint32_t*', blob.data.v + dataSizeOfs + 4)
---DEBUG:local from = ptr[0]
-	ptr[0] = #blob - datasStartOfs
---DEBUG:print('changing datasOfs from', from, 'to', ptr[0])
-	local ptr = ffi.cast('uint32_t*', blob.data.v + fileSizeOfs)
---DEBUG:local from = ptr[0]
-	ptr[0] = #blob
---DEBUG:print('changing fileSize from', from, 'to', ptr[0])
+--DEBUG:local from = header.datasOfs
+	header.datasOfs = datasStartOfs
+--DEBUG:print('changing datasStart from', from, 'to', header.datasOfs)
+--DEBUG:local from = header.dataSize
+	header.dataSize = #blob - datasStartOfs
+--DEBUG:print('changing datasOfs from', from, 'to', header.dataSize)
+--DEBUG:local from = header.fileSize
+	header.fileSize = #blob
+--DEBUG:print('changing fileSize from', from, 'to', header.fileSize)
 
 	-- now sha1 checksum TODO
-	local ptr = ffi.cast('uint8_t*', blob.data.v + sha1Ofs)
-	local sha1sig = sha2.sha1(ffi.string(ptr + 20, #blob - sha1Ofs - 20))
+	local sha1Ofs = ffi.offsetof(header_item, 'sha1sig')
+	local sha1sig = sha2.sha1(ffi.string(header.sha1sig + 20, #blob - sha1Ofs - 20))
 --DEBUG:print('sha1sig', sha1sig)
-	assert.len(sha1sig, 40)
+	assert.len(assert.type(sha1sig, 'string'), 40)
 	sha1sig = string.unhex(sha1sig)
-	assert.type(sha1sig, 'string')
-	assert.len(sha1sig, 20)
-	ffi.copy(ptr, sha1sig, 20)
+	assert.len(assert.type(sha1sig, 'string'), 20)
+	ffi.copy(header.sha1sig, sha1sig, 20)
 
 	-- now adler
-	local ptr = ffi.cast('uint8_t*', blob.data.v + checksumOfs)
-	local checksum = adler32(ptr + 4, #blob - checksumOfs - 4)
-	ffi.cast('uint32_t*', ptr)[0] = checksum
+	local checksumOfs = ffi.offsetof(header_item, 'checksum')
+	header.checksum  = adler32(blob.data.v + checksumOfs + 4, #blob - checksumOfs - 4)
 --DEBUG:print('adler32', '0x'..bit.tohex(checksum, 8))
 	-- TODO remove temp write fields?
 
