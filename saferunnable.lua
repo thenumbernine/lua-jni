@@ -1,6 +1,8 @@
 --[[
 Implementation of the lua-thread project thread/lite.lua but for java/vm.lua usage
 
+Also packs and unpacks Java arguments similar to what JavaLuaClass calls would do.
+
 This is *not* a wrapper for java.lang.Thread (like the other Lua files are wrappers of Java classes).
 ... maybe it'll become one? not sure...
 
@@ -30,6 +32,23 @@ function LiteThread.Lua:__gc() end
 --]]
 
 local M = {}
+
+--[[
+-- how to track java object garbage collection
+-- https://stackoverflow.com/questions/74373440/how-to-garbage-collect-callbacks-with-weak-references-in-java
+function M:trackJavaObject(env, obj)
+	if not M.queue then
+		M.queue = env.java.lang.ref.ReferenceQueue()
+		local weakRef = env.java.lang.ref.WeakReference(obj, queue)
+
+		-- start a monitoring thread here ...
+		-- ... can I do it on same thread? probably not?
+		-- hmm chicken and the egg, I want to use this for thread cleanup ...
+		-- maybe that means I have to run one and only one of these to handle all my java cleanup?
+		--
+	end
+end
+--]]
 
 --[[
 args:
@@ -71,6 +90,9 @@ function M:run(args)
 
 	-- it would be nice to have a java-on-gc callback so that I could associate this Lua object with the jobject
 	--  and then only clean up the associated resources (callback, sub-lua-state, etc) upon java object's collect...
+	-- let's try ...
+	--M:trackJavaObject(env, obj)
+
 	return obj
 end
 

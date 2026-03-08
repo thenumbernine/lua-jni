@@ -26,6 +26,7 @@ JavaVM.version = ffi.C.JNI_VERSION_1_6
 --[[
 args:
 	version optional, defaults to JavaVM.version which defaults to JNI_VERSION_1_6
+	usingAndroidJNI = optional flag for forwarding to jnienvs to keep track of android idiosyncracies
 
 	-and-
 
@@ -46,7 +47,7 @@ args:
 function JavaVM:init(args)
 	args = args or {}
 	self.version = args.version
-
+	self.usingAndroidJNI = args.usingAndroidJNI
 	if args.ptr then
 		-- reattach to an old JavaVM*
 		local jvmPtr = ffi.cast(JavaVM_ptr, args.ptr)
@@ -68,6 +69,7 @@ function JavaVM:init(args)
 			local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
 			jniEnvArgs.vm = self
 			jniEnvArgs.ptr = jniEnvPtrArr[0]
+			jniEnvArgs.usingAndroidJNI = self.usingAndroidJNI
 			self.jniEnv = JNIEnv(jniEnvArgs)
 		end
 
@@ -129,6 +131,7 @@ function JavaVM:init(args)
 		local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
 		jniEnvArgs.vm = self
 		jniEnvArgs.ptr = jniEnvPtrArr[0]
+		jniEnvArgs.usingAndroidJNI = self.usingAndroidJNI
 		self.jniEnv = JNIEnv(jniEnvArgs)
 
 		-- no longer need to retain for gc

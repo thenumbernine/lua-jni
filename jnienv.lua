@@ -73,7 +73,7 @@ But I'll just dodge them in the object's __index metamethod.
 args:
 	ptr = JNIEnv* cdata
 	vm = vm to store (optional, to prevent it from gc'ing if we hold only the JNIEnv)
-	findClassCantHandleSignatures =
+	usingAndroidJNI =
 		My old Android Java doesn't like signature for JNIEnv->FindClass
 		But signature-based lookups are the most flexible, especially for finding array classes, so I'm making it the default.
 		So Android Java has to pass this extra flag.
@@ -81,6 +81,7 @@ args:
 function JNIEnv:init(args)
 	self._ptr = assert.type(assert.index(args, 'ptr'), 'cdata', "expected a JNIEnv*")
 	self._vm = args.vm or false		-- jnienv will hold the vm just so the vm doesn't gc
+	self._usingAndroidJNI = not not args.usingAndroidJNI
 	if not self._vm then
 		-- make a JavaVM object around the pointer
 		local jvmPtrArr = JavaVM_ptr_1()
@@ -95,10 +96,9 @@ function JNIEnv:init(args)
 		self._vm = JavaVM{
 			ptr = jvmPtr,
 			jniEnv = self,	-- don't make a new JNIEnv wrapper
+			usingAndroidJNI = self._usingAndroidJNI,
 		}
 	end
-
-	self._findClassCantHandleSignatures = not not args.findClassCantHandleSignatures
 
 	self._classesLoaded = {}
 
@@ -218,14 +218,39 @@ function JNIEnv:_findClass(classpath)
 
 	local classObj = self._classesLoaded[classpath]
 	if not classObj then
-		-- NOTICE NOTICE NOTICE
+		--[[ NOTICE NOTICE NOTICE
 		-- using a JNI signature, i.e. "Ljava/lang/ClassName;", is the most flexible here
 		-- however Google's Android Java is dumb and can't handle that,
 		-- it only wants "java/lang/ClassName"
 		-- but this method can't handle arrays-of-classes and primitives.
+
+Wait it just got even dumber on Google's part.
+
+Here's desktop compat. It makes sense.  It uses either slash-separated, or L-slash-semicolon JNI-signature-style , but only L-slash-semicolon for array-types:
+
+	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object')		<- cdata<void *>: 0x5d3ba1cccaf8
+	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object[]')		<- cdata<void *>: NULL
+	> J._ptr[0].FindClass(J._ptr, 'Ljava/lang/Object;')		<- cdata<void *>: 0x5d3ba1cccb00
+	> J._ptr[0].FindClass(J._ptr, '[Ljava/lang/Object;')	<- cdata<void *>: 0x5d3ba1cccb08
+
+Here's Android.  It's nonsense.  It *must* be slash, without L-slash-semicolon, *except* for arrays:
+
+	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object')		<- works
+	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object[]')		<- segfaults
+	> J._ptr[0].FindClass(J._ptr, 'Ljava/lang/Object;')		<- segfaults
+	> J._ptr[0].FindClass(J._ptr, '[Ljava/lang/Object;')	<- WORKS ... ??!??!?
+
+I think nobody of competence came up with Android's spec.  Especially their segfault-on-error.
+		--]]
 		local slashClassPath
-		if self._findClassCantHandleSignatures then
-			slashClassPath = classpath:gsub('%.', '/')
+		if self._usingAndroidJNI then
+			-- android has, only for arrays, use JNI-style L-slash-semicolon
+			-- but for all others, explicitly do not.
+			if classpath:match'%]$' then
+				slashClassPath = getJNISig(classpath)
+			else
+				slashClassPath = classpath:gsub('%.', '/')
+			end
 		else
 			slashClassPath = getJNISig(classpath)
 		end
