@@ -131,7 +131,7 @@ function M:run(args)
 	local asmClassArgs = {
 		version = 0x41,
 		isPublic = true,
-		isSuper = true,
+		isSuper = true,				-- .class only
 		thisClass = classname,
 		superClass = parentClass,
 		interfaces = interfaces,
@@ -223,8 +223,13 @@ function M:run(args)
 
 		-- special for ctors, call parent
 		if method.name == '<init>' then
-			code:insert{'aload_0'}
-			code:insert{'invokespecial', parentClass, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
+			if J._usingAndroidJNI then
+				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V'}
+				code:insert{'return-void'}
+			else
+				code:insert{'aload_0'}
+				code:insert{'invokespecial', parentClass, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
+			end
 		end
 
 		local func = assert.index(method, 'value')
@@ -373,7 +378,7 @@ function M:run(args)
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
 		-- provide a default ctor, no need for closure or callback
-		if env._usingAndroidJNI then
+		if J._usingAndroidJNI then
 			asmClassArgs.methods:insert{
 				isPublic = true,
 				isConstructor = true,

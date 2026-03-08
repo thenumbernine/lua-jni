@@ -406,3 +406,4 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? and method be value by Lua function with autogen native code?  Then there's no more need for JavaLuaClass ... or JavaNativeCallback ...
 - JavaObject `.this` and `.super` for nonvirtual qualified lookup wrapper.
 - type-inference in text-based assembler
+- TODO dex assembler methods, maybe use android studio disasm's `invoke-direct {args...} Lclass/path;->functionname(methodig)return`

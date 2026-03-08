@@ -48,7 +48,8 @@ function M:run(env)
 		asmClass = JavaASMDex:fromAsm(template[[
 .class public <?=newClassName?>	# no super? what does that do again?
 .super java.lang.Object
-.method public <init> ()V
+.method public constructor <init> ()V
+	.registers 1 1 1
 	# 'this' is already on the stack ...
 	#invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
 	# TODO I don't yet translate classnames of invokes ...

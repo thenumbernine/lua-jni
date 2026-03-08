@@ -260,7 +260,6 @@ function JavaASM:fromAsm(code)
 				local parts = string.split(methodDef, '%s+')
 				method.sig = assert(parts:remove(), "expected sig")
 				method.name = assert(parts:remove(), "expected name")
-				if method.name == '<init>' then method.isConstructor = true end	-- dalvik flag
 				for _,part in ipairs(parts) do
 					method[assert.index({
 						public = 'isPublic',
@@ -271,6 +270,7 @@ function JavaASM:fromAsm(code)
 						synchronized = 'isSynchronized',
 						native = 'isNative',
 						abstract = 'isAbstract',
+						constructor = 'isConstructor',
 					}, part, 'unknown method access-flag')] = true
 				end
 				args.methods = args.methods or table()
