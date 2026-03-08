@@ -14,8 +14,8 @@ JavaArray.__name = 'JavaArray'
 JavaArray.super = nil
 JavaArray.class = nil
 JavaArray.subclass = nil
---JavaArray.isa = nil -- TODO
---JavaArray.isaSet = nil -- TODO
+--JavaArray.isa = nil -- handled in __index
+--JavaArray.isaSet = nil -- handled in __index
 
 --[[
 args:

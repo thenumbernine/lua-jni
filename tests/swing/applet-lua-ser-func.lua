@@ -1,10 +1,13 @@
 #!/usr/bin/env luajit
--- load our classes using lambdas, which use java.luaclass auto-subclasses
+--[[
+attempting to use function-serialization instead of inline-strings ...
+--]]
 
-local thread = require 'thread.lite'{
-	code = [=[
-	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
-	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
+local LiteThread = require 'thread.lite'
+
+-- as soon as I move this to an inline function, the style init changes...
+local function threadRun(J, this, ...)	-- DO NOT read anything outside this thread from inside this thread.  it will cross thread Lua-state lines.  and then something will break.
+	print('threadRun', J, this, ...)
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -76,16 +79,49 @@ local thread = require 'thread.lite'{
 	frame:setVisible(true)				-- shows it
 
 	print'THREAD DONE'
+end
+
+-- if I make the thread *after* initializing the VM ... segfault
+local thread = LiteThread{
+	code = [=[
+	-- This changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
+	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
+	local jarg = J:_fromJObject(arg)
+	local javaCallback = assert(load(javaCallbackBC))
+	javaCallback(J, jarg:_unpack())
 ]=],
 }
 
 local J = require 'java'
 
-local ffi = require 'ffi'
-thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
+local function CreateThread(args)
+	local env = args.env
+	local func = args.func
+	args.func = nil
+
+
+	local ffi = require 'ffi'
+	thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
+	thread.lua([[ javaCallbackBC = ... ]], string.dump(func))
+
+	local obj = env.Runnable:_cb(thread.funcptr)
+
+	-- TODO need to save this externally
+	-- don't let it GC
+	-- Java will throw away the Lua object
+	 --rawset(obj, '_thread', thread)
+	_G.javaLiteThread = thread
+
+	-- on __gc?
+	thread:showErr()
+
+	return obj
+end
 
 J.javax.swing.SwingUtilities:invokeAndWait(
-	J.Runnable:_cb(thread.funcptr)
+	CreateThread{
+		env = J,
+		func = threadRun,
+	}
 )
-thread:showErr()
 

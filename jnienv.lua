@@ -318,6 +318,7 @@ function JNIEnv:_version()
 end
 
 function JNIEnv:_fromJObject(jobject)
+	if jobject == nil then return nil end
 	local classpath = self:_getObjClassPath(jobject)
 	return JavaObject._createObjectForClassPath{
 		env = self,
