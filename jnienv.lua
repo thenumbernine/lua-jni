@@ -973,4 +973,15 @@ function JNIEnv:_defineClass(asm, newClassName)
 	return self:_fromJClass(jclass)
 end
 
+-- wrap a Lua function  in a lite-thread sub-Lua-state
+-- and return the java.lang.Runnable JavaObject that contains a callback to it
+-- such that it is multithread-safe even in single-threaded LuaJIT
+function JNIEnv:_wrapFuncRunnable(func)
+	assert.type(func, 'function')
+	return require 'java.thread'{
+		env = self,
+		func = func,
+	}
+end
+
 return JNIEnv

@@ -9,6 +9,8 @@ This is a wrapper for creating the C callback closures and Lua sub-state, and ha
 Any time in Lua-Java that you are going to pass a Runnable to something that's going to spawn a new thread, you must use this instead.
 
 Maybe I should change the name to JavaThreadSafeRunnable ? hmm...
+
+Maybe I should provide this function-as-ctor option to lite-thread ?
 --]]
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
@@ -47,7 +49,12 @@ function M:run(args)
 	thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
 	thread.lua([[ javaCallbackBC = ... ]], string.dump(func))
 
-	self._thread = thread
+	-- hmm gc problems ...
+	-- my child lua state is gc'ing too quickly
+	-- assigning here doesn't matter. ..
+	-- can't assign it to the object, because the Lua object will gc long before the Java one does ...
+	-- my fix is to disable thread.lite and lua gc from here for the time being...
+	--self._thread = thread
 
 	-- can't use ctor since ctor autodetects SAM-function-wrapping if a function is passed, and we're passing a cdata function-pointer
 	local obj = env.Runnable:_cb(thread.funcptr)
