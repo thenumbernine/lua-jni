@@ -372,26 +372,42 @@ function M:run(args)
 
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
-		asmClassArgs.methods:insert{
-			isPublic = true,
-			name = '<init>',
-			sig = '()V',
-			maxStack = 1,
-			maxLocals = 1,
-
-			-- provide a default ctor, no need for closure or callback
-			code = [[
+		-- provide a default ctor, no need for closure or callback
+		if env._usingAndroidJNI then
+			asmClassArgs.methods:insert{
+				isPublic = true,
+				isConstructor = true,
+				name = '<init>',
+				sig = '()V',
+				maxRegs = 1,
+				regsIn = 1,
+				regsOut = 1,
+				code = [[
+invoke-direct ]]..getJNISig(parentClass)..[[ <init> ()V
+return-void
+]],
+			}
+		else
+			asmClassArgs.methods:insert{
+				isPublic = true,
+				name = '<init>',
+				sig = '()V',
+				maxStack = 1,
+				maxLocals = 1,
+				code = [[
 aload_0
 invokespecial ]]..parentClass..[[ <init> ()V
 return
 ]],
-		}
+			}
+		end
 	else
 		for _,ctor in ipairs(args.ctors) do
 			ctor.name = '<init>'
 			ctor.sig = ctor.sig or {'void'}
 			ctor.sig[1] = 'void'
 			ctor.isStatic = false
+			ctor.isConstructor = true	-- .dex only
 			buildLuaWrapperMethod(ctor)
 		end
 	end

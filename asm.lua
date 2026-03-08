@@ -53,10 +53,11 @@ function JavaASM:fromArgs(args)
 			-- do this here or upon ctor?
 			method.code = string.split(string.trim(method.code), '\n')
 				:mapi(function(line)
+					local i = line:find(self.lineComment,1,true)
+					if i then
+						line = line:sub(1,i-1)
+					end
 					return string.trim(line)
-				end)
-				:filteri(function(line)
-					return line:sub(1, #self.lineComment) ~= self.lineComment
 				end)
 				:mapi(function(line)
 					return string.split(line, '%s+')
@@ -169,7 +170,7 @@ function JavaASM:fromAsm(code)
 	local args = {}
 	local lines = string.split(code, '\n')
 	for _,line in ipairs(lines) do
-		line = line:match('^(.*)'..string.patescape(self.lineComment)) or line
+		line = line:match('^(.-)'..string.patescape(self.lineComment)) or line
 		line = string.trim(line)
 		if line == '' then goto lineDone end
 		local sourceFileDef = line:match'^%.source%s+(.-)$'	-- .source
