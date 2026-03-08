@@ -1,7 +1,15 @@
 #!/usr/bin/env luajit
 -- load our classes using lambdas, which use java.luaclass auto-subclasses
 
-local thread = require 'thread.lite'{
+-- NOTICE if I move JavaVM+JNIEnv creation to before LiteThread / sub-Lua-state creation then I get JVM segfaults........
+-- ... unless I disable Lua.__gc() and LiteThread.__gc() ...
+local J = require 'java'
+-- this is segfaulting javavm ...
+require 'lua'.__gc = function() end
+require 'thread.lite'.__gc = function() end
+
+-- even if the thread is assigned to global...
+_G.thread = require 'thread.lite'{
 	code = [=[
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
@@ -79,8 +87,6 @@ local thread = require 'thread.lite'{
 ]=],
 }
 
-local J = require 'java'
-
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
@@ -89,4 +95,3 @@ J.javax.swing.SwingUtilities:invokeAndWait(
 	J.Runnable:_cb(thread.funcptr)
 )
 thread:showErr()
-

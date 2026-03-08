@@ -16,6 +16,11 @@ local class = require 'ext.class'
 local JavaObject = require 'java.object'
 local LiteThread = require 'thread.lite'
 
+-- TODO TODO TODO
+-- this is causing segfaults upon JavaVM's construction...
+require 'lua'.__gc = function() end
+require 'thread.lite'.__gc = function() end
+
 
 local M = {}
 
