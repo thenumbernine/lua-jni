@@ -284,6 +284,7 @@ function JavaASM:fromAsm(code)
 			goto lineDone
 		end
 		if currentMethod then
+			-- jasmin syntax:
 			local maxStackDef = line:match'^%.limit%s+stack%s+(.*)$'
 			if maxStackDef then
 				currentMethod.maxStack = assert(tonumber(maxStackDef))
@@ -292,6 +293,16 @@ function JavaASM:fromAsm(code)
 			local maxLocalsDef = line:match'^%.limit%s+stack%s+(.*)$'
 			if maxLocalsDef then
 				currentMethod.maxLocals = assert(tonumber(maxLocalsDef))
+				goto lineDone
+			end
+			-- sort of smali syntax:
+			-- .registers <maxRegs> [<regsIn>] [<regsOut>]
+			local maxRegsDef = line:match'^%.registers%s+(.*)$'
+			if maxRegsDef then
+				local values = string.split(maxRegsDef, '%s+')
+				currentMethod.maxRegs = assert(tonumber(values[1]))
+				currentMethod.regsIn = tonumber(values[2])
+				currentMethod.regsOut = tonumber(values[3])
 				goto lineDone
 			end
 			-- TODO .line
