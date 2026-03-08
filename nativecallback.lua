@@ -43,7 +43,7 @@ function M:run(env)
 	local asmClass
 	-- you will have to set this,
 	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
-	if env._usingDex then
+	if env._usingAndroidJNI then
 		local JavaASMDex = require 'java.asmdex'
 		asmClass = JavaASMDex:fromAsm(template[[
 .class public <?=newClassName?>	# no super? what does that do again?

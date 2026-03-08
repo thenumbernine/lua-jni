@@ -962,7 +962,6 @@ end
 'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)
 'newClassName' = classname, not necessary if using a JavaASMClass/JavaASMDex object.
 --]]
-JNIEnv._usingDex = false	-- set this to 'true' in Android
 function JNIEnv:_defineClass(asm, newClassName)
 	local code
 	if type(asm) == 'string' then
