@@ -16,13 +16,18 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local class = require 'ext.class'
 local JavaObject = require 'java.object'
+
 local LiteThread = require 'thread.lite'
 
+-- [[
 -- TODO TODO TODO
--- this is causing segfaults upon JavaVM's construction...
-require 'lua'.__gc = function() end
-require 'thread.lite'.__gc = function() end
-
+-- __gc in either is causing segfaults upon JavaVM's construction...
+-- so subclass them locally and here override their __gc function
+LiteThread = LiteThread:subclass()
+function LiteThread:__gc() end
+LiteThread.Lua = LiteThread.Lua:subclass()
+function LiteThread.Lua:__gc() end
+--]]
 
 local M = {}
 
@@ -56,12 +61,16 @@ function M:run(args)
 	-- my fix is to disable thread.lite and lua gc from here for the time being...
 	--self._thread = thread
 
-	-- can't use ctor since ctor autodetects SAM-function-wrapping if a function is passed, and we're passing a cdata function-pointer
+	-- Can't use Runnable() since ctor autodetects SAM-function-wrapping if a function is passed,
+	--  and we're passing a cdata function-pointer.
 	local obj = env.Runnable:_cb(thread.funcptr)
 	rawset(obj, '_thread', thread)
+
 	-- do this but after done running
 	--thread:showErr()
 
+	-- it would be nice to have a java-on-gc callback so that I could associate this Lua object with the jobject
+	--  and then only clean up the associated resources (callback, sub-lua-state, etc) upon java object's collect...
 	return obj
 end
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env luajit
--- use our thread-safe-runnable wrapper... 
+-- use our thread-safe-runnable wrapper...
 local J = require 'java'
-J.javax.swing.SwingUtilities:invokeAndWait(J:_wrapFuncRunnable(function(J, this)
-print('this', this)			
+J.javax.swing.SwingUtilities:invokeAndWait(J:_safeRunnable(function(J, this)
+print('this', this)
 	-- TODO THIS IS RUN FROM ANOTHER THREAD
 	-- DO NOT REFERENCE ANTYHING OUTSIDE THIS FUNCTION
 
