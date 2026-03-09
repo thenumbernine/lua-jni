@@ -958,7 +958,7 @@ Name = class()
 Name.__name = 'Name'
 Name.subclass = nil
 
-Name._notthere = true	-- query this to know the class you're looking for isn't there...
+Name._exists = false 	-- query this to know the class you're looking for isn't there...
 function Name:init(args)
 	rawset(self, '_env', assert.index(args, 'env'))
 	rawset(self, '_name', assert.index(args, 'name'))

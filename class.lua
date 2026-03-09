@@ -23,7 +23,7 @@ JavaClass.subclass = nil
 --JavaClass.isa = nil -- handled in __index
 --JavaClass.isaSet = nil -- handled in __index
 
-
+JavaClass._exists = true	-- versus JNI namespace search's_exists == false
 function JavaClass:init(args)
 	-- matches JavaObject, its superclass, but here I'm not calling JavaObject:init...
 	local env = assert.index(args, 'env')
