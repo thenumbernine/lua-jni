@@ -1787,7 +1787,9 @@ assert.type(const.name, 'string')
 							io.stderr:write('!!! WARNING !!! method '
 								..method.name..' instruction #'..instrIndex
 								..': '..table.mapi(inst, function(x) return tostring(x) end):concat()
-								..' stack underflow detected.\n')
+								..' stack underflow detected.\n'
+								..'instructions:\n'
+								..require 'ext.tolua'(method.code))
 						end
 					end
 					if inst.stackadd then

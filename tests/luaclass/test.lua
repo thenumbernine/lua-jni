@@ -54,9 +54,7 @@ local Test = require 'java.luaclass'{
 		{
 			name = 'testStatic',
 			isStatic = true,
-			sig = {'void',
-				--'double'	-- TODO...
-			},
+			sig = {'void', 'double'},
 			value = function(...)
 				print('static method here with args:', ...)
 			end,
@@ -99,4 +97,4 @@ assert.eq(test.baz, 137LL)
 assert.eq(test2.baz, 137LL)
 print('test.baz', test.baz)
 
-test:testStatic()
+test:testStatic(math.pi)

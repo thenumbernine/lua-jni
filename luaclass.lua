@@ -278,7 +278,8 @@ function M:run(args)
 			argIndex[i-1] = maxArgIndex
 			maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
 		end
-
+--DEBUG:print('method', method.name, require 'ext.tolua'(method.sig))
+--DEBUG:print('argIndex', require 'ext.tolua'(argIndex))
 		-- now native callback will get ...
 		-- 1) a funcptr from a closure
 		if isAndroid then
@@ -291,7 +292,9 @@ function M:run(args)
 			--  or should I change .class to detect and remove the type arg?
 			code:insert{'const-wide', 'v'..maxArgIndex, ffi.cast('jlong', funcptr)}
 		else
+			-- stack:
 			code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
+			-- stack: long funcptr
 		end
 
 		local sigNumArgs = #sig-1
@@ -310,8 +313,10 @@ function M:run(args)
 				'[java/lang/Object;',
 			}
 		else
+			-- stack: [Object this], long funcptr
 			pushConstInt(argArraySize)
 			code:insert{'anewarray', 'java/lang/Object'}
+			-- stack: long funcptr, Object[] args
 		end
 
 		-- set args[0] = this
@@ -330,9 +335,13 @@ function M:run(args)
 				}
 			else
 				code:insert{'dup'}
+				-- stack: funcptr, args, args
 				pushConstInt(argArrayIndex)				-- array index ...?
+				-- stack: funcptr, args, args, argArrayIndex
 				code:insert{'aload_'..localVarIndex}	-- local index (0 for 'this')
+				-- stack: funcptr, args, args, argArrayIndex, this
 				code:insert{'aastore'}
+				-- stack: funcptr, args ... args[argArrayIndex] = this
 			end
 			localVarIndex = localVarIndex + 1	-- start us at 1
 			argArrayIndex = argArrayIndex + 1
@@ -340,9 +349,7 @@ function M:run(args)
 
 		if sigNumArgs > 0 then
 			for i=0,sigNumArgs-1 do		-- 0-based argument index
-				code:insert{'dup'}
 
-				pushConstInt(argArrayIndex)
 				local argSig = sig[i+2]
 				local primInfo = infoForPrims[argSig]
 
@@ -368,22 +375,44 @@ function M:run(args)
 						argArrayIndex,
 					}
 				else
-					local argOpcode = primInfo and 'iload' or 'aload'
+					code:insert{'dup'}
+					-- stack: funcptr, args, args
+					pushConstInt(argArrayIndex)
+					-- stack: funcptr, args, args, argArrayIndex
+
+					local argOpcode
+					if primInfo then
+						if argSig == 'long' then
+							argOpcode = 'lload'
+						elseif argSig == 'double' then
+							argOpcode = 'dload'
+						elseif argSig == 'float' then
+							argOpcode = 'fload'
+						else	-- all other prims: int
+							argOpcode = 'iload'
+						end
+					else	-- all non-prims: Object
+						argOpcode = 'aload'
+					end
+
 					if localVarIndex < 4 then
 						-- aload, iload, etc have 0123 as separate commands:
 						code:insert{argOpcode..'_'..localVarIndex}
 					else
 						code:insert{argOpcode, localVarIndex}
 					end
+					-- stack: funcptr, args, args, argArrayIndex, local[localVarIndex]
+
 					if primInfo then
 						code:insert{
 							'invokestatic',
 							primInfo.boxedType,
 							'valueOf',
-							getJNISig{primInfo.boxedType, primInfo.name}
+							getJNISig{primInfo.boxedType, argSig}
 						}
 					end
 					code:insert{'aastore'}
+					-- stack: funcptr, args ... args[argArrayIndex] = local[localVarIndex]
 				end
 
 				if argSig == 'long' or argSig == 'double' then
@@ -425,9 +454,27 @@ function M:run(args)
 			code:insert{'return-void'}	-- aliased on .class to 'return'
 		elseif primInfo then
 			if isAndroid then
+				-- cast to boxed type
+				code:insert{'move-result-object', 'v1'}
+				code:insert{'check-cast', 'v1', getJNISig(primInfo.boxedType)}
+				-- convert back to value
+				code:insert{
+					'invoke-virtual',
+					getJNISig(primInfo.boxedType),
+					primInfo.name..'Value',
+					getJNISig{primInfo.name},
+				}
+				if primInfo.name == 'long' or primInfo.name == 'double' then
+					code:insert{'move-result-wide', 'v1'}
+					code:insert{'return-wide', 'v1'}
+				else
+					code:insert{'move-result', 'v1'}
+					code:insert{'return', 'v1'}
+				end
 			else
-				-- cast to BoxedType
+				-- cast to boxed type
 				code:insert{'checkcast', primInfo.boxedType}
+				-- convert back to value
 				code:insert{
 					'invokevirtual',
 					primInfo.boxedType,
@@ -438,6 +485,13 @@ function M:run(args)
 			end
 		else
 			if isAndroid then
+				code:insert{'move-result-object', 'v1'}
+				code:insert{
+					'check-cast',
+					'v1',
+					getJNISig(erturnType)
+				}
+				code:insert{'return-object', 'v1'}
 			else
 				code:insert{
 					'checkcast',
