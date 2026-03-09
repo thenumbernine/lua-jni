@@ -1,10 +1,8 @@
 #!/usr/bin/env luajit
 -- use our thread-safe-runnable wrapper...
 local J = require 'java'
-J.javax.swing.SwingUtilities:invokeAndWait(J:_safeRunnable(function(J, this)
-print('this', this)
-	-- TODO THIS IS RUN FROM ANOTHER THREAD
-	-- DO NOT REFERENCE ANTYHING OUTSIDE THIS FUNCTION
+local runnable = J:_safeRunnable(function(J, this)
+	-- THIS IS RUN FROM ANOTHER THREAD AND LUA STATE
 
 	local JFrame = J.javax.swing.JFrame
 	local frame = JFrame'HelloWorldSwing Example'
@@ -76,5 +74,6 @@ print('this', this)
 	frame:setVisible(true)				-- shows it
 
 	print'THREAD DONE'
-
-end))
+end)
+J.javax.swing.SwingUtilities:invokeAndWait(runnable)
+runnable._thread:showErr()

@@ -18,6 +18,7 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local class = require 'ext.class'
 local JavaObject = require 'java.object'
+local Lua = require 'lua'
 
 local LiteThread = require 'thread.lite'
 
@@ -61,17 +62,15 @@ function M:run(args)
 	local env = assert.index(args, 'env')
 	local func = assert.type(assert.index(args, 'func'), 'function')
 
-	local thread = LiteThread{
-		code = [=[
-	-- This changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
-	local env = require 'java.vm'{ptr=jvmPtr}.jniEnv
-	local jarg = env:_fromJObject(arg)
-	local javaCallback = assert(load(javaCallbackBC))
-	javaCallback(env, jarg:_unpack())
-]=],
-}
-	thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
-	thread.lua([[ javaCallbackBC = ... ]], string.dump(func))
+	local thread = LiteThread(function(arg)
+		-- THIS IS RUN IN THE CHILD LUA STATE
+		-- This changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
+		local env = require 'java.vm'{ptr=jvmPtr}.jniEnv
+		local jarg = env:_fromJObject(arg)
+		javaCallback(env, jarg:_unpack())
+	end)
+	thread.lua([[jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
+	thread.lua([[javaCallback = ... ]], func)
 
 	-- hmm gc problems ...
 	-- my child lua state is gc'ing too quickly
