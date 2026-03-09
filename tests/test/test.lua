@@ -43,10 +43,10 @@ print('Test.test()', Test_test(Test))
 -- try to make a new Test()
 local Test_init = assert(Test:_method{name='<init>', sig={}})
 print('Test_init', Test_init)
-local testObj = Test_init:_new(Test)
+local testObj = assert(Test_init:_new(Test))
 print('testObj', testObj)
 
-local testObj = Test:_new()
+local testObj = assert(Test:_new())
 print('testObj', testObj)
 
 -- overload from Lua types

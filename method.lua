@@ -151,6 +151,7 @@ end
 -- TODO if I do my own matching of args to stored java reflect methods then I don't need to require the end-user to pick out the ctor method themselves...
 function JavaMethod:_new(classObj, ...)
 	local env = self._env
+	env:_checkExceptions()
 	local classpath = assert(classObj._classpath)
 	local result = env._ptr[0].NewObject(
 		env._ptr,
@@ -158,6 +159,10 @@ function JavaMethod:_new(classObj, ...)
 		self._ptr,
 		env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
+	if result == nil then 	-- uhm when would this be?
+		local ex = env:_exceptionOccurred()
+		return nil, 'failed to call ctor sig='..require 'ext.tolua'(self._sig), ex
+	end
 	-- fun fact, for java the ctor has return signature 'void'
 	-- which means the self._sig[1] won't hvae the expected classpath
 	-- which means we have to store/retrieve extra the classpath of the classObj
