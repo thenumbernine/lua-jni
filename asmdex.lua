@@ -228,9 +228,10 @@ end):setmetatable(nil)
 local function instPushString(inst, stringIndex, asm)
 	local str = asm.strings[1+stringIndex]
 	if not str then
-		error('OOB string '..stringIndex)
+		inst:insert('!!! OOB string '..stringIndex)
+	else
+		inst:insert(str)
 	end
-	inst:insert(str)
 end
 local function instReadString(inst, index, asm)
 	return (asm.findString(inst[index]))
@@ -239,14 +240,15 @@ end
 local function instPushType(inst, typeIndex, asm)
 	local typestr = asm.types[1+typeIndex]
 	if not typestr then
-		error('OOB type '..typeIndex)
+		inst:insert('!!! OOB type '..typeIndex)
+	else
+		inst:insert(
+			typestr -- toDotSepName(typestr)
+		)
 	end
-	inst:insert(
-		typestr -- toDotSepName(typestr)
-	)
 end
 local function instReadType(inst, index, asm)
-	return (asm.findString(
+	return (asm.findType(
 		-- how about prims?  are they jni-signature style?
 		inst[index]	-- toLSlashSepName(inst[index])
 	))
@@ -255,9 +257,10 @@ end
 local function instPushProto(inst, protoIndex, asm)
 	local proto = asm.protos[1+protoIndex]
 	if not proto then
-		error('OOB proto '..protoIndex)
+		inst:insert('!!! OOB proto '..protoIndex)
+	else
+		inst:insert(proto)
 	end
-	inst:insert(proto)
 end
 local function instReadProto(inst, index, asm)
 	return (asm.findProto(inst[index]))
@@ -266,11 +269,12 @@ end
 local function instPushField(inst, fieldIndex, asm)
 	local field = asm.fields[1+fieldIndex]
 	if not field then
-		error('OOB field '..fieldIndex)
+		inst:insert('!!! OOB field '..fieldIndex)
+	else
+		inst:insert(field.class) --toDotSepName(field.class))
+		inst:insert(field.name)
+		inst:insert(field.sig)
 	end
-	inst:insert(field.class) --toDotSepName(field.class))
-	inst:insert(field.name)
-	inst:insert(field.sig)
 end
 local function instReadField(inst, index, asm)
 	return (asm.findField(
@@ -283,11 +287,12 @@ end
 local function instPushMethod(inst, methodIndex, asm)
 	local method = asm.methods[1+methodIndex]
 	if not method then
-		error('OOB method '..methodIndex)
+		inst:insert('!!! OOB method '..methodIndex)
+	else
+		inst:insert(method.class) --toDotSepName(method.class))
+		inst:insert(method.name)
+		inst:insert(method.sig)
 	end
-	inst:insert(method.class) --toDotSepName(method.class))
-	inst:insert(method.name)
-	inst:insert(method.sig)
 end
 local function instReadMethod(inst, index, asm)
 	if not inst[index]
@@ -326,72 +331,62 @@ local function regname(index)
 	error("got an out of bound register: "..index)
 end
 
+local function tonibble(x)
+	return bit.band(0xf, x),
+		bit.band(0xf, bit.rshift(x, 4)),
+		bit.band(0xf, bit.rshift(x, 8)),
+		bit.band(0xf, bit.rshift(x, 12))
+end
+
+local function fromnibble(a,b,c,d)
+	return bit.bor(
+		bit.band(0xf, a),
+		bit.lshift(bit.band(0xf, b or 0), 4),
+		bit.lshift(bit.band(0xf, c or 0), 8),
+		bit.lshift(bit.band(0xf, d or 0), 12)
+	)
+end
+
+-- sign-extended to 32 bits...
+local function signed4to32(x)
+	if 0 ~= bit.band(8, x) then
+		x = bit.bor(0xFFFFFFF0, x)
+	end
+	return x
+end
+local function signed8to32(x)
+	if 0 ~= bit.band(0x80, x) then
+		x = bit.bor(0xFFFFFF00, x)
+	end
+	return x
+end
+
 
 local Instr = class()
 Instr.insert = table.insert
 Instr.append = table.append
 function Instr:traverse(visit) end	-- accumulate any unique constants, ... before we have to sort them ... and then re-visit them all again to get their correct indexes ... smh
 
+-- 00|op
 local Instr10x = Instr:subclass()
 function Instr10x:read(hi, blob, asm)
-	self:insert(hi)				-- NOTICE throws away hi
+	self:insert(hi)				-- throws away hi
 end
 function Instr10x:write(blob, asm)
 	blob:writeu1(self[2] or 0)
 end
 function Instr10x:maxRegs() return 0 end
 
-local Instr10t = Instr:subclass()
-function Instr10t:read(hi, blob, asm)
-	self:insert(hi)					-- signed 8 bit branch offset
-end
-function Instr10t:write(blob, asm)
-	blob:writeu1(self[2])
-end
-function Instr10t:maxRegs() return 0 end
-
-local Instr11x = Instr:subclass()
-function Instr11x:read(hi, blob, asm)
-	self:insert(regname(hi))
-end
-function Instr11x:write(blob, asm)
-	blob:writeu1(readreg(self[2]))
-end
-
-local Instr11x_1 = Instr11x:subclass()
-function Instr11x_1:maxRegs()
-	return readreg(self[2]) + 1
-end
-
-local Instr11x_2 = Instr11x:subclass()
-function Instr11x_2:maxRegs()
-	return readreg(self[2]) + 2
-end
-
-local Instr11n = Instr:subclass()
-function Instr11n:read(hi, blob, asm)
-	self:insert(regname(bit.band(0xf, hi)))	-- A = reg (4 bits)
-	self:insert(bit.band(0xf, bit.rshift(hi, 8)))		-- B = signed 4 bit
-end
-function Instr11n:write(blob, asm)
-	blob:writeu1(bit.bor(
-		bit.band(0xf, readreg(self[2])),
-		bit.lshift(bit.band(0xf, self[3]), 4)
-	))
-end
-function Instr11n:maxRegs()
-	return math.max(readreg(self[2]), readreg(self[3])) + 1
-end
-
 local Instr12x = Instr:subclass()
 function Instr12x:read(hi, blob, asm)
-	self:insert(regname(bit.band(hi, 0xf)))
-	self:insert(regname(bit.band(bit.rshift(hi, 4), 0xf)))
+	local A, B = tonibble(hi)
+	self:insert(regname(A))
+	self:insert(regname(B))
 end
 function Instr12x:write(blob, asm)
-	blob:writeu1(bit.bor(
-		bit.band(0xf, readreg(self[2])),
-		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
+	blob:writeu1(fromnibble(
+		readreg(self[2]),
+		readreg(self[3])
 	))
 end
 
@@ -413,6 +408,94 @@ end
 local Instr12x_2_2 = Instr12x:subclass()
 function Instr12x_2_2:maxRegs()
 	return math.max(readreg(self[2]), readreg(self[3])) + 2
+end
+
+local Instr11n = Instr:subclass()
+function Instr11n:read(hi, blob, asm)
+	local A, B = tonibble(hi)
+	B = signed4to32(B)
+	self:insert(regname(A))
+	self:insert(B)
+end
+function Instr11n:write(blob, asm)
+	blob:writeu1(fromnibble(
+		readreg(self[2]),
+		self[3]
+	))
+end
+function Instr11n:maxRegs()
+	return readreg(self[2]) + 1
+end
+
+local Instr11x = Instr:subclass()
+function Instr11x:read(hi, blob, asm)
+	self:insert(regname(hi))
+end
+function Instr11x:write(blob, asm)
+	blob:writeu1(readreg(self[2]))
+end
+
+local Instr11x_1 = Instr11x:subclass()
+function Instr11x_1:maxRegs()
+	return readreg(self[2]) + 1
+end
+
+local Instr11x_2 = Instr11x:subclass()
+function Instr11x_2:maxRegs()
+	return readreg(self[2]) + 2
+end
+
+local Instr10t = Instr:subclass()
+function Instr10t:read(hi, blob, asm)
+	self:insert(signed8to32(hi))					-- signed 8 bit branch offset
+end
+function Instr10t:write(blob, asm)
+	blob:writes1(self[2])
+end
+function Instr10t:maxRegs() return 0 end
+
+local Instr20t = Instr:subclass()
+function Instr20t:read(hi, blob, asm)
+	self:insert(blob:reads2())		-- signed
+	self:insert(hi)					-- throws away hi
+end
+function Instr20t:write(blob, asm)
+	blob:writeu1(self[3] or 0)	-- out of order, throw-away is last
+	blob:writes2(self[2])
+end
+function Instr20t:maxRegs() return 0 end
+
+local Instr22x = Instr:subclass()
+function Instr22x:read(hi, blob, asm)
+	self:insert(regname(hi))
+	self:insert(regname(blob:readu2()))
+end
+function Instr22x:write(blob, asm)
+	blob:writeu1(readreg(self[2]))
+	blob:writeu2(readreg(self[3]))
+end
+
+local Instr22x_1 = Instr22x:subclass()
+function Instr22x_1:maxRegs()
+	return math.max(readreg(self[2]), readreg(self[3])) + 1
+end
+
+local Instr22x_2 = Instr22x:subclass()
+function Instr22x_2:maxRegs()
+	return math.max(readreg(self[2]), readreg(self[3])) + 2
+end
+
+local Instr21t = Instr:subclass()
+function Instr21t:read(hi, blob, asm)
+	self:insert(regname(hi))
+	self:insert(blob:reads2())
+end
+function Instr21t:write(blob, asm)
+	blob:writeu1(readreg(self[2]))
+	blob:writes2(self[3])
+end
+function Instr21t:maxRegs()
+	return readreg(self[2]) + 1
 end
 
 local Instr21s = Instr:subclass()
@@ -510,65 +593,26 @@ function Instr21c_field_2:maxRegs()
 	return readreg(self[2]) + 2
 end
 
-local Instr22x = Instr:subclass()
-function Instr22x:read(hi, blob, asm)
-	self:insert(regname(hi))
-	self:insert(regname(blob:readu2()))
-end
-function Instr22x:write(blob, asm)
-	blob:writeu1(readreg(self[2]))
-	blob:writeu2(readreg(self[3]))
-end
-
-local Instr22x_1 = Instr22x:subclass()
-function Instr22x_1:maxRegs()
-	return math.max(readreg(self[2]), readreg(self[3])) + 1
-end
-
-local Instr22x_2 = Instr22x:subclass()
-function Instr22x_2:maxRegs()
-	return math.max(readreg(self[2]), readreg(self[3])) + 2
-end
-
 -- instance-of A=dest reg, B=ref reg, C=type
-local Instr22c_instanceof = Instr:subclass()
-function Instr22c_instanceof:read(hi, blob, asm)
-	self:insert(regname(bit.band(hi, 0xf)))
-	self:insert(regname(bit.band(bit.rshift(hi, 4), 0xf)))
+-- new-array A=dest reg, B=size reg, C=type
+local Instr22c_type = Instr:subclass()
+function Instr22c_type:read(hi, blob, asm)
+	local A, B = tonibble(hi)
+	self:insert(regname(A))
+	self:insert(regname(B))
 	instPushType(self, blob:readu2(), asm)
 end
-function Instr22c_instanceof:write(blob, asm)
-	blob:writeu1(bit.bor(
-		bit.band(0xf, readreg(self[2])),
-		bit.lshift(bit.band(0xf, readreg(self[3])), 4)
+function Instr22c_type:write(blob, asm)
+	blob:writeu1(fromnibble(
+		readreg(self[2]),
+		readreg(self[3])
 	))
 	blob:writeu2(instReadType(self, 4, asm))
 end
-function Instr22c_instanceof:maxRegs()
+function Instr22c_type:maxRegs()
 	return math.max(readreg(self[2]), readreg(self[3])) + 1
 end
-function Instr22c_instanceof:traverse(visit)
-	visit:type(self[4])
-end
-
--- new-array A=dest reg, B=size, C=type
-local Instr22c_newarray = Instr:subclass()
-function Instr22c_newarray:read(hi, blob, asm)
-	self:insert(regname(bit.band(hi, 0xf)))			-- hi byte lo nibble = A = dest reg
-	self:insert(bit.band(bit.rshift(hi, 4), 0xf))	-- hi byte hi nibble = B = array size
-	instPushType(self, blob:readu2(), asm)
-end
-function Instr22c_newarray:write(blob, asm)
-	blob:writeu1(bit.bor(
-		bit.band(0xf, readreg(self[2])),
-		bit.lshift(bit.band(0xf, self[3]), 4)
-	))
-	blob:writeu2(instReadType(self, 4, asm))
-end
-function Instr22c_newarray:maxRegs()
-	return readreg(self[2]) + 1
-end
-function Instr22c_newarray:traverse(visit)
+function Instr22c_type:traverse(visit)
 	visit:type(self[4])
 end
 
@@ -653,17 +697,6 @@ function Instr23x_2_2_2:maxRegs()
 	) + 2
 end
 
-local Instr20t = Instr:subclass()
-function Instr20t:read(hi, blob, asm)
-	self:insert(blob:reads2())		-- signed
-	self:insert(hi)		-- NOTICE throws away hi
-end
-function Instr20t:write(blob, asm)
-	blob:writeu1(self[3] or 0)	-- out of order, throw-away is last
-	blob:writes2(self[2])
-end
-function Instr20t:maxRegs() return 0 end
-
 local Instr22t = Instr:subclass()
 function Instr22t:read(hi, blob, asm)
 	self:insert(regname(bit.band(hi, 0xf)))
@@ -679,19 +712,6 @@ function Instr22t:write(blob, asm)
 end
 function Instr22t:maxRegs()
 	return math.max(readreg(self[2]), readreg(self[3])) + 1
-end
-
-local Instr21t = Instr:subclass()
-function Instr21t:read(hi, blob, asm)
-	self:insert(regname(hi))
-	self:insert(blob:reads2())
-end
-function Instr21t:write(blob, asm)
-	blob:writeu1(readreg(self[2]))
-	blob:writes2(self[3])
-end
-function Instr21t:maxRegs()
-	return readreg(self[2]) + 1
 end
 
 local Instr22s = Instr:subclass()
@@ -820,7 +840,7 @@ end
 
 local Instr35c_type = Instr:subclass()
 function Instr35c_type:read(hi, blob, asm)
-	local A = bit.band(0xf, bit.rshift(hi, 4))
+	local G, A = tonibble(hi)
 	if A < 1 or A > 5 then
 		error(self[1].." expected 1-5 args, found "..A)
 	end
@@ -832,7 +852,6 @@ function Instr35c_type:read(hi, blob, asm)
 	local x = blob:readu2()
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
-	local G = bit.band(hi, 0xf)
 	local regs = table{
 		regname(bit.band(x, 0xf)),
 		regname(bit.band(bit.rshift(x, 4), 0xf)),
@@ -847,12 +866,9 @@ function Instr35c_type:write(blob, asm)
 	if A < 1 or A > 5 then
 		error(self[1].." expected 1-5 args, found "..A)
 	end
-
 	local G = readregopt(self[7])
-	blob:writeu1(bit.bor(
-		bit.band(0xf, G),
-		bit.lshift(bit.band(0xf, A), 4)
-	))
+
+	blob:writeu1(fromnibble(G, A))
 	blob:writeu2(instReadType(self, 2, asm))
 	blob:writeu2(bit.bor(
 		bit.band(0xf, readregopt(self[3])),
@@ -876,7 +892,7 @@ end
 
 local Instr35c_method = Instr:subclass()
 function Instr35c_method:read(hi, blob, asm)
-	local A = bit.band(0xf, bit.rshift(hi, 4))
+	local G, A = tonibble(hi)
 	if A < 0 or A > 5 then
 		error(self[1].." expected 0-5 args, found "..A)
 	end
@@ -887,7 +903,6 @@ function Instr35c_method:read(hi, blob, asm)
 	local x = blob:readu2()
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
-	local G = bit.band(hi, 0xf)
 	local regs = table{
 		regname(bit.band(x, 0xf)),
 		regname(bit.band(bit.rshift(x, 4), 0xf)),
@@ -902,12 +917,9 @@ function Instr35c_method:write(blob, asm)
 	if A < 0 or A > 5 then
 		error(self[1].." expected 0-5 args, found "..A)
 	end
-
 	local G = readregopt(self[9])
-	blob:writeu1(bit.bor(
-		bit.band(0xf, G),
-		bit.lshift(bit.band(0xf, A), 4)
-	))
+
+	blob:writeu1(fromnibble(G, A))
 	blob:writeu2(instReadMethod(self, 2, asm))
 	blob:writeu2(bit.bor(
 		bit.band(0xf, readregopt(self[5])),
@@ -1153,10 +1165,10 @@ local InstrClassesForOp = {
 	[0x1d] = Instr11x_1:subclass{name='monitor-enter'},						-- 1d 11x	monitor-enter vAA	A: reference-bearing register (8 bits)	Acquire the monitor for the indicated object.
 	[0x1e] = Instr11x_1:subclass{name='monitor-exit'},						-- 1e 11x	monitor-exit vAA	A: reference-bearing register (8 bits)	Release the monitor for the indicated object. Note: If this instruction needs to throw an exception, it must do so as if the pc has already advanced past the instruction. It may be useful to think of this as the instruction successfully executing (in a sense), and the exception getting thrown after the instruction but before the next one gets a chance to run. This definition makes it possible for a method to use a monitor cleanup catch-all (e.g., finally) block as the monitor cleanup for that block itself, as a way to handle the arbitrary exceptions that might get thrown due to the historical implementation of Thread.stop(), while still managing to have proper monitor hygiene.
 	[0x1f] = Instr21c_type:subclass{name='check-cast'},						-- 1f 21c	check-cast vAA, type@BBBB	A: reference-bearing register (8 bits) B: type index (16 bits)	Throw a ClassCastException if the reference in the given register cannot be cast to the indicated type. Note: Since A must always be a reference (and not a primitive value), this will necessarily fail at runtime (that is, it will throw an exception) if B refers to a primitive type.
-	[0x20] = Instr22c_instanceof:subclass{name='instance-of'},				-- 20 22c	instance-of vA, vB, type@CCCC	A: destination register (4 bits) B: reference-bearing register (4 bits) C: type index (16 bits)	Store in the given destination register 1 if the indicated reference is an instance of the given type, or 0 if not. Note: Since B must always be a reference (and not a primitive value), this will always result in 0 being stored if C refers to a primitive type.
+	[0x20] = Instr22c_type:subclass{name='instance-of'},					-- 20 22c	instance-of vA, vB, type@CCCC	A: destination register (4 bits) B: reference-bearing register (4 bits) C: type index (16 bits)	Store in the given destination register 1 if the indicated reference is an instance of the given type, or 0 if not. Note: Since B must always be a reference (and not a primitive value), this will always result in 0 being stored if C refers to a primitive type.
 	[0x21] = Instr12x_1_1:subclass{name='array-length'},					-- 21 12x	array-length vA, vB	A: destination register (4 bits) B: array reference-bearing register (4 bits)	Store in the given destination register the length of the indicated array, in entries
 	[0x22] = Instr21c_type:subclass{name='new-instance'},					-- 22 21c	new-instance vAA, type@BBBB	A: destination register (8 bits) B: type index	Construct a new instance of the indicated type, storing a reference to it in the destination. The type must refer to a non-array class.
-	[0x23] = Instr22c_newarray:subclass{name='new-array'},					-- 23 22c	new-array vA, vB, type@CCCC	A: destination register (4 bits) B: size register C: type index	Construct a new array of the indicated type and size. The type must be an array type.
+	[0x23] = Instr22c_type:subclass{name='new-array'},						-- 23 22c	new-array vA, vB, type@CCCC	A: destination register (4 bits) B: size register C: type index	Construct a new array of the indicated type and size. The type must be an array type.
 	[0x24] = Instr35c_type:subclass{name='filled-new-array'},				-- 24 35c	filled-new-array {vC, vD, vE, vF, vG}, type@BBBB	A: array size and argument word count (4 bits) B: type index (16 bits) C..G: argument registers (4 bits each)	Construct an array of the given type and size, filling it with the supplied contents. The type must be an array type. The array's contents must be single-word (that is, no arrays of long or double, but reference types are acceptable). The constructed instance is stored as a "result" in the same way that the method invocation instructions store their results, so the constructed instance must be moved to a register with an immediately subsequent move-result-object instruction (if it is to be used).
 	[0x25] = Instr3rc_type:subclass{name='filled-new-array/range'},			-- 25 3rc	filled-new-array/range {vCCCC .. vNNNN}, type@BBBB	A: array size and argument word count (8 bits) B: type index (16 bits) C: first argument register (16 bits) N = A + C - 1	Construct an array of the given type and size, filling it with the supplied contents. Clarifications and restrictions are the same as filled-new-array, described above.
 	[0x26] = Instr31t:subclass{name='fill-array-data'},						-- 26 31t	fill-array-data vAA, +BBBBBBBB (with supplemental data as specified below in "fill-array-data-payload Format")	A: array reference (8 bits) B: signed "branch" offset to table data pseudo-instruction (32 bits)	Fill the given array with the indicated data. The reference must be to an array of primitives, and the data table must match it in type and must contain no more elements than will fit in the array. That is, the array may be larger than the table, and if so, only the initial elements of the array are set, leaving the remainder alone.
@@ -2137,7 +2149,7 @@ function JavaASMDex:compile()
 	local types = table()
 	traverser.string = nothing	-- done for now
 	traverser.type = function(visit, typestr)
-		addUnique(types, findString(typestr))
+		local index = addUnique(types, findString(typestr))
 	end
 	traverse(traverser)
 
@@ -2159,6 +2171,7 @@ function JavaASMDex:compile()
 		local typeStrIndex = findString(typestr)
 		return findUnique(types, typeStrIndex)
 	end
+	self.findType = findType
 
 	-------- now build type lists, ignore types and strings
 

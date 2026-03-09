@@ -305,11 +305,25 @@ function M:run(args)
 
 		-- 2) an Object[] of {this, ... rest of args of the method}
 		if isAndroid then
+			if argArraySize < 8 then
+				code:insert{
+					'const/4',
+					'v'..(maxArgIndex+2),
+					argArraySize,
+				}
+			else
+				assert(argArraySize < 128)
+				code:insert{
+					'const/8',
+					'v'..(maxArgIndex+2),
+					argArraySize,
+				}
+			end
 			-- v{N+2} gets Object[] args
 			code:insert{
 				'new-array',
 				'v'..(maxArgIndex+2),
-				argArraySize,
+				'v'..(maxArgIndex+2),
 				'[java/lang/Object;',
 			}
 		else
