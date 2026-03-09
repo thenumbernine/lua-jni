@@ -16,11 +16,11 @@ end
 --[[
 Ok I gotta think of some way to describe the different names ...
 There's slash-separated names.  .class files use these.
-... arrays are [ prefix, primitives are single-letter. 
+... arrays are [ prefix, primitives are single-letter.
 There's L-slash-separated-semicolon names.  JNI-call-signatures use these, and .dex files use these.
-... arrays are [ prefix, primitives are single-letter. 
+... arrays are [ prefix, primitives are single-letter.
 There's dot-separated names.  The Java language API uses these.
-... arrays are [] suffix,primitives are whole words. 
+... arrays are [] suffix,primitives are whole words.
 --]]
 local function toSlashSepName(s)
 	s = s:match'^L(.*);$' or s	-- from L-slash-sep-; to slash-sep

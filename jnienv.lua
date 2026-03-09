@@ -5,9 +5,12 @@ local string = require 'ext.string'
 local table = require 'ext.table'
 local JavaClass = require 'java.class'
 local JavaObject = require 'java.object'
-local prims = require 'java.util'.prims
-local infoForPrims = require 'java.util'. infoForPrims
-local getJNISig = require 'java.util'.getJNISig
+
+local java_util = require 'java.util'
+local prims = java_util.prims
+local infoForPrims = java_util. infoForPrims
+local getJNISig = java_util.getJNISig
+local toSlashSepName = java_util.toSlashSepName
 
 local jboolean = ffi.typeof'jboolean'	-- uint8_t
 local jbyte = ffi.typeof'jbyte'			-- int8_t
@@ -860,23 +863,47 @@ function JNIEnv:_defineClass(asm, newClassName)
 		error('JNIEnv:_defineClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
 	end
 
-	newClassName = newClassName:gsub('%.', '/')
+	if self._usingAndroidJNI then
+		local loader = self.Thread:currentThread():getContextClassLoader()
 
-	local loader = self.Thread:currentThread():getContextClassLoader()
-	self:_checkExceptions()
-	local jclass = self._ptr[0].DefineClass(
-		self._ptr,
-		newClassName,
-		loader._ptr,
-		code,
-		#code)
-	self:_checkExceptions()
-	-- is DefineClass supposed to throw an exception on failure?
-	-- cuz on Android it's not...
-	if jclass == nil then
-		error("JNI DefineClass failed to load "..tostring(newClassName))
+		local byteCodeArray = self:_newArray('byte', #code)
+		do
+			local ptr = byteCodeArray:_map()
+			ffi.copy(ptr, code, #code)
+			byteCodeArray:_unmap(ptr)
+		end
+
+		local ByteBuffer = self.java.nio.ByteBuffer
+		assert(ByteBuffer._exists, "failed to find java.nio.ByteBuffer")
+		local byteBuf = ByteBuffer:wrap(byteCodeArray)
+
+		local InMemoryDexClassLoader = self.dalvik.system.InMemoryDexClassLoader
+		assert(InMemoryDexClassLoader._exists, "failed to find dalvik.system.InMemoryDexClassLoader")
+		local dexLoader = InMemoryDexClassLoader(byteBuf, loader)
+		local clobj = dexLoader:loadClass(newClassName)
+		if not clobj then
+			error("JNI DefineClass failed to load "..tostring(newClassName))
+		end
+		return self:_fromJClass(clobj._ptr)
+	else
+		local newClassNameSlashSep = toSlashSepName(newClassName)
+
+		local loader = self.Thread:currentThread():getContextClassLoader()
+		self:_checkExceptions()
+		local jclass = self._ptr[0].DefineClass(
+			self._ptr,
+			newClassNameSlashSep,
+			loader._ptr,
+			code,
+			#code)
+		self:_checkExceptions()
+		-- is DefineClass supposed to throw an exception on failure?
+		-- cuz on Android it's not...
+		if jclass == nil then
+			error("JNI DefineClass failed to load "..tostring(newClassName))
+		end
+		return self:_fromJClass(jclass)
 	end
-	return self:_fromJClass(jclass)
 end
 
 -- wrap a Lua function  in a lite-thread sub-Lua-state
