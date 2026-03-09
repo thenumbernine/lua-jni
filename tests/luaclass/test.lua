@@ -17,7 +17,7 @@ local Test = require 'java.luaclass'{
 			isStatic = true,
 			-- NOTICE I am initializing values as field's ConstantValue attribute
 			-- but it looks like javac initializes values as <clinit> assignment
-			value = {tag='long', value='137'},	-- structure used by JavaASMClass
+			value = {tag='long', value=137},	-- structure used by JavaASMClass
 			sig = 'long',
 		},
 		doo = {				-- key=string value=table, use name for key, and the rest of the value properties
