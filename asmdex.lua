@@ -2238,7 +2238,7 @@ function JavaASMDex:compile()
 
 	-------- now build the fields.
 
-	local function encodeField(cass, name, sig)
+	local function encodeField(class, name, sig)
 		return field_id_item{
 			classIndex = findType(class),
 			sigIndex = findType(sig),
