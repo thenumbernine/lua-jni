@@ -381,6 +381,7 @@ function M:run(args)
 							'valueOf',										-- method name
 							getJNISig{primInfo.boxedType, primInfo.name},	-- signature
 							'v'..localVarIndex,								-- argument
+							(argSig == 'long' or argSig == 'double') and 'v'..(localVarIndex+1) or nil
 						}
 						code:insert{
 							'move-result-object',
@@ -459,6 +460,7 @@ function M:run(args)
 				runMethodName,
 				runMethodSig,
 				'v'..maxArgIndex,		-- jlong funcptr
+				'v'..(maxArgIndex+1),
 				'v'..(maxArgIndex+2),	-- Object[] args index
 			}
 		else
