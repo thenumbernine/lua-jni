@@ -7,7 +7,6 @@ local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
 local JavaClass = require 'java.class'
-local JavaASMClass = require 'java.asmclass'
 local getJNISig = require 'java.util'.getJNISig
 local infoForPrims = require 'java.util'.infoForPrims
 
@@ -94,7 +93,7 @@ args:
 --]]
 function M:run(args)
 	local J = assert.index(args, 'env')
-
+	local isAndroid = J._usingAndroidJNI
 	local NativeCallback = require 'java.nativecallback'(J)
 
 	local classname = args.name
@@ -195,6 +194,7 @@ function M:run(args)
 			else
 				sig = {}	-- default to void()
 			end
+			method.sig = sig
 		end
 		sig[1] = sig[1] or 'void'
 		local returnType = sig[1]
@@ -209,6 +209,8 @@ function M:run(args)
 		end
 
 		local code = table()
+
+		-- .class-only, since .dex doesn't use a stack
 		local function pushConstInt(value)
 			if value == -1 then
 				code:insert{'iconst_m1'}
@@ -221,12 +223,12 @@ function M:run(args)
 
 		-- special for ctors, call parent
 		if method.name == '<init>' then
-			if J._usingAndroidJNI then
-				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V'}
-				code:insert{'return-void'}
+			if isAndroid then
+				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v0'}
 			else
-				code:insert{'aload_0'}
-				code:insert{'invokespecial', parentClass, '<init>', '()V'}	-- TODO this always calls the parent-class's <init>().  what about dif args?
+				code:insert{'aload_0'}		-- push 'this' onto the stack
+				-- TODO This always calls the parent-class's <init>().  what about dif args?
+				code:insert{'invokespecial', parentClass, '<init>', '()V'}
 			end
 		end
 
@@ -267,18 +269,50 @@ function M:run(args)
 			error("idk how to handle method value of type "..type(func))
 		end
 
+		-- map from arg # (1-based) to stack or register index # (0-based)
+		local argIndex = table()
+		-- in android do static methods have a 'this' equivalent, like 'class', like the JNI static calls do?
+		local maxArgIndex = method.isStatic and 0 or 1
+		for i=2,#sig do
+			local sigi = sig[i]
+			argIndex[i-1] = maxArgIndex
+			maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
+		end
+
 		-- now native callback will get ...
 		-- 1) a funcptr from a closure
-		code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
+		if isAndroid then
+			-- v0 has 'this' ... or 'class'? or null?
+			-- v1..v{N-1} have all the arguments ....
 
-		-- 2) an Object[] of {this, ... rest of args of the method}
+			-- v{N} & v{N+1} get jlong funcptr
+
+			-- TODO should I add a type arg to .dex const-wide?
+			--  or should I change .class to detect and remove the type arg?
+			code:insert{'const-wide', 'v'..maxArgIndex, ffi.cast('jlong', funcptr)}
+		else
+			code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
+		end
+
 		local sigNumArgs = #sig-1
 --DEBUG:print('sigNumArgs', sigNumArgs)
 		local argArraySize = sigNumArgs
 			-- +1 for 'this' unless it's static
 			+ (method.isStatic and 0 or 1)
-		pushConstInt(argArraySize)
-		code:insert{'anewarray', 'java/lang/Object'}
+
+		-- 2) an Object[] of {this, ... rest of args of the method}
+		if isAndroid then
+			-- v{N+2} gets Object[] args
+			code:insert{
+				'new-array',
+				'v'..(maxArgIndex+2),
+				argArraySize,
+				'[java/lang/Object;',
+			}
+		else
+			pushConstInt(argArraySize)
+			code:insert{'anewarray', 'java/lang/Object'}
+		end
 
 		-- set args[0] = this
 		-- if it's static, what to do?
@@ -287,10 +321,19 @@ function M:run(args)
 		local argArrayIndex = 0
 		-- to skip 'this' ... right?
 		if not method.isStatic then
-			code:insert{'dup'}
-			pushConstInt(0)		-- array index ...?
-			code:insert{'aload_'..argArrayIndex}	-- local index (0 for 'this')
-			code:insert{'aastore'}
+			if isAndroid then
+				code:insert{
+					'iput-object',
+					'v'..localVarIndex,		-- value to push: 'this'
+					'v'..(maxArgIndex+2),	-- array
+					argArrayIndex,			-- array index
+				}
+			else
+				code:insert{'dup'}
+				pushConstInt(argArrayIndex)				-- array index ...?
+				code:insert{'aload_'..localVarIndex}	-- local index (0 for 'this')
+				code:insert{'aastore'}
+			end
 			localVarIndex = localVarIndex + 1	-- start us at 1
 			argArrayIndex = argArrayIndex + 1
 		end
@@ -303,23 +346,45 @@ function M:run(args)
 				local argSig = sig[i+2]
 				local primInfo = infoForPrims[argSig]
 
-				local argOpcode = primInfo and 'iload' or 'aload'
-				if localVarIndex < 4 then
-					-- aload, iload, etc have 0123 as separate commands:
-					code:insert{argOpcode..'_'..localVarIndex}
-				else
-					code:insert{argOpcode, localVarIndex}
-				end
-				if primInfo then
+				if isAndroid then
+					if primInfo then
+						-- call 'valueOf' to box before storing
+						code:insert{
+							'invoke-static',
+							getJNISig(primInfo.boxedType),					-- class
+							'valueOf',										-- method name
+							getJNISig{primInfo.boxedType, primInfo.name},	-- signature
+							'v'..localVarIndex,								-- argument
+						}
+						code:insert{
+							'move-result-object',
+							'v'..localVarIndex,			-- can I do it destructively and overwrite the argument?
+						}
+					end
 					code:insert{
-						'invokestatic',
-						primInfo.boxedType,
-						'valueOf',
-						getJNISig{primInfo.boxedType, primInfo.name}
+						'iput-object',
+						'v'..localVarIndex,		-- value to push
+						'v'..(maxArgIndex+2),	-- array
+						argArrayIndex,
 					}
+				else
+					local argOpcode = primInfo and 'iload' or 'aload'
+					if localVarIndex < 4 then
+						-- aload, iload, etc have 0123 as separate commands:
+						code:insert{argOpcode..'_'..localVarIndex}
+					else
+						code:insert{argOpcode, localVarIndex}
+					end
+					if primInfo then
+						code:insert{
+							'invokestatic',
+							primInfo.boxedType,
+							'valueOf',
+							getJNISig{primInfo.boxedType, primInfo.name}
+						}
+					end
+					code:insert{'aastore'}
 				end
-
-				code:insert{'aastore'}
 
 				if argSig == 'long' or argSig == 'double' then
 					localVarIndex = localVarIndex + 2
@@ -331,35 +396,55 @@ function M:run(args)
 		end
 
 		-- call `NativeCallback.run(funcptr, Object[]{this, args...})`
-		code:insert{
-			'invokestatic',
-			NativeCallback._classpath,
-			assert(NativeCallback._runMethodName),
-			'(JLjava/lang/Object;)Ljava/lang/Object;',
-		}
+		local callbackClassPath = NativeCallback._classpath
+		local runMethodName = assert(NativeCallback._runMethodName)
+		local runMethodSig = '(JLjava/lang/Object;)Ljava/lang/Object;'
+		if isAndroid then
+			code:insert{
+				'invoke-static',
+				callbackClassPath,
+				runMethodName,
+				runMethodSig,
+				'v'..maxArgIndex,		-- jlong funcptr
+				'v'..(maxArgIndex+2),	-- Object[] args index
+			}
+		else
+			code:insert{
+				'invokestatic',
+				callbackClassPath,
+				runMethodName,
+				runMethodSig,
+			}
+		end
 
 		-- now on the stack is a java.lang.Object from NativeCallback.run()
 		-- next, convert it depending on this function's return type
 --DEBUG:print('returnType', returnType)
 		local primInfo = infoForPrims[returnType]
 		if returnType == 'void' then
-			code:insert{'return'}
+			code:insert{'return-void'}	-- aliased on .class to 'return'
 		elseif primInfo then
-			-- cast to BoxedType
-			code:insert{'checkcast', primInfo.boxedType}
-			code:insert{
-				'invokevirtual',
-				primInfo.boxedType,
-				primInfo.name..'Value',
-				getJNISig{primInfo.name},
-			}
-			code:insert{primInfo.returnOp}
+			if isAndroid then
+			else
+				-- cast to BoxedType
+				code:insert{'checkcast', primInfo.boxedType}
+				code:insert{
+					'invokevirtual',
+					primInfo.boxedType,
+					primInfo.name..'Value',
+					getJNISig{primInfo.name},
+				}
+				code:insert{primInfo.returnOp}
+			end
 		else
-			code:insert{
-				'checkcast',
-				(returnType:gsub('%.', '/')),
-			}
-			code:insert{'areturn'}
+			if isAndroid then
+			else
+				code:insert{
+					'checkcast',
+					(returnType:gsub('%.', '/')),
+				}
+				code:insert{'areturn'}
+			end
 		end
 
 		if method.isPublic == nil then method.isPublic = true end
@@ -375,7 +460,7 @@ function M:run(args)
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
 		-- provide a default ctor, no need for closure or callback
-		if J._usingAndroidJNI then
+		if isAndroid then
 			asmClassArgs.methods:insert{
 				isPublic = true,
 				isConstructor = true,
@@ -434,7 +519,13 @@ return
 		end
 	end
 
-	return J:_defineClass(JavaASMClass(asmClassArgs))
+	if isAndroid then
+		local JavaASMDex = require 'java.asmdex'
+		return J:_defineClass(JavaASMDex(asmClassArgs))
+	else
+		local JavaASMClass = require 'java.asmclass'
+		return J:_defineClass(JavaASMClass(asmClassArgs))
+	end
 end
 
 return setmetatable(M, {

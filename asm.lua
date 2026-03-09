@@ -266,6 +266,7 @@ function JavaASM:fromAsm(code)
 				local parts = string.split(methodDef, '%s+')
 				method.sig = assert(parts:remove(), "expected sig")
 				method.sig = sigStrToObj(method.sig)
+				assert.type(method.sig, 'table')
 				method.name = assert(parts:remove(), "expected name")
 				for _,part in ipairs(parts) do
 					method[assert.index({

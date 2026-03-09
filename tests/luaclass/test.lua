@@ -35,7 +35,7 @@ local Test = require 'java.luaclass'{
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
 			value = function(this, ...)
 				print('this=', this)
-				print('here with', ...)
+				print('here with args:', ...)
 				return 42
 			end,
 		},
@@ -54,9 +54,11 @@ local Test = require 'java.luaclass'{
 		{
 			name = 'testStatic',
 			isStatic = true,
-			sig = {'void'},
+			sig = {'void',
+				--'double'	-- TODO...
+			},
 			value = function(...)
-				print('here with', ...)
+				print('static method here with args:', ...)
 			end,
 		}
 		--]]

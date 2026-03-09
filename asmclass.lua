@@ -1532,6 +1532,9 @@ function JavaASMClass:compile()
 		field.sig = getJNISig(field.sig)
 	end
 	for _,method in ipairs(self.methods) do
+		if type(method.sig) ~= 'table' then
+			error("got invalid method sig: "..require'ext.tolua'(method.sig))
+		end
 		method.sig = getJNISig(method.sig)
 	end
 
