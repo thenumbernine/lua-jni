@@ -346,10 +346,12 @@ function M:run(args)
 		-- TODO pass the JavaObject of the java.lang.Class?
 		local localVarIndex = 0
 		local argArrayIndex = 0
+		if isAndroid then
+			localVarIndex = 4	-- pass our 3 outgoing and 1 local
+		end
 		-- to skip 'this' ... right?
 		if not method.isStatic then
 			if isAndroid then
-				localVarIndex = 4
 				--v3 = argArrayIndex
 				code:insert{'const', 'v3', argArrayIndex}
 				code:insert{

@@ -849,14 +849,15 @@ function Instr35c_type:read(hi, blob, asm)
 	instPushType(self, typeIndex, asm)
 
 	-- will the 3rd byte be read if there is only 1 A?
-	local x = blob:readu2()
-
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
+	local x = blob:readu2()
+	local C,D,E,F = tonibble(x)
+
 	local regs = table{
-		regname(bit.band(x, 0xf)),
-		regname(bit.band(bit.rshift(x, 4), 0xf)),
-		regname(bit.band(bit.rshift(x, 8), 0xf)),
-		regname(bit.band(bit.rshift(x, 12), 0xf)),
+		regname(C),
+		regname(D),
+		regname(E),
+		regname(F),
 		regname(G),
 	}
 	self:append(regs:sub(1, A))
@@ -866,16 +867,15 @@ function Instr35c_type:write(blob, asm)
 	if A < 1 or A > 5 then
 		error(self[1].." expected 1-5 args, found "..A)
 	end
+	local C = readregopt(self[3])
+	local D = readregopt(self[4])
+	local E = readregopt(self[5])
+	local F = readregopt(self[6])
 	local G = readregopt(self[7])
 
 	blob:writeu1(fromnibble(G, A))
 	blob:writeu2(instReadType(self, 2, asm))
-	blob:writeu2(bit.bor(
-		bit.band(0xf, readregopt(self[3])),
-		bit.lshift(bit.band(0xf, readregopt(self[4])), 4),
-		bit.lshift(bit.band(0xf, readregopt(self[5])), 8),
-		bit.lshift(bit.band(0xf, readregopt(self[6])), 12)
-	))
+	blob:writeu2(fromnibble(C, D, E, F))
 end
 function Instr35c_type:maxRegs()
 	return math.max(
@@ -900,14 +900,14 @@ function Instr35c_method:read(hi, blob, asm)
 	local methodIndex = blob:readu2()	-- B = method => self 2..4
 	instPushMethod(self, methodIndex, asm)
 
-	local x = blob:readu2()
-
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
+	local x = blob:readu2()
+	local C,D,E,F = tonibble(x)
 	local regs = table{
-		regname(bit.band(x, 0xf)),
-		regname(bit.band(bit.rshift(x, 4), 0xf)),
-		regname(bit.band(bit.rshift(x, 8), 0xf)),
-		regname(bit.band(bit.rshift(x, 12), 0xf)),
+		regname(C),
+		regname(D),
+		regname(E),
+		regname(F),
 		regname(G),
 	}
 	self:append(regs:sub(1, A))
@@ -917,16 +917,15 @@ function Instr35c_method:write(blob, asm)
 	if A < 0 or A > 5 then
 		error(self[1].." expected 0-5 args, found "..A)
 	end
+	local C = readregopt(self[5])
+	local D = readregopt(self[6])
+	local E = readregopt(self[7])
+	local F = readregopt(self[8])
 	local G = readregopt(self[9])
 
 	blob:writeu1(fromnibble(G, A))
 	blob:writeu2(instReadMethod(self, 2, asm))
-	blob:writeu2(bit.bor(
-		bit.band(0xf, readregopt(self[5])),
-		bit.lshift(bit.band(0xf, readregopt(self[6])), 4),
-		bit.lshift(bit.band(0xf, readregopt(self[7])), 8),
-		bit.lshift(bit.band(0xf, readregopt(self[8])), 12)
-	))
+	blob:writeu2(fromnibble(C, D, E, F))
 end
 function Instr35c_method:maxRegs()
 	return math.max(
@@ -2434,6 +2433,10 @@ function JavaASMDex:compile()
 				+ (protoProps.argTypes:mapi(function(jnisigi)
 						return (jnisigi == 'J' or jnisigi == 'D') and 2 or 1
 					end):sum() or 0)
+
+
+			-- TODO TODO
+			-- this is max # used for *calls*, not for *returns*
 			method.inferredRegsOut =
 				(isStaticNonCtor and 0 or 1)
 				+ (
