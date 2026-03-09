@@ -54,7 +54,8 @@ function M:run(env)
 	#invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
 	# TODO I don't yet translate classnames of invokes ...
 	#  so you have to use .dex preferred L//; format
-	invoke-direct Ljava/lang/Object; <init> ()V	# call ((java.lang.Object)this).<init>()
+	# TODO do I need an explicit 'v0' at the end, or should it be implicit?
+	invoke-direct Ljava/lang/Object; <init> ()V	v0
 	return-void
 .end method
 .method public static native <?=runMethodName?> <?=runMethodSig?>
