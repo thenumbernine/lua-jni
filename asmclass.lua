@@ -19,6 +19,7 @@ My best attempt at interpreting. ..
 https://docs.oracle.com/javase/specs/jvms/se10/html/jvms-4.html
 https://en.wikipedia.org/wiki/List_of_JVM_bytecode_instructions
 --]]
+require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
 local table = require 'ext.table'
 local assert = require 'ext.assert'

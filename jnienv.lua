@@ -1,3 +1,4 @@
+require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
 local class = require 'ext.class'
 local assert = require 'ext.assert'

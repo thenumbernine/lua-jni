@@ -3,6 +3,7 @@ https://source.android.com/docs/core/runtime/dex-format
 https://source.android.com/docs/core/runtime/dalvik-bytecode
 https://source.android.com/docs/core/runtime/instruction-formats
 --]]
+require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
 local class = require 'ext.class'
 local assert = require 'ext.assert'
@@ -29,6 +30,9 @@ local fieldAccessFlags = java_util.fieldAccessFlags
 local methodAccessFlags = java_util.methodAccessFlags
 local toLSlashSepSemName = java_util.toLSlashSepSemName
 local toDotSepName  = java_util.toDotSepName
+
+
+local jlong = ffi.typeof'jlong'
 
 
 -- https://en.wikipedia.org/wiki/Adler-32
@@ -1110,7 +1114,7 @@ function Instr51l_long:read(hi, blob, asm)
 end
 function Instr51l_long:write(blob, asm)
 	blob:writeu1(readreg(self[2]))
-	blob:write('jlong', self[3])
+	blob:write(jlong(self[3]))
 end
 function Instr51l_long:maxRegs()
 	return readreg(self[2]) + 2	-- long/double takes 2 regs
