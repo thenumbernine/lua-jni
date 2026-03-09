@@ -839,6 +839,58 @@ function JNIEnv:_javaToLuaArg(value, returnType)
 	}
 end
 
+-- _defineClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
+--[[
+'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)
+'newClassName' = classname, not necessary if using a JavaASMClass/JavaASMDex object.
+--]]
+function JNIEnv:_defineClass(asm, newClassName)
+	local code
+	if type(asm) == 'string' then
+		code = asm
+	elseif type(asm) == 'table' then
+		--if JavaASMClass:isa(asm) or JavaASMDex:isa(asm) then
+--DEBUG:print('asm class:')
+--DEBUG:print(require 'ext.tolua'(asm))
+		code = asm:compile()
+--DEBUG:print('asm class code')
+--DEBUG:print(require 'ext.string'.hexdump(code))
+		newClassName = newClassName or asm.thisClass
+	else
+		error('JNIEnv:_defineClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
+	end
+
+	newClassName = newClassName:gsub('%.', '/')
+
+	local loader = self.Thread:currentThread():getContextClassLoader()
+	self:_checkExceptions()
+	local jclass = self._ptr[0].DefineClass(
+		self._ptr,
+		newClassName,
+		loader._ptr,
+		code,
+		#code)
+	self:_checkExceptions()
+	-- is DefineClass supposed to throw an exception on failure?
+	-- cuz on Android it's not...
+	if jclass == nil then
+		error("JNI DefineClass failed to load "..tostring(newClassName))
+	end
+	return self:_fromJClass(jclass)
+end
+
+-- wrap a Lua function  in a lite-thread sub-Lua-state
+-- and return the java.lang.Runnable JavaObject that contains a callback to it
+-- such that it is multithread-safe even in single-threaded LuaJIT
+function JNIEnv:_safeRunnable(func)
+	assert.type(func, 'function')
+	local JavaSafeRunnable = require 'java.saferunnable'
+	return JavaSafeRunnable{
+		env = self,
+		func = func,
+	}
+end
+
 function JNIEnv:__tostring()
 	return self.__name..'('..tostring(self._ptr)..')'
 end
@@ -906,6 +958,7 @@ Name = class()
 Name.__name = 'Name'
 Name.subclass = nil
 
+Name._notthere = true	-- query this to know the class you're looking for isn't there...
 function Name:init(args)
 	rawset(self, '_env', assert.index(args, 'env'))
 	rawset(self, '_name', assert.index(args, 'name'))
@@ -955,58 +1008,6 @@ assert.eq(true, env._ignoringExceptions)
 
 --DEBUG:print('Name __index', k, 'classpath', classpath)
 	return Name{env=env, name=classpath}
-end
-
--- _defineClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
---[[
-'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)
-'newClassName' = classname, not necessary if using a JavaASMClass/JavaASMDex object.
---]]
-function JNIEnv:_defineClass(asm, newClassName)
-	local code
-	if type(asm) == 'string' then
-		code = asm
-	elseif type(asm) == 'table' then
-		--if JavaASMClass:isa(asm) or JavaASMDex:isa(asm) then
---DEBUG:print('asm class:')
---DEBUG:print(require 'ext.tolua'(asm))
-		code = asm:compile()
---DEBUG:print('asm class code')
---DEBUG:print(require 'ext.string'.hexdump(code))
-		newClassName = newClassName or asm.thisClass
-	else
-		error('JNIEnv:_defineClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
-	end
-
-	newClassName = newClassName:gsub('%.', '/')
-
-	local loader = self.Thread:currentThread():getContextClassLoader()
-	self:_checkExceptions()
-	local jclass = self._ptr[0].DefineClass(
-		self._ptr,
-		newClassName,
-		loader._ptr,
-		code,
-		#code)
-	self:_checkExceptions()
-	-- is DefineClass supposed to throw an exception on failure?
-	-- cuz on Android it's not...
-	if jclass == nil then
-		error("JNI DefineClass failed to load "..tostring(newClassName))
-	end
-	return self:_fromJClass(jclass)
-end
-
--- wrap a Lua function  in a lite-thread sub-Lua-state
--- and return the java.lang.Runnable JavaObject that contains a callback to it
--- such that it is multithread-safe even in single-threaded LuaJIT
-function JNIEnv:_safeRunnable(func)
-	assert.type(func, 'function')
-	local JavaSafeRunnable = require 'java.saferunnable'
-	return JavaSafeRunnable{
-		env = self,
-		func = func,
-	}
 end
 
 return JNIEnv
