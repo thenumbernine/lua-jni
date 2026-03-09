@@ -489,7 +489,7 @@ function M:run(args)
 				code:insert{
 					'check-cast',
 					'v1',
-					getJNISig(erturnType)
+					getJNISig(returnType)
 				}
 				code:insert{'return-object', 'v1'}
 			else
