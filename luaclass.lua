@@ -441,7 +441,7 @@ function M:run(args)
 		if isAndroid then
 			code:insert{
 				'invoke-static',
-				callbackClassPath,
+				getJNISig(callbackClassPath),
 				runMethodName,
 				runMethodSig,
 				'v'..maxArgIndex,		-- jlong funcptr
