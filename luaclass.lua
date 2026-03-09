@@ -280,22 +280,6 @@ function M:run(args)
 		end
 --DEBUG:print('method', method.name, require 'ext.tolua'(method.sig))
 --DEBUG:print('argIndex', require 'ext.tolua'(argIndex))
-		-- now native callback will get ...
-		-- 1) a funcptr from a closure
-		if isAndroid then
-			-- v0 has 'this' ... or 'class'? or null?
-			-- v1..v{N-1} have all the arguments ....
-
-			-- v{N} & v{N+1} get jlong funcptr
-
-			-- TODO should I add a type arg to .dex const-wide?
-			--  or should I change .class to detect and remove the type arg?
-			code:insert{'const-wide', 'v'..maxArgIndex, ffi.cast('jlong', funcptr)}
-		else
-			-- stack:
-			code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
-			-- stack: long funcptr
-		end
 
 		local sigNumArgs = #sig-1
 --DEBUG:print('sigNumArgs', sigNumArgs)
@@ -303,29 +287,53 @@ function M:run(args)
 			-- +1 for 'this' unless it's static
 			+ (method.isStatic and 0 or 1)
 
+		--[[
+		me learning android
+		maybe this is wrong
+		but
+		maxRegs = # used for calling out (regsOut) ... at the beginning
+			+ any local use only regs ... go next
+			+ # used for being called (regIn, determined by arg types + static or not) ... go at the end
+		--]]
+		if isAndroid then
+			-- v0 & v1 for funcptr
+			-- v2 for Object[] list
+			method.regsOut = 3
+			-- v3 = local for array index
+			-- so that means 'this' is at v4
+			-- and the rest of the args are past v3 ...
+			-- ... right?
+			method.regsIn = maxArgIndex
+			local numLocals = 1
+			method.maxRegs = method.regsOut + numLocals + method.regsIn
+		end
+
+		-- now native callback will get ...
+		-- 1) a funcptr from a closure
+		if isAndroid then
+			-- v4 has 'this' ... or 'class'? or null?
+			-- v5... have all the arguments ....
+			-- v0&v1 get jlong funcptr
+
+			-- TODO should I add a type arg to .dex const-wide?
+			--  or should I change .class to detect and remove the type arg?
+			code:insert{'const-wide', 'v0', ffi.cast('jlong', funcptr)}
+		else
+			-- stack:
+			code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
+			-- stack: long funcptr
+		end
+
 		-- 2) an Object[] of {this, ... rest of args of the method}
 		if isAndroid then
 			if argArraySize < 8 then
-				code:insert{
-					'const/4',
-					'v'..(maxArgIndex+2),
-					argArraySize,
-				}
+				code:insert{'const/4', 'v2', argArraySize}
 			else
-				assert(argArraySize < 128)
-				code:insert{
-					'const/8',
-					'v'..(maxArgIndex+2),
-					argArraySize,
-				}
+				assert(argArraySize < 128, 'more plz')
+				code:insert{'const/8', 'v2', argArraySize}
 			end
-			-- v{N+2} gets Object[] args
-			code:insert{
-				'new-array',
-				'v'..(maxArgIndex+2),
-				'v'..(maxArgIndex+2),
-				'[java/lang/Object;',
-			}
+			-- v2 gets Object[] args
+			code:insert{'new-array', 'v2', 'v2', '[java/lang/Object;'}
 		else
 			-- stack: [Object this], long funcptr
 			pushConstInt(argArraySize)
@@ -341,16 +349,14 @@ function M:run(args)
 		-- to skip 'this' ... right?
 		if not method.isStatic then
 			if isAndroid then
-				code:insert{
-					'const',
-					'v'..(maxArgIndex+3),	--v{N+3} = argArrayIndex
-					argArrayIndex,
-				}
+				localVarIndex = 4
+				--v3 = argArrayIndex
+				code:insert{'const', 'v3', argArrayIndex}
 				code:insert{
 					'aput-object',
 					'v'..localVarIndex,		-- reg with value to push: 'this'
-					'v'..(maxArgIndex+2),	-- reg with array
-					'v'..(maxArgIndex+3),	-- reg with array index
+					'v2',	-- reg with array
+					'v3',	-- reg with array index
 				}
 			else
 				code:insert{'dup'}
@@ -388,16 +394,13 @@ function M:run(args)
 							'v'..localVarIndex,			-- can I do it destructively and overwrite the argument?
 						}
 					end
-					code:insert{
-						'const',
-						'v'..(maxArgIndex+3),	--v{N+3} = argArrayIndex
-						argArrayIndex,
-					}
+					--v3 = argArrayIndex
+					code:insert{'const', 'v3', argArrayIndex}
 					code:insert{
 						'aput-object',
 						'v'..localVarIndex,		-- reg with value to push: local #localVarIndex
-						'v'..(maxArgIndex+2),	-- reg with array
-						'v'..(maxArgIndex+3),	-- reg with array index
+						'v2',					-- reg with array
+						'v3',					-- reg with array index
 					}
 				else
 					code:insert{'dup'}
@@ -459,9 +462,9 @@ function M:run(args)
 				getJNISig(callbackClassPath),
 				runMethodName,
 				runMethodSig,
-				'v'..maxArgIndex,		-- jlong funcptr
-				'v'..(maxArgIndex+1),
-				'v'..(maxArgIndex+2),	-- Object[] args index
+				'v0',		-- jlong funcptr
+				'v1',
+				'v2'		-- Object[] args index
 			}
 		else
 			code:insert{
@@ -481,8 +484,8 @@ function M:run(args)
 		elseif primInfo then
 			if isAndroid then
 				-- cast to boxed type
-				code:insert{'move-result-object', 'v1'}
-				code:insert{'check-cast', 'v1', getJNISig(primInfo.boxedType)}
+				code:insert{'move-result-object', 'v0'}
+				code:insert{'check-cast', 'v0', getJNISig(primInfo.boxedType)}
 				-- convert back to value
 				code:insert{
 					'invoke-virtual',
@@ -491,11 +494,11 @@ function M:run(args)
 					getJNISig{primInfo.name},
 				}
 				if primInfo.name == 'long' or primInfo.name == 'double' then
-					code:insert{'move-result-wide', 'v1'}
-					code:insert{'return-wide', 'v1'}
+					code:insert{'move-result-wide', 'v0'}
+					code:insert{'return-wide', 'v0'}
 				else
-					code:insert{'move-result', 'v1'}
-					code:insert{'return', 'v1'}
+					code:insert{'move-result', 'v0'}
+					code:insert{'return', 'v0'}
 				end
 			else
 				-- cast to boxed type
@@ -511,13 +514,13 @@ function M:run(args)
 			end
 		else
 			if isAndroid then
-				code:insert{'move-result-object', 'v1'}
+				code:insert{'move-result-object', 'v0'}
 				code:insert{
 					'check-cast',
-					'v1',
+					'v0',
 					getJNISig(returnType)
 				}
-				code:insert{'return-object', 'v1'}
+				code:insert{'return-object', 'v0'}
 			else
 				code:insert{
 					'checkcast',
