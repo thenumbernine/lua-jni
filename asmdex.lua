@@ -232,14 +232,19 @@ local function instReadString(inst, index, asm)
 end
 
 local function instPushType(inst, typeIndex, asm)
-	local typ = asm.types[1+typeIndex]
-	if not typ then
+	local typestr = asm.types[1+typeIndex]
+	if not typestr then
 		error('OOB type '..typeIndex)
 	end
-	inst:insert(typ)
+	inst:insert(
+		typestr -- toDotSepName(typestr)
+	)
 end
 local function instReadType(inst, index, asm)
-	return (asm.findString(inst[index]))
+	return (asm.findString(
+		-- how about prims?  are they jni-signature style?
+		inst[index]	-- toLSlashSepName(inst[index])
+	))
 end
 
 local function instPushProto(inst, protoIndex, asm)
@@ -258,12 +263,16 @@ local function instPushField(inst, fieldIndex, asm)
 	if not field then
 		error('OOB field '..fieldIndex)
 	end
-	inst:insert(toLSlashSepSemName(field.class))
+	inst:insert(field.class) --toDotSepName(field.class))
 	inst:insert(field.name)
 	inst:insert(field.sig)
 end
 local function instReadField(inst, index, asm)
-	return (asm.findField(inst[index], inst[index+1], inst[index+2]))
+	return (asm.findField(
+		toLSlashSepSemName(inst[index]),	-- class
+		inst[index+1],					-- name
+		inst[index+2]					-- sig
+	))
 end
 
 local function instPushMethod(inst, methodIndex, asm)
@@ -271,7 +280,7 @@ local function instPushMethod(inst, methodIndex, asm)
 	if not method then
 		error('OOB method '..methodIndex)
 	end
-	inst:insert(toLSlashSepSemName(method.class))
+	inst:insert(method.class) --toDotSepName(method.class))
 	inst:insert(method.name)
 	inst:insert(method.sig)
 end
@@ -282,7 +291,11 @@ local function instReadMethod(inst, index, asm)
 	then
 		error("instruction needs args "..index..'-'..(index+2)..': '..require'ext.tolua'(inst))
 	end
-	return (asm.findMethod(inst[index], inst[index+1], inst[index+2]))
+	return (asm.findMethod(
+		toLSlashSepSemName(inst[index]),	-- class
+		inst[index+1],					-- name
+		inst[index+2]					-- sig
+	))
 end
 
 
@@ -780,96 +793,100 @@ end
 
 local Instr35c_type = Instr:subclass()
 function Instr35c_type:read(hi, blob, asm)
-	local argc = bit.band(hi, 0xf)
-	if argc < 1 or argc > 5 then
-		error(self[1].." expected 1-5 args, found "..argc)
+	local A = bit.band(0xf, bit.rshift(hi, 4))
+	if A < 1 or A > 5 then
+		error(self[1].." expected 1-5 args, found "..A)
 	end
 
-	local typeIndex = blob:readu2()	-- B = type
+	local typeIndex = blob:readu2()	-- B = type => self[2]
 	instPushType(self, typeIndex, asm)
 
-	-- will the 3rd byte be read if there is only 1 argc?
+	-- will the 3rd byte be read if there is only 1 A?
 	local x = blob:readu2()
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
+	local G = bit.band(hi, 0xf)
 	local regs = table{
-		regname(bit.band(bit.rshift(hi, 4), 0xf)),
 		regname(bit.band(x, 0xf)),
 		regname(bit.band(bit.rshift(x, 4), 0xf)),
 		regname(bit.band(bit.rshift(x, 8), 0xf)),
 		regname(bit.band(bit.rshift(x, 12), 0xf)),
+		regname(G),
 	}
-	self:append(regs:sub(1, argc))
+	self:append(regs:sub(1, A))
 end
 function Instr35c_type:write(blob, asm)
-	local argc = #self - 2
-	if argc < 1 or argc > 5 then
-		error(self[1].." expected 1-5 args, found "..argc)
+	local A = #self - 2
+	if A < 1 or A > 5 then
+		error(self[1].." expected 1-5 args, found "..A)
 	end
 
+	local G = readregopt(self[7])
 	blob:writeu1(bit.bor(
-		argc,
-		bit.lshift(bit.band(0xf, readregopt(self[4])), 4)
+		bit.band(0xf, G),
+		bit.lshift(bit.band(0xf, A), 4)
 	))
-	blob:writeu2(instReadType(self, 3, asm))
+	blob:writeu2(instReadType(self, 2, asm))
+	blob:writeu2(bit.bor(
+		bit.band(0xf, readregopt(self[3])),
+		bit.lshift(bit.band(0xf, readregopt(self[4])), 4),
+		bit.lshift(bit.band(0xf, readregopt(self[5])), 8),
+		bit.lshift(bit.band(0xf, readregopt(self[6])), 12)
+	))
+end
+function Instr35c_type:maxRegs()
+	return math.max(
+		readregopt(self[3], -1),
+		readregopt(self[4], -1),
+		readregopt(self[5], -1),
+		readregopt(self[6], -1),
+		readregopt(self[7], -1)
+	) + 1
+end
+function Instr35c_type:traverse(visit)
+	visit:type(self[2])
+end
+
+local Instr35c_method = Instr:subclass()
+function Instr35c_method:read(hi, blob, asm)
+	local A = bit.band(0xf, bit.rshift(hi, 4))
+	if A < 0 or A > 5 then
+		error(self[1].." expected 0-5 args, found "..A)
+	end
+
+	local methodIndex = blob:readu2()	-- B = method => self 2..4
+	instPushMethod(self, methodIndex, asm)
+	
+	local x = blob:readu2()
+
+	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
+	local G = bit.band(hi, 0xf)
+	local regs = table{
+		regname(bit.band(x, 0xf)),
+		regname(bit.band(bit.rshift(x, 4), 0xf)),
+		regname(bit.band(bit.rshift(x, 8), 0xf)),
+		regname(bit.band(bit.rshift(x, 12), 0xf)),
+		regname(G),
+	}
+	self:append(regs:sub(1, A))
+end
+function Instr35c_method:write(blob, asm)
+	local A = #self - 4
+	if A < 0 or A > 5 then
+		error(self[1].." expected 0-5 args, found "..A)
+	end
+
+	local G = readregopt(self[9])
+	blob:writeu1(bit.bor(
+		bit.band(0xf, G),
+		bit.lshift(bit.band(0xf, A), 4)
+	))
+	blob:writeu2(instReadMethod(self, 2, asm))
 	blob:writeu2(bit.bor(
 		bit.band(0xf, readregopt(self[5])),
 		bit.lshift(bit.band(0xf, readregopt(self[6])), 4),
 		bit.lshift(bit.band(0xf, readregopt(self[7])), 8),
 		bit.lshift(bit.band(0xf, readregopt(self[8])), 12)
-	))
-end
-function Instr35c_type:maxRegs()
-	return math.max(
-		readregopt(self[4], -1),
-		readregopt(self[5], -1),
-		readregopt(self[6], -1),
-		readregopt(self[7], -1),
-		readregopt(self[8], -1)
-	) + 1
-end
-function Instr35c_type:traverse(visit)
-	visit:type(self[3])
-end
-
-local Instr35c_method = Instr:subclass()
-function Instr35c_method:read(hi, blob, asm)
-	local argc = bit.band(hi, 0xf)
-	if argc < 0 or argc > 5 then
-		error(self[1].." expected 0-5 args, found "..argc)
-	end
-
-	local methodIndex = blob:readu2()	-- B = method
-	instPushMethod(self, methodIndex, asm)
-
-	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
-	local x = blob:readu2()
-
-	local regs = table{
-		regname(bit.band(bit.rshift(hi, 4), 0xf)),
-		regname(bit.band(x, 0xf)),
-		regname(bit.band(bit.rshift(x, 4), 0xf)),
-		regname(bit.band(bit.rshift(x, 8), 0xf)),
-		regname(bit.band(bit.rshift(x, 12), 0xf)),
-	}
-	self:append(regs:sub(1, argc))
-end
-function Instr35c_method:write(blob, asm)
-	local argc = #self - 4
-	if argc < 0 or argc > 5 then
-		error(self[1].." expected 0-5 args, found "..argc)
-	end
-
-	blob:writeu1(bit.bor(
-		argc,
-		bit.lshift(bit.band(0xf, readregopt(self[5])), 4)
-	))
-	blob:writeu2(instReadMethod(self, 2, asm))
-	blob:writeu2(bit.bor(
-		bit.band(0xf, readregopt(self[6])),
-		bit.lshift(bit.band(0xf, readregopt(self[7])), 4),
-		bit.lshift(bit.band(0xf, readregopt(self[8])), 8),
-		bit.lshift(bit.band(0xf, readregopt(self[9])), 12)
 	))
 end
 function Instr35c_method:maxRegs()
@@ -1351,7 +1368,7 @@ key differences in ASMDex vs ASMClass:
 - - they will have a .class table holding the, thisClass, superClass, and class access flags
 - - each method and field will have a .class reference
 - internally .dex uses some weird convoluted arg type list and "shorty" (smh Google...) arg string that is a typical Java function jni arg signature string but with a) return type first, b) parenthesis removed, and c) all class names removed.
-- .dex methods havae "maxRegs", "regsIn", "regsOut" where .class methods have "maxLocals" and "maxStacks"
+- .dex methods have "maxRegs", "regsIn", "regsOut" where .class methods have "maxLocals" and "maxStacks"
 - the instruction sets are different
 - optional attributes differ
 --]]
@@ -1653,6 +1670,8 @@ io.stderr:write('TODO support dynamically-linked .dex files\n')
 						local debugInfoOfs = codeItem.debugInfoOfs
 						-- codeItem.instSize is "in 16-bit code units..." ... this is the number of uint16_t's
 						local instEndOfs = blob.ofs + bit.lshift(codeItem.instSize, 1)
+-- me double-checking that my re-encoding of asm is correct...
+method.codeData = string.bytes(ffi.string(blob.data.v + blob.ofs, bit.lshift(codeItem.instSize, 1)))
 						local code = table()
 						method.code = code
 						while blob.ofs < instEndOfs do

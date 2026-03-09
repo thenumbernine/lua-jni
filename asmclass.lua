@@ -400,14 +400,14 @@ local InstrClassesForOp = {
 	[0x2b] = Instr:subclass{name='aload_1', stackadd=1, maxLocals=2},	-- → objectref .... load a reference onto the stack from local variable 1
 	[0x2c] = Instr:subclass{name='aload_2', stackadd=1, maxLocals=3},	-- → objectref .... load a reference onto the stack from local variable 2
 	[0x2d] = Instr:subclass{name='aload_3', stackadd=1, maxLocals=4},	-- → objectref .... load a reference onto the stack from local variable 3
-	[0x2e] = Instr:subclass{name='iaload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load an int from an array
-	[0x2f] = Instr:subclass{name='laload', stacksub=2, stackadd=2},	-- arrayref, index → value .... load a long from an array
-	[0x30] = Instr:subclass{name='faload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a float from an array
-	[0x31] = Instr:subclass{name='daload', stacksub=2, stackadd=2},	-- arrayref, index → value .... load a double from an array
-	[0x32] = Instr:subclass{name='aaload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load onto the stack a reference from an array
-	[0x33] = Instr:subclass{name='baload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a byte or Boolean value from an array
-	[0x34] = Instr:subclass{name='caload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load a char from an array
-	[0x35] = Instr:subclass{name='saload', stacksub=2, stackadd=1},	-- arrayref, index → value .... load short from array
+	[0x2e] = Instr:subclass{name='iaload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load an int from an array
+	[0x2f] = Instr:subclass{name='laload', stacksub=2, stackadd=2},		-- arrayref, index → value .... load a long from an array
+	[0x30] = Instr:subclass{name='faload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load a float from an array
+	[0x31] = Instr:subclass{name='daload', stacksub=2, stackadd=2},		-- arrayref, index → value .... load a double from an array
+	[0x32] = Instr:subclass{name='aaload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load onto the stack a reference from an array
+	[0x33] = Instr:subclass{name='baload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load a byte or Boolean value from an array
+	[0x34] = Instr:subclass{name='caload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load a char from an array
+	[0x35] = Instr:subclass{name='saload', stacksub=2, stackadd=1},		-- arrayref, index → value .... load short from array
 
 	-- 1: index .... value → .... store int value into variable #index
 	-- TODO in some cases where the previous instruction is a pushed int, the maxLocals from this can be deterministic...
@@ -991,6 +991,14 @@ local InstrClassesForOp = {
 local opForInstName = table.map(InstrClassesForOp, function(cl, op)
 	return op, cl.name
 end)
+
+-- maybe some alt instruction names for dex compat?
+opForInstName['return-void'] = assert.index(opForInstName, 'return')
+opForInstName['return-int'] = assert.index(opForInstName, 'ireturn')
+opForInstName['return-long'] = assert.index(opForInstName, 'lreturn')
+opForInstName['return-float'] = assert.index(opForInstName, 'freturn')
+opForInstName['return-double'] = assert.index(opForInstName, 'dreturn')
+opForInstName['return-object'] = assert.index(opForInstName, 'areturn')
 
 
 local JavaASMClass = JavaASM:subclass()

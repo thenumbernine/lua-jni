@@ -2,9 +2,9 @@
 
 I'm sure this has been done before, but here's my version.
 
-This library includes...
-- LuaJIT binding file for `jni.h`
-- Some Lua-wrapping classes for JavaVM, JNIEnv, etc.
+This library includes:
+- LuaJIT binding file for direct access to C API of `jni.h`
+- Lua-wrapping classes for JavaVM, JNIEnv, etc.
 - JavaObject's and JavaClass's, to write nearly-Java-identical code in LuaJIT -- no more type declarations required!
 - A JavaASMClass class for assembling Java in LuaJIT.  Create new classes at runtime -- no more `javac` required!
 - Java-native callback and Lua binding layer.  Create new Java classes from Lua functions!
@@ -27,11 +27,7 @@ local jvm = JVM{
 	},
 }
 local J = jvm.jniEnv
-```
 
-From there:
-
-```
 J.System.out:println("hello java")
 ```
 
