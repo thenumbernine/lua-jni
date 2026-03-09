@@ -22,6 +22,7 @@ files = {
 	"method.lua",
 	"nativecallback.lua",
 	"object.lua",
+	"saferunnable.lua",
 	"string.lua",
 	"tests/applet-lambdas/applet_lambdas.lua",
 	"tests/asmclass/TestClassVisitor.java",
@@ -74,13 +75,14 @@ files = {
 	"tests/javac/runnable.lua",
 	"tests/javac/runnable_mt.lua",
 	"tests/javafx/TestJavaFX.java",
-	"tests/luaclass/applet_sam.lua",
 	"tests/luaclass/javafx.lua",
 	"tests/luaclass/runnable.lua",
 	"tests/luaclass/runnable_mt.lua",
 	"tests/luaclass/test.lua",
 	"tests/luaclass/test2.lua",
 	"tests/println.lua",
+	"tests/swing/applet-lua-ser-func.lua",
+	"tests/swing/applet.lua",
 	"tests/test/Test.java",
 	"tests/test/TestTest.java",
 	"tests/test/test.lua",
@@ -90,12 +92,13 @@ files = {
 deps = {
 	"ext",
 	--"ffi",	-- for tests/, just for ffi.c.pthread, for getting pthread_self()
+	"lua",	-- for use with java.saferunnable
 	"make",	-- used by java/build.lua, only if you want to invoke `gcc` or `javac` at runtime.
 	"sha2",	-- used by java/asmdex.lua
-	"stl",	-- java/blob.lua
+	"stl",	-- java/blob.lua, which is used by java/asmclass.lua or java/asmdex.lua
 	"struct",	-- slowly incorporating this into the asm reader/writers
 	"template",	-- now that I'm writing java asm, template is useful.  java/nativeclass.lua
-	--"thread",	-- for tests/
+	"thread",	-- for use with java.saferunnable
 }
 generateBindings = ||{
 	{

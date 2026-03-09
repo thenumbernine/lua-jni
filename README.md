@@ -332,12 +332,22 @@ Notice that the names in instructions are slash-separated unlike the dot-separat
 - `cl = asmClass:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
 
 
+### JavaASMDex
+`JavaASMDex = require 'java.asmdex'`
+
+Same as JavaASMClass but for `.dex` files.
+
+
 ### NativeCallback
 `NativeCallback = require 'java.nativecallback`
 
-This is a helper class to provide the one and only C JNI function that I need to do LuaJIT -> Java -> LuaJIT calls.
-Maybe I'll slowly merge its functionality more and more with JavaASMClass and JavaLuaClass...
+This is a helper class to call native callbacks that are either C or LuaJIT function closures.  It is generated with JavaASMClass/JavaASMDex at runtime, and loaded using `JNIEnv:_defineClass()`.
 
+### SafeRunnable
+- `SafeRunnable = require 'java.saferunnable`
+- `env:_safeRunnable(function(newThreadEnv) ... end)`
+
+This creates a subclass of `java.lang.Runnable` that provides a safe callback when invoked in Java on new threads.  The callback will be created with a new sub-Lua-state to prevent unsafe access of a single-threaded Lua state.
 
 <hr>
 
@@ -358,7 +368,8 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - [lua-struct](http://github.com/thenumbernine/struct-lua) - Using with the ASM file formats.
 - [lua-template](http://github.com/thenumbernine/lua-template) - Using with my ASM writing in places like `java/nativecallback.lua`. 
 - [lua-stl](http://github.com/thenumbernine/lua-stl) - I tried hard not to use this, but here it is, used in the ASM file blob reader/writers, for the stl-vector implementation.  Maybe I'll replace it with a luajit string.buffer.
-- [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread`.
+- [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread` or `java/saferunnable.lua`.
+- [lua-lua](https://github.com/thenumbernine/lua-lua) - optional, if you want to use `java.lang.Thread` or `java/saferunnable.lua`.
 - [lua-make](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the `java/build.lua` file to invoke javac or gcc.
 - [SHA2](https://github.com/Egor-Skriptunoff/pure_lua_SHA) - optional, but required if you are using `java/asmdex.lua`.
 
