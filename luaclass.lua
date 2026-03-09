@@ -208,6 +208,45 @@ function M:run(args)
 			io.stderr:write'!!! WARNING !!! You are defining a class method toString() with an atypical signature.  In my experience the VM will segfault next, or just warn you if you are lucky.  Enjoy.\n'
 		end
 
+		-- map from arg # (1-based) to stack or register index # (0-based)
+		local argIndex = table()
+		-- in android do static methods have a 'this' equivalent, like 'class', like the JNI static calls do?
+		local maxArgIndex = method.isStatic and 0 or 1
+		for i=2,#sig do
+			local sigi = sig[i]
+			argIndex[i-1] = maxArgIndex
+			maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
+		end
+--DEBUG:print('method', method.name, require 'ext.tolua'(method.sig))
+--DEBUG:print('argIndex', require 'ext.tolua'(argIndex))
+
+		local sigNumArgs = #sig-1
+--DEBUG:print('sigNumArgs', sigNumArgs)
+		local argArraySize = sigNumArgs
+			-- +1 for 'this' unless it's static
+			+ (method.isStatic and 0 or 1)
+
+		--[[
+		me learning android
+		maybe this is wrong
+		but
+		maxRegs = # used for calling out (regsOut) ... at the beginning
+			+ any local use only regs ... go next
+			+ # used for being called (regIn, determined by arg types + static or not) ... go at the end
+		--]]
+		if isAndroid then
+			-- v2 for Object[] list
+			-- v0 & v1 for funcptr
+			method.regsOut = 3
+			-- v3 = local for array index
+			-- so that means 'this' is at v4
+			-- and the rest of the args are past v3 ...
+			-- ... right?
+			method.regsIn = maxArgIndex
+			local numLocals = 1
+			method.maxRegs = method.regsOut + numLocals + method.regsIn
+		end
+
 		local code = table()
 
 		-- .class-only, since .dex doesn't use a stack
@@ -224,7 +263,7 @@ function M:run(args)
 		-- special for ctors, call parent
 		if method.name == '<init>' then
 			if isAndroid then
-				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v0'}
+				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v4'}	-- v4 has 'this'
 			else
 				code:insert{'aload_0'}		-- push 'this' onto the stack
 				-- TODO This always calls the parent-class's <init>().  what about dif args?
@@ -267,45 +306,6 @@ function M:run(args)
 			funcptr = closure
 		else
 			error("idk how to handle method value of type "..type(func))
-		end
-
-		-- map from arg # (1-based) to stack or register index # (0-based)
-		local argIndex = table()
-		-- in android do static methods have a 'this' equivalent, like 'class', like the JNI static calls do?
-		local maxArgIndex = method.isStatic and 0 or 1
-		for i=2,#sig do
-			local sigi = sig[i]
-			argIndex[i-1] = maxArgIndex
-			maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
-		end
---DEBUG:print('method', method.name, require 'ext.tolua'(method.sig))
---DEBUG:print('argIndex', require 'ext.tolua'(argIndex))
-
-		local sigNumArgs = #sig-1
---DEBUG:print('sigNumArgs', sigNumArgs)
-		local argArraySize = sigNumArgs
-			-- +1 for 'this' unless it's static
-			+ (method.isStatic and 0 or 1)
-
-		--[[
-		me learning android
-		maybe this is wrong
-		but
-		maxRegs = # used for calling out (regsOut) ... at the beginning
-			+ any local use only regs ... go next
-			+ # used for being called (regIn, determined by arg types + static or not) ... go at the end
-		--]]
-		if isAndroid then
-			-- v0 & v1 for funcptr
-			-- v2 for Object[] list
-			method.regsOut = 3
-			-- v3 = local for array index
-			-- so that means 'this' is at v4
-			-- and the rest of the args are past v3 ...
-			-- ... right?
-			method.regsIn = maxArgIndex
-			local numLocals = 1
-			method.maxRegs = method.regsOut + numLocals + method.regsIn
 		end
 
 		-- now native callback will get ...
@@ -494,6 +494,7 @@ function M:run(args)
 					getJNISig(primInfo.boxedType),
 					primInfo.name..'Value',
 					getJNISig{primInfo.name},
+					'v0',
 				}
 				if primInfo.name == 'long' or primInfo.name == 'double' then
 					code:insert{'move-result-wide', 'v0'}
