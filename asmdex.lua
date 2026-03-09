@@ -2623,27 +2623,28 @@ function JavaASMDex:compile()
 			blob:writeUleb128(#directMethodIndexes)
 			blob:writeUleb128(#virtualMethodIndexes)
 
-			local function writeFields(fieldIndexes)
-				local lastFieldIndex = 1	-- from 1-based to 0-based
-				for _,fieldIndex in ipairs(fieldIndexes) do
-					blob:writeUleb128(fieldIndex - lastFieldIndex)
-					blob:writeUleb128(self.fields[fieldIndex].accessFlags)
-					lastFieldIndex = fieldIndex
+			local function writeFields(fieldWriteIndexes)
+				local lastFieldWriteIndex = 1	-- from 1-based to 0-based
+				for _,fieldWriteIndex in ipairs(fieldWriteIndexes) do
+					blob:writeUleb128(fieldWriteIndex - lastFieldWriteIndex)
+					local field = fieldWritesToOrigs[fieldWriteIndex]
+					blob:writeUleb128(field.accessFlags)
+					lastFieldWriteIndex = fieldWriteIndex
 				end
 			end
 			writeFields(staticFieldIndexes)
 			writeFields(instanceFieldIndexes)
 
-			local function writeMethods(methodIndexes)
-				local lastMethodIndex = 1	-- from 1-based to 0-based
-				for _,methodIndex in ipairs(methodIndexes) do
---DEBUG:print('writing class data for method', methodIndex-1)
-					blob:writeUleb128(methodIndex - lastMethodIndex)
-					local method = self.methods[methodIndex]
+			local function writeMethods(methodWriteIndexes)
+				local lastMethodWriteIndex = 1	-- from 1-based to 0-based
+				for _,methodWriteIndex in ipairs(methodWriteIndexes) do
+--DEBUG:print('writing class data for method', methodWriteIndex-1)
+					blob:writeUleb128(methodWriteIndex - lastMethodWriteIndex)
+					local method = methodWritesToOrigs[methodWriteIndex]
 					blob:writeUleb128(method.accessFlags)
 					-- I guess this means I better already have written the code offset data
 					blob:writeUleb128(method.codeOfs or 0)
-					lastMethodIndex = methodIndex
+					lastMethodWriteIndex = methodWriteIndex
 				end
 			end
 			writeMethods(directMethodIndexes)
