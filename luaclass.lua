@@ -328,10 +328,15 @@ function M:run(args)
 		if not method.isStatic then
 			if isAndroid then
 				code:insert{
-					'iput-object',
-					'v'..localVarIndex,		-- value to push: 'this'
-					'v'..(maxArgIndex+2),	-- array
-					argArrayIndex,			-- array index
+					'const',
+					'v'..(maxArgIndex+3),	--v{N+3} = argArrayIndex
+					argArrayIndex,
+				}
+				code:insert{
+					'aput-object',
+					'v'..localVarIndex,		-- reg with value to push: 'this'
+					'v'..(maxArgIndex+2),	-- reg with array
+					'v'..(maxArgIndex+3),	-- reg with array index
 				}
 			else
 				code:insert{'dup'}
@@ -369,10 +374,15 @@ function M:run(args)
 						}
 					end
 					code:insert{
-						'iput-object',
-						'v'..localVarIndex,		-- value to push
-						'v'..(maxArgIndex+2),	-- array
+						'const',
+						'v'..(maxArgIndex+3),	--v{N+3} = argArrayIndex
 						argArrayIndex,
+					}
+					code:insert{
+						'aput-object',
+						'v'..localVarIndex,		-- reg with value to push: local #localVarIndex
+						'v'..(maxArgIndex+2),	-- reg with array
+						'v'..(maxArgIndex+3),	-- reg with array index
 					}
 				else
 					code:insert{'dup'}
