@@ -45,7 +45,7 @@ function M:run(env)
 	-- TODO infer if we're in Android somehow, maybe reaad a property or something?
 	if env._usingAndroidJNI then
 		local JavaASMDex = require 'java.asmdex'
-		asmClass = JavaASMDex:fromAsm(template[[
+		asmClass = JavaASMDex:fromAsm(template([[
 .class public <?=newClassName?>	# no super? what does that do again?
 .super java.lang.Object
 .method public constructor <init> ()V
@@ -63,7 +63,7 @@ function M:run(env)
 			newClassName = newClassName,
 			runMethodName = M.runMethodName,
 			runMethodSig = M.runMethodSig,
-		})
+		}))
 	else
 		local JavaASMClass = require 'java.asmclass'
 		asmClass = JavaASMClass:fromAsm(template([[
