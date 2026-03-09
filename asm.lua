@@ -5,6 +5,11 @@ local assert = require 'ext.assert'
 local string = require 'ext.string'
 local path = require 'ext.path'
 
+local java_util = require 'java.util'
+local getDotSepName = java_util.getDotSepName
+local sigStrToObj = java_util.sigStrToObj
+
+
 local JavaASM = class()
 
 -- ; is a popular asm comment syntax, right?
@@ -234,6 +239,7 @@ function JavaASM:fromAsm(code)
 					field.value = value
 				end
 				field.sig = assert(parts:remove(), "expected field signature")
+				field.sig = getDotSepName(field.sig)
 				field.name = assert(parts:remove(), "expected field name")
 				for _,part in ipairs(parts) do
 					field[assert.index({
@@ -259,6 +265,7 @@ function JavaASM:fromAsm(code)
 				local method = {}
 				local parts = string.split(methodDef, '%s+')
 				method.sig = assert(parts:remove(), "expected sig")
+				method.sig = sigStrToObj(method.sig)
 				method.name = assert(parts:remove(), "expected name")
 				for _,part in ipairs(parts) do
 					method[assert.index({

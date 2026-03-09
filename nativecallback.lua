@@ -50,11 +50,6 @@ function M:run(env)
 .super java.lang.Object
 .method public constructor <init> ()V
 	.registers 1 1 1
-	# 'this' is already on the stack ...
-	#invoke-direct java.lang.Object <init> ()V	# call ((java.lang.Object)this).<init>()
-	# TODO I don't yet translate classnames of invokes ...
-	#  so you have to use .dex preferred L//; format
-	# TODO do I need an explicit 'v0' at the end, or should it be implicit?
 	invoke-direct Ljava/lang/Object; <init> ()V	v0
 	return-void
 .end method

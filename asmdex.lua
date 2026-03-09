@@ -20,6 +20,7 @@ local WriteBlobLE = java_blob.WriteBlobLE
 local java_util = require 'java.util'
 local deepCopy = java_util.deepCopy
 local splitMethodJNISig = java_util.splitMethodJNISig
+local getJNISig = java_util.getJNISig
 local sigStrToObj = java_util.sigStrToObj
 local setFlagsToObj = java_util.setFlagsToObj
 local getFlagsFromObj = java_util.getFlagsFromObj
@@ -856,7 +857,7 @@ function Instr35c_method:read(hi, blob, asm)
 
 	local methodIndex = blob:readu2()	-- B = method => self 2..4
 	instPushMethod(self, methodIndex, asm)
-	
+
 	local x = blob:readu2()
 
 	-- C..G are 4 bits each, so 20 bits total, so one of them is top nibble of 'hi' and the rest are another uint16 ...
@@ -1832,6 +1833,15 @@ io.stderr:write('!!! TODO !!! debugInfoOfs '..debugInfoOfs..'\n')
 		self.classes = nil
 	end
 
+	-- convert field signatures to dot
+	for _,field in ipairs(self.fields) do
+		field.sig = toDotSepName(field.sig)
+	end
+	-- convert method signatures to arg table
+	for _,method in ipairs(self.methods) do
+		method.sig = sigStrToObj(method.sig)
+	end
+
 	--[[ these are now baked into instructions, no longer needed
 	-- but keep them around for debugging
 	self.protos = nil
@@ -1860,14 +1870,20 @@ function JavaASMDex:compile()
 	--     *) method code
 	-- for single-class dex files, auto-insert class into all listed fields and methods
 
+	self.fields = self.fields or table()
+	self.methods = self.methods or table()
+
 	-- convert back from ... to L...;
 	-- to make the args match up with asmclass
-
+	for _,field in ipairs(self.fields) do
+		field.sig = getJNISig(field.sig)
+	end
+	for _,method in ipairs(self.methods) do
+		method.sig = getJNISig(method.sig)
+	end
 
 	-- move any class properties from root into a new class object
 	-- (but only if there's no .classes already
-	self.fields = self.fields or table()
-	self.methods = self.methods or table()
 	local buildingSingleClass
 	if not self.classes then
 		buildingSingleClass = true

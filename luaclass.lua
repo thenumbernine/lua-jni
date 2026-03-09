@@ -67,7 +67,7 @@ args:
 	ctors = (optional) {
 		{
 			value = Lua callback function
-			sig =
+			sig = table, 1st is return value, rest are dot-separated typename arguments,
 			isPrivate =
 			isPublic =
 		},
@@ -76,7 +76,7 @@ args:
 	methods = (optional) {
 		{
 			name =
-			sig = table, 1st is return value, rest are arguments,
+			sig = table, 1st is return value, rest are dot-separated typename arguments,
 			value = Lua callback function, or cdata pointer to C function
 			isVarArgs
 			isStatic
@@ -176,9 +176,7 @@ function M:run(args)
 
 			field.name = assert.type(assert.index(field, 'name'), 'string')
 
-			field.sig = getJNISig((
-				assert.type(assert.index(field, 'sig'), 'string')
-			))
+			assert.type(assert.index(field, 'sig'), 'string')
 
 			-- TODO here some conversion of constant value based on type or something
 			if field.value then
@@ -366,7 +364,6 @@ function M:run(args)
 
 		if method.isPublic == nil then method.isPublic = true end
 		method.value = nil
-		method.sig = jniSig
 		method.code = code
 
 		--method.maxStack = 6	-- always? or will it be sig dependent? esp for long/double?
@@ -383,12 +380,12 @@ function M:run(args)
 				isPublic = true,
 				isConstructor = true,
 				name = '<init>',
-				sig = '()V',
+				sig = {'void'},
 				maxRegs = 1,
 				regsIn = 1,
 				regsOut = 1,
 				code = [[
-invoke-direct ]]..getJNISig(parentClass)..[[ <init> ()V
+invoke-direct ]]..getJNISig(parentClass)..[[ <init> ()V v0
 return-void
 ]],
 			}
@@ -396,7 +393,7 @@ return-void
 			asmClassArgs.methods:insert{
 				isPublic = true,
 				name = '<init>',
-				sig = '()V',
+				sig = {'void'},
 				maxStack = 1,
 				maxLocals = 1,
 				code = [[

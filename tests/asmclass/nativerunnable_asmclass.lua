@@ -21,19 +21,19 @@ return function(J)
 			{
 				isPublic = true,
 				name = 'funcptr',
-				sig = 'J',
+				sig = 'long',
 			},
 			{
 				isPublic = true,
 				name = 'arg',
-				sig = 'Ljava/lang/Object;',
+				sig = 'java.lang.Object',
 			},
 		},
 		methods={
 			{
 				isPublic=true,
 				name='<init>',
-				sig='(J)V',
+				sig = {'void', 'long'},
 				maxStack=3,
 				maxLocals=3,
 				code = [[
@@ -48,7 +48,7 @@ return
 			{
 				isPublic=true,
 				name='<init>',
-				sig='(JLjava/lang/Object;)V',
+				sig = {'void', 'long', 'java.lang.Object'},
 				maxStack=3,
 				maxLocals=4,
 				code = [[
@@ -66,7 +66,7 @@ return
 			{
 				isPublic=true,
 				name='run',
-				sig='()V',
+				sig = {'void'},
 				maxStack=3,
 				maxLocals=1,
 				code = [[

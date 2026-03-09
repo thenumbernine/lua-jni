@@ -22,16 +22,16 @@ return function(J)
 			{
 				isPublic = true,
 				name = 'funcptr',
-				sig = 'J',
+				sig = 'long',
 			},
 		},
 		methods={
 			{
-				isPublic=true,
-				name='<init>',
-				sig='(J)V',
-				maxStack=3,
-				maxLocals=3,
+				isPublic = true,
+				name = '<init>',
+				sig = {'void', 'long'},
+				maxStack = 3,
+				maxLocals = 3,
 				code = [[
 aload_0
 invokespecial java.lang.Object <init> ()V
@@ -42,11 +42,11 @@ return
 ]],
 			},
 			{
-				isPublic=true,
-				name='actionPerformed',
-				sig='(Ljava/awt/event/ActionEvent;)V',
-				maxStack=3,
-				maxLocals=2,
+				isPublic = true,
+				name = 'actionPerformed',
+				sig = {'void', 'java.awt.event.ActionEvent'},
+				maxStack = 3,
+				maxLocals = 2,
 				code = [[
 aload_0
 getfield ]]..newClassName..[[ funcptr J
@@ -56,7 +56,7 @@ invokestatic ]]..NativeCallback._classpath:gsub('%.', '/')
 	..[[ (JLjava/lang/Object;)Ljava/lang/Object;
 pop
 return
-]],				
+]],
 			}
 		},
 	}

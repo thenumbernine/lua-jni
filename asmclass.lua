@@ -39,6 +39,7 @@ local fieldAccessFlags = java_util.fieldAccessFlags
 local methodAccessFlags = java_util.methodAccessFlags
 local setFlagsToObj = java_util.setFlagsToObj
 local getFlagsFromObj = java_util.getFlagsFromObj
+local getJNISig = java_util.getJNISig
 local sigStrToObj = java_util.sigStrToObj
 local deepCopy = java_util.deepCopy
 local toSlashSepName  = java_util.toSlashSepName
@@ -1494,6 +1495,15 @@ io.stderr:write("TODO handle reading class attr "..tostring(attr.name))
 			self.interfaces[i] = toDotSepName(self.interfaces[i])
 		end
 	end
+
+	-- convert field signatures to dot
+	for _,field in ipairs(self.fields) do
+		field.sig = toDotSepName(field.sig)
+	end
+	-- convert method signatures to arg table
+	for _,method in ipairs(self.methods) do
+		method.sig = sigStrToObj(method.sig)
+	end
 end
 
 
@@ -1512,6 +1522,19 @@ function JavaASMClass:compile()
 			self.interfaces[i] = toSlashSepName(self.interfaces[i])
 		end
 	end
+
+	self.fields = self.fields or table()
+	self.methods = self.methods or table()
+
+	-- convert back from ... to L...;
+	-- to make the args match up with asmclass
+	for _,field in ipairs(self.fields) do
+		field.sig = getJNISig(field.sig)
+	end
+	for _,method in ipairs(self.methods) do
+		method.sig = getJNISig(method.sig)
+	end
+
 
 	--[[
 	build constants fresh?  why not?
