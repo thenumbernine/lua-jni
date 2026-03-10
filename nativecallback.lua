@@ -1,6 +1,9 @@
 --[[
 Here's the fake-class used for the solve purpose of its one native function that a lot of other functions are using for Java calling into LuaJIT.
 I guess with JavaASMClass and JavaLuaClass, the need for this is getting slimmer and slimmer...
+
+In fact, JavaLuaClass's methods are now automatically java-native and cast from Lua-to-C closures, so they don't need this anymore.
+However what does is JavaLuaClass's ctors still, because ctors can't be native in Java, though I could make the Lua callback as a separate native member that the ctor calls using JavaASMClass/Dex ...
 --]]
 require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
