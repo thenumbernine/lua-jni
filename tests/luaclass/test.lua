@@ -31,6 +31,7 @@ local Test = require 'java.luaclass'{
 		toString = function(this)
 			return 'from Test.toString()'
 		end,
+-- [=[		
 		testFunc = {
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
 			value = function(this, ...)
@@ -60,8 +61,10 @@ local Test = require 'java.luaclass'{
 			end,
 		}
 		--]]
+--]=]	
 	},
 }
+print(Test.__name)
 print('Test', Test)
 
 local test = Test()

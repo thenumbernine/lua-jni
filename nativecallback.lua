@@ -2,6 +2,7 @@
 Here's the fake-class used for the solve purpose of its one native function that a lot of other functions are using for Java calling into LuaJIT.
 I guess with JavaASMClass and JavaLuaClass, the need for this is getting slimmer and slimmer...
 --]]
+require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
 local template = require 'template'
 

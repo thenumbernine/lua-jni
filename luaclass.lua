@@ -2,13 +2,17 @@
 auto-gen java bytecode at runtime to make a glue-class whose methods point to Lua functions
 uses java/nativecallback.lua to do its LuaJIT->Java->LuaJIT, but honestly we're getting to the point where I can just inline that myself...
 --]]
-
+local jni = require 'java.ffi.jni'		-- get cdefs
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local table = require 'ext.table'
-local JavaClass = require 'java.class'
-local getJNISig = require 'java.util'.getJNISig
-local infoForPrims = require 'java.util'.infoForPrims
+local vector = require 'stl.vector-lua'
+local JNIEnv = require 'java.jnienv'
+
+local java_util = require 'java.util'
+local getJNISig = java_util .getJNISig
+local infoForPrims = java_util.infoForPrims
+
 
 local uniqueNameCounter = 1
 
@@ -138,6 +142,7 @@ function M:run(args)
 		methods = table(),
 	}
 
+	local nativeMethods = vector'JNINativeMethod'
 
 	-- pairs() order is non-deterministic
 	-- but I think pairs() does ipairs integer indexes in order at least?
@@ -185,7 +190,7 @@ function M:run(args)
 		end
 	end
 
-	local function buildLuaWrapperMethod(method)
+	local function fixMethodSig(method)
 		local sig = method.sig
 
 		if not sig then
@@ -197,16 +202,23 @@ function M:run(args)
 			method.sig = sig
 		end
 		sig[1] = sig[1] or 'void'
-		local returnType = sig[1]
-		local jniSig = getJNISig(sig)
+
+		-- I need to hold onto this for at least the duration of nativeMethods[]
+		method.jniSig = getJNISig(sig)
 
 		-- fun fact, defining toString() with a return type other than the java.lang.String makes the VM segfault
 		-- adding extra args to toString() makes the VM give you a warning
 		if method.name == 'toString'
-		and jniSig ~= '()Ljava/lang/String;'
+		and method.jniSig ~= '()Ljava/lang/String;'
 		then
 			io.stderr:write'!!! WARNING !!! You are defining a class method toString() with an atypical signature.  In my experience the VM will segfault next, or just warn you if you are lucky.  Enjoy.\n'
 		end
+	end
+
+	local function buildLuaWrapperMethod(method)
+		fixMethodSig(method)
+		local sig = method.sig
+		local returnType = sig[1]
 
 		-- map from arg # (1-based) to stack or register index # (0-based)
 		local argIndex = table()
@@ -578,8 +590,8 @@ return
 		for _,ctor in ipairs(args.ctors) do
 			ctor.name = '<init>'
 			ctor.sig = ctor.sig or {'void'}
-			ctor.sig[1] = 'void'
-			ctor.isStatic = false
+			ctor.sig[1] = 'void'		-- ctor must return void
+			ctor.isStatic = false		-- ctor must not be static
 			ctor.isConstructor = true	-- .dex only
 			buildLuaWrapperMethod(ctor)
 		end
@@ -601,17 +613,116 @@ return
 				end
 			end
 			assert.type(method, 'table')
+			--[=[ don't build a lua wrapper in java asm...
 			buildLuaWrapperMethod(method)
+			--]=]
+			-- [=[ instead just flag the methods as native and pass your own lua unwrapper
+			method.isNative = true
+			if method.isPublic == nil then method.isPublic = true end
+			method.code = nil
+			asmClassArgs.methods:insert(method)
+
+			local func = assert.index(method, 'value')
+			fixMethodSig(method)
+			local nativeMethod = nativeMethods:emplace_back()
+			nativeMethod.name = method.name
+			nativeMethod.signature = method.jniSig	-- built in fixMethodSig()
+			if type(func) == 'cdata' then
+				-- assume whoever passes this knows what they are doing...
+				nativeMethod.fnPtr = ffi.cast('void*', func)
+--DEBUG:io.stderr:write("!!! DANGER !!! I just got rid of the translation layer for cdata function pointers...\n")
+			else
+				local function jniTypeForSig(s)
+					if s == 'void 'then return 'void' end
+					if s == 'java.lang.String' then return 'jstring' end
+					local primInfo = infoForPrims[s]
+					if primInfo then return 'j'..s end
+					return 'jobject'
+				end
+
+				local sig = method.sig
+				local returnType = sig[1]
+
+				-- build wrapper for args here:
+				local jniCSig = table()
+				jniCSig:insert(jni.JNIEXPORT..' ')
+				jniCSig:insert(jniTypeForSig(returnType))
+				jniCSig:insert(' '..jni.JNICALL)
+				jniCSig:insert'(*)(JNIEnv*'	-- function args begin
+				if method.isStatic then
+					jniCSig:insert', jclass'	-- calling class
+				else
+					jniCSig:insert', jobject'	-- this
+				end
+				for i=2,#sig do
+					jniCSig:insert(', '..jniTypeForSig(sig[i]))
+				end
+				jniCSig:insert')'		-- function args end
+--DEBUG:print('for method', method.isStatic and 'static' or '', 'sig', require 'ext.tolua'(method.sig))
+				local cfuncType = jniCSig:concat()
+--DEBUG:print('got c sig', cfuncType)
+				-- cfuncType will tell LuaJIT how to translate arguments to JNI types
+				-- the wrapper should be similar to the ctor implementaiton but without the Object[] and boxing/unboxing
+				local wrapper = function(envPtr, thisOrClass, ...)
+					--[[ this is somewhat thread-safe since JNI will call the C func with a new envPtr when we are crossing threads
+					-- but I've already got java/saferunnable.lua for handling that, with its new Lua state.
+					--  (it is why method.value can accept cdata)
+					-- so here I wont do this and I'll just use closure env
+					local J = JNIEnv{ptr=envPtr, vm=J._vm, usingAndroidJNI=J._usingAndroidJNI}
+					--]]
+					-- lazy for now while I debug this:
+					if method.isStatic then
+						-- TODO this method but also with a class helper?
+						thisOrClass = J:_fromJClass(thisOrClass)
+					else
+						thisOrClass = J:_javaToLuaArg(thisOrClass, classname)
+					end
+					local args = table.pack(...)
+					for i=1,args.n do
+						args[i] = J:_javaToLuaArg(args[i], sig[i+1])
+					end
+
+					local result = func(thisOrClass, args:unpack(1, args.n))
+
+					if returnType == 'void' then return end
+					if result == nil then return nil end
+
+					return J:_luaToJavaArg(result, sig[1])
+				end
+				local closure = ffi.cast(cfuncType, wrapper)
+				closures:insert{
+					wrapper = wrapper,
+					closure = closure,
+					func = func,
+					name = method.name,
+					sig = method.jniSig,
+				}
+				nativeMethod.fnPtr = ffi.cast('void*', closure)
+			end
+			--]=]
 		end
 	end
 
+	local cl
 	if isAndroid then
 		local JavaASMDex = require 'java.asmdex'
-		return J:_defineClass(JavaASMDex(asmClassArgs))
+		cl = J:_defineClass(JavaASMDex(asmClassArgs))
 	else
 		local JavaASMClass = require 'java.asmclass'
-		return J:_defineClass(JavaASMClass(asmClassArgs))
+		cl = J:_defineClass(JavaASMClass(asmClassArgs))
 	end
+	if not cl then return nil, "failed to define class" end
+
+	if #nativeMethods > 0 then
+print('registering', #nativeMethods)
+for i=0,#nativeMethods-1 do
+	local n = nativeMethods.v + i
+	print(n.fnPtr, ffi.string(n.name), ffi.string(n.signature))
+end
+		J._ptr[0].RegisterNatives(J._ptr, cl._ptr, nativeMethods.v, #nativeMethods)
+	end
+
+	return cl
 end
 
 return setmetatable(M, {

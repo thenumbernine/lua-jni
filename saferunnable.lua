@@ -14,12 +14,11 @@ Maybe I should change the name to JavaThreadSafeRunnable ? hmm...
 
 Maybe I should provide this function-as-ctor option to lite-thread ?
 --]]
+local jni = require 'java.ffi.jni'
 local ffi = require 'ffi'
 local assert = require 'ext.assert'
 local class = require 'ext.class'
 local JavaObject = require 'java.object'
-local Lua = require 'lua'
-
 local LiteThread = require 'thread.lite'
 
 -- [[
@@ -31,6 +30,9 @@ function LiteThread:__gc() end
 LiteThread.Lua = LiteThread.Lua:subclass()
 function LiteThread.Lua:__gc() end
 --]]
+
+-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
+LiteThread.threadFuncTypeName = jni.JNIEXPORT..' void '..jni.JNICALL..' (*)(JNIEnv*, jobject)'
 
 local M = {}
 
@@ -70,6 +72,8 @@ function M:run(args)
 		javaCallback(env, jarg:_unpack())
 	end)
 	thread.lua([[jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
+
+	-- convert to bytecode and pass into the child Lua state:
 	thread.lua([[javaCallback = ... ]], func)
 
 	-- hmm gc problems ...
