@@ -571,6 +571,18 @@ function JavaClass:__index(k)
 			options = methodsForName,
 		}
 	end
+
+	-- check inner-classes?
+	local env = rawget(self, '_env')
+	local classpath = self._classpath..'$'..k
+	env:_checkExceptions()
+assert.eq(false, env._ignoringExceptions)
+	env._ignoringExceptions = true
+	local cl = env:_findClass(classpath)
+assert.eq(true, env._ignoringExceptions)
+	env._ignoringExceptions = false
+	env:_exceptionClear()
+	if cl then return cl end
 end
 
 -- build the subclass used for _cb()
