@@ -96,14 +96,14 @@ args:
 	isInterface		<- btw what is an interface class's parent class?
 --]]
 function M:run(args)
-	local J = assert.index(args, 'env')
-	local isAndroid = J._usingAndroidJNI
-	local NativeCallback = require 'java.nativecallback'(J)
+	local env = assert.index(args, 'env')
+	local isAndroid = env._usingAndroidJNI
+	local NativeCallback = require 'java.nativecallback'(env)
 
 	local classname = args.name
 	if not classname then
 		classname = M.classnameBase
-			..bit.tohex(ffi.cast('uint64_t', J._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
+			..bit.tohex(ffi.cast('uint64_t', env._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
 			..'_'..uniqueNameCounter
 		uniqueNameCounter = uniqueNameCounter + 1
 	end
@@ -296,7 +296,7 @@ function M:run(args)
 --DEBUG:print('wrapper calling sig', require 'ext.tolua'(sig))
 				if args ~= nil then
 					-- args should be Object[] always, and for members it will have args[0]==this
-					args = J:_javaToLuaArg(args, 'java.lang.Object[]')
+					args = env:_javaToLuaArg(args, 'java.lang.Object[]')
 					result = func(args:_unpack())
 				else
 					result = func()
@@ -310,7 +310,7 @@ function M:run(args)
 --DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedSig)
 					-- will be a java.lang.Object here no matter what
 					-- so the jobject(jobject) funcptr sig can handle it
-					return J:_luaToJavaArg(result, boxedSig)
+					return env:_luaToJavaArg(result, boxedSig)
 				end
 			end
 			local closure = ffi.cast('void*(*)(void*)', wrapper)
@@ -668,18 +668,18 @@ return
 					-- but I've already got java/saferunnable.lua for handling that, with its new Lua state.
 					--  (it is why method.value can accept cdata)
 					-- so here I wont do this and I'll just use closure env
-					local J = JNIEnv{ptr=envPtr, vm=J._vm, usingAndroidJNI=J._usingAndroidJNI}
+					local env = JNIEnv{ptr=envPtr, vm=env._vm, usingAndroidJNI=env._usingAndroidJNI}
 					--]]
 					-- lazy for now while I debug this:
 					if method.isStatic then
 						-- TODO this method but also with a class helper?
-						thisOrClass = J:_fromJClass(thisOrClass)
+						thisOrClass = env:_fromJClass(thisOrClass)
 					else
-						thisOrClass = J:_javaToLuaArg(thisOrClass, classname)
+						thisOrClass = env:_javaToLuaArg(thisOrClass, classname)
 					end
 					local args = table.pack(...)
 					for i=1,args.n do
-						args[i] = J:_javaToLuaArg(args[i], sig[i+1])
+						args[i] = env:_javaToLuaArg(args[i], sig[i+1])
 					end
 
 					local result = func(thisOrClass, args:unpack(1, args.n))
@@ -687,7 +687,7 @@ return
 					if returnType == 'void' then return end
 					if result == nil then return nil end
 
-					return J:_luaToJavaArg(result, sig[1])
+					return env:_luaToJavaArg(result, sig[1])
 				end
 				local closure = ffi.cast(cfuncType, wrapper)
 				closures:insert{
@@ -706,20 +706,20 @@ return
 	local cl
 	if isAndroid then
 		local JavaASMDex = require 'java.asmdex'
-		cl = J:_defineClass(JavaASMDex(asmClassArgs))
+		cl = env:_defineClass(JavaASMDex(asmClassArgs))
 	else
 		local JavaASMClass = require 'java.asmclass'
-		cl = J:_defineClass(JavaASMClass(asmClassArgs))
+		cl = env:_defineClass(JavaASMClass(asmClassArgs))
 	end
 	if not cl then return nil, "failed to define class" end
 
 	if #nativeMethods > 0 then
-print('registering', #nativeMethods)
-for i=0,#nativeMethods-1 do
-	local n = nativeMethods.v + i
-	print(n.fnPtr, ffi.string(n.name), ffi.string(n.signature))
-end
-		J._ptr[0].RegisterNatives(J._ptr, cl._ptr, nativeMethods.v, #nativeMethods)
+--DEBUG:print('registering', #nativeMethods)
+--DEBUG:for i=0,#nativeMethods-1 do
+--DEBUG:	local n = nativeMethods.v + i
+--DEBUG:	print(n.fnPtr, ffi.string(n.name), ffi.string(n.signature))
+--DEBUG:end
+		env._ptr[0].RegisterNatives(env._ptr, cl._ptr, nativeMethods.v, #nativeMethods)
 	end
 
 	return cl

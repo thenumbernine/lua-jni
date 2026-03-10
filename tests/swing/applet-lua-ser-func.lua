@@ -1,5 +1,6 @@
 #!/usr/bin/env luajit
 -- use our thread-safe-runnable wrapper...
+local jni = require 'java.ffi.jni'
 local J = require 'java'
 local runnable = J:_safeRunnable(function(J, this)
 	-- THIS IS RUN FROM ANOTHER THREAD AND LUA STATE

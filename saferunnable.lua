@@ -21,6 +21,8 @@ local class = require 'ext.class'
 local JavaObject = require 'java.object'
 local LiteThread = require 'thread.lite'
 
+local M = {}
+
 -- [[
 -- TODO TODO TODO
 -- __gc in either is causing segfaults upon JavaVM's construction...
@@ -33,8 +35,6 @@ function LiteThread.Lua:__gc() end
 
 -- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
 LiteThread.threadFuncTypeName = jni.JNIEXPORT..' void '..jni.JNICALL..' (*)(JNIEnv*, jobject)'
-
-local M = {}
 
 --[[
 -- how to track java object garbage collection
@@ -64,17 +64,42 @@ function M:run(args)
 	local env = assert.index(args, 'env')
 	local func = assert.type(assert.index(args, 'func'), 'function')
 
-	local thread = LiteThread(function(arg)
-		-- THIS IS RUN IN THE CHILD LUA STATE
-		-- This changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
-		local env = require 'java.vm'{ptr=jvmPtr}.jniEnv
-		local jarg = env:_fromJObject(arg)
-		javaCallback(env, jarg:_unpack())
-	end)
-	thread.lua([[jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
+	local thread = LiteThread{
+		-- callback prefix code.
+		-- I need to require java.ffi.jni in here,
+		--  or the ffi.cast(threadFuncTypeName) won't work
+		init = function(thread)
+			-- this is needed for the ffi.cast threadFuncTypeName declaration
+			thread.lua[[require 'java.ffi.jni']]
 
-	-- convert to bytecode and pass into the child Lua state:
-	thread.lua([[javaCallback = ... ]], func)
+			--[=[ this is only necessary if we are rebuilding the JavaVM first, below:
+			thread.lua([[jvmPtr = ... ]], ffi.cast('uint64_t', env._vm._ptr))
+			--]=]
+
+			-- convert to bytecode and pass into the child Lua state:
+			thread.lua([[debug.getregistry().java_lang_Runnable_run_callback = ... ]], func)
+		end,
+		-- callback function:
+		func = function(envPtr, this)
+			-- THIS IS RUN ON A SEPARATE THREAD AND IN THE CHILD LUA STATE
+
+			-- [[ from JNIEnv
+			local env = require 'java.jnienv'{ptr=envPtr}
+			--]]
+			--[[ from shared JavaVM pointer:
+			-- This changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
+			local env = require 'java.vm'{ptr=jvmPtr}.jniEnv
+			--]]
+			--[[ now since this is a callback fro a jni native call, we have to convert the args,
+			-- which, for Runnable.run(), is just 'this'
+			this = env:_javaToLuaArg(this, 'java.lang.Runnable')
+			--]]
+			-- [[ or if we want to query the class manually (to get the Runnable runtime-generated subclass name)
+			local this = env:_fromJObject(this)
+			--]]
+			debug.getregistry().java_lang_Runnable_run_callback(env, this)
+		end,
+	}
 
 	-- hmm gc problems ...
 	-- my child lua state is gc'ing too quickly
