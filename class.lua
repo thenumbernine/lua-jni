@@ -609,4 +609,11 @@ function JavaClass:_cb(func, ...)
 	return self:_cbClass(func)(...)
 end
 
+-- if this calls parent class __tostring, that will call JavaObject:__tostring(), which calls the Java .toString(), but it will be on a jclass pointer...
+-- ... which OpenJDK doesn't mind, but Android will segfault because Google is retarded.
+-- Google Gemini tells me Android JNI segfaults so much and has so many exceptional cases to their API because "it makes it go faster".  Like speed holes I guess.
+function JavaClass:__tostring()
+	return self:_getDebugStr()
+end
+
 return JavaClass
