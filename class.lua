@@ -117,6 +117,7 @@ end
 -- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env
+	local envptr = env._ptr
 
 	-- throw any excpetions occurred so far
 	-- because from here on out in setupReflection I will be throwing exceptions away (java.lang.NoSuchMethodError, etc)
@@ -137,38 +138,74 @@ function JavaClass:_setupReflection()
 	local java_lang_reflect_Method = env._java_lang_reflect_Method
 	local java_lang_reflect_Constructor = env._java_lang_reflect_Constructor
 
-	-- do I need to save these?
-	self._javaObjFields = java_lang_Class._java_lang_Class_getFields(self)
-		or false	-- dont' let these set to nil so that __index wont get angry
-	self._javaObjMethods = java_lang_Class._java_lang_Class_getMethods(self)
-		or false
-	self._javaObjConstructors = java_lang_Class._java_lang_Class_getConstructors(self)
-		or false
---DEBUG:print(self._classpath..' has '..#self._javaObjFields..' fields and '..#self._javaObjMethods..' methods and '..#self._javaObjConstructors..' constructors')
+	local jobjectFields = envptr[0].CallObjectMethod(
+		envptr,
+		self._ptr,
+		java_lang_Class._java_lang_Class_getFields._ptr)
+	local numFields = envptr[0].GetArrayLength(envptr, jobjectFields)
+
+	local jobjectMethods = envptr[0].CallObjectMethod(
+		envptr,
+		self._ptr,
+		java_lang_Class._java_lang_Class_getMethods._ptr)
+	local numMethods = envptr[0].GetArrayLength(envptr, jobjectMethods)
+
+	-- manually handling memory during _setupReflection()
+	local jobjectCtors = envptr[0].CallObjectMethod(
+		envptr,
+		self._ptr,
+		java_lang_Class._java_lang_Class_getConstructors._ptr)
+	local numCtors = envptr[0].GetArrayLength(envptr, jobjectCtors)
+
+--DEBUG:print(self._classpath..' has '..numFields..' fields and '..numMethods..' methods and '..numCtors..' constructors')
 
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
-	if self._javaObjFields == false then
+	if jobjectFields == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get fields from class '..self._classpath..'\n')
 	else
-		for i=0,#self._javaObjFields-1 do
-			local field = self._javaObjFields[i]
+		for i=0,numFields-1 do
+			-- Field
+			local field = envptr[0].GetObjectArrayElement(
+				envptr,
+				jobjectFields,
+				i)
 
-			local name = tostring(java_lang_reflect_Field._java_lang_reflect_Field_getName(field))
+			-- String
+			local jstringName = envptr[0].CallObjectMethod(
+				envptr,
+				field,
+				java_lang_reflect_Field._java_lang_reflect_Field_getName._ptr)
+			local name = env:_fromJString(jstringName)
+			env:_deleteLocalRef(jstringName)
 
-			-- fieldType is a jobject ... of a java.lang.Class
-			-- can I just treat it like a jclass?
-			-- can I just call java.lang.Class.getTypeName() on it?
-			-- I guess I can also just do _javaToString and get the same results?
-			local fieldType = java_lang_reflect_Field._java_lang_reflect_Field_getType(field)
+			-- Class
+			local fieldType = envptr[0].CallObjectMethod(
+				envptr,
+				field,
+				java_lang_reflect_Field._java_lang_reflect_Field_getType._ptr)
 
-			local fieldClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(fieldType))
---DEBUG:print('fieldType', fieldType, fieldClassPath)
+			-- String
+			local jstringFieldClassPath = envptr[0].CallObjectMethod(
+				envptr,
+				fieldType,
+				java_lang_Class._java_lang_Class_getTypeName._ptr)
+			env:_deleteLocalRef(fieldType)
+			
+			local fieldClassPath = env:_fromJString(jstringFieldClassPath)
+			env:_deleteLocalRef(jstringFieldClassPath)
+--DEBUG:print('fieldType', fieldClassPath)
 
-			local modifiers = java_lang_reflect_Field._java_lang_reflect_Field_getModifiers(field)
+			local modifiers = envptr[0].CallIntMethod(
+				envptr,
+				field,
+				java_lang_reflect_Field._java_lang_reflect_Field_getModifiers._ptr)
 --DEBUG:print('modifiers', modifiers)
 
 			-- ok now switch this reflect field obj to a jni jfieldID
-			local jfieldID = env._ptr[0].FromReflectedField(env._ptr, field._ptr)
+			local jfieldID = envptr[0].FromReflectedField(
+				envptr,
+				field)
+			env:_deleteLocalRef(field)
 
 --DEBUG:print('jfieldID', jfieldID)
 			assert(jfieldID ~= nil, "couldn't get jfieldID from reflect field for "..tostring(name))
@@ -198,37 +235,83 @@ function JavaClass:_setupReflection()
 			self._fields[name]:insert(fieldObj)
 --DEBUG:print('field['..i..'] = '..name, fieldClassPath)
 		end
+		env:_deleteLocalRef(jobjectFields)
 	end
 
 	-- TODO how does name resolution go? fields or methods first?
 	-- I think they shouldn't ever overlap?
-	if self._javaObjMethods == false then
+	if jobjectMethods == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get methods from class '..self._classpath..'\n')
 	else
-		for i=0,#self._javaObjMethods-1 do
-			local method = self._javaObjMethods[i]
+		for i=0,numMethods-1 do
+			-- Method
+			local method = envptr[0].GetObjectArrayElement(
+				envptr,
+				jobjectMethods,
+				i)
 
-			local name = tostring(java_lang_reflect_Method._java_lang_reflect_Method_getName(method))
+			-- String
+			local jstringName = envptr[0].CallObjectMethod(
+				envptr,
+				method,
+				java_lang_reflect_Method._java_lang_reflect_Method_getName._ptr)
+			local name = env:_fromJString(jstringName)
+			env:_deleteLocalRef(jstringName)
 
 			local sig = table()
 
-			local methodReturnType = java_lang_reflect_Method._java_lang_reflect_Method_getReturnType(method)
+			-- Class
+			local methodReturnType = envptr[0].CallObjectMethod(
+				envptr,
+				method,
+				java_lang_reflect_Method._java_lang_reflect_Method_getReturnType._ptr)
+			
+			-- String
+			local jstringReturnTypeClassPath = envptr[0].CallObjectMethod(
+				envptr,
+				methodReturnType,
+				java_lang_Class._java_lang_Class_getTypeName._ptr)
+			env:_deleteLocalRef(methodReturnType)
 
-			local returnTypeClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodReturnType))
+			local returnTypeClassPath = env:_fromJString(jstringReturnTypeClassPath)
+			env:_deleteLocalRef(jstringReturnTypeClassPath)
+
 			sig:insert(returnTypeClassPath)
 
-			local paramType = java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes(method)
+			-- Class[]
+			local paramTypes = envptr[0].CallObjectMethod(
+				envptr,
+				method,
+				java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes._ptr)
+			local numParamTypes = envptr[0].GetArrayLength(envptr, paramTypes)
 
-			for j=0,#paramType-1 do
-				local methodParamType = paramType[j]
+			for j=0,numParamTypes-1 do
+				-- Class
+				local methodParamType = envptr[0].GetObjectArrayElement(envptr, paramTypes, j)
 
-				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodParamType))
-				sig:insert(paramClassPath)
+				-- String
+				local paramClassPath = envptr[0].CallObjectMethod(
+					envptr,
+					methodParamType,
+					java_lang_Class._java_lang_Class_getTypeName._ptr)
+				env:_deleteLocalRef(methodParamType)
+				
+				sig:insert(env:_fromJString(paramClassPath))
+				
+				env:_deleteLocalRef(paramClassPath)
 			end
+			env:_deleteLocalRef(paramTypes)
 
-			local modifiers = java_lang_reflect_Method._java_lang_reflect_Method_getModifiers(method)
+			-- int
+			local modifiers = envptr[0].CallIntMethod(
+				envptr,
+				method,
+				java_lang_reflect_Method._java_lang_reflect_Method_getModifiers._ptr)
 
-			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
+			local jmethodID = envptr[0].FromReflectedMethod(
+				envptr,
+				method)
+			env:_deleteLocalRef(method)
 
 --DEBUG:print('jmethodID', jmethodID)
 			assert(jmethodID ~= nil, "couldn't get jmethodID from reflect method for "..tostring(name))
@@ -257,33 +340,55 @@ function JavaClass:_setupReflection()
 			self._methods[name]:insert(methodObj)
 --DEBUG:print('method['..i..'] = '..name, tolua(sig))
 		end
+		env:_deleteLocalRef(jobjectMethods)
 	end
 
 	-- can constructors use JNIEnv.FromReflectedMethod ?
-	if self._javaObjConstructors == false then
+	if jobjectCtors == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get constructors from class '..self._classpath..'\n')
 	else
 		local ctorname = '<init>'	-- all constructors have the same name
 		local foundDefaultCtor
-		for i=0,#self._javaObjConstructors-1 do
-			local method = self._javaObjConstructors[i]
+		for i=0,numCtors-1 do
+			-- Constructor
+			local method = envptr[0].GetObjectArrayElement(envptr, jobjectCtors, i)
 
 			local sig = table()
 			sig:insert'void'	-- constructor signature has void return type
 
-			local paramType = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes(method)
+			-- Class[]
+			local paramTypes = envptr[0].CallObjectMethod(
+				envptr,
+				method,
+				java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes._ptr)
+			local numParamTypes = envptr[0].GetArrayLength(envptr, paramTypes)
 
-			for j=0,#paramType-1 do
-				local methodParamType = paramType[j]
+			for j=0,numParamTypes-1 do
+				local methodParamType = envptr[0].GetObjectArrayElement(envptr, paramTypes, j)
 
-				local paramClassPath = tostring(java_lang_Class._java_lang_Class_getTypeName(methodParamType))
-				sig:insert(paramClassPath)
+				-- String
+				local paramClassPath = envptr[0].CallObjectMethod(
+					envptr,
+					methodParamType,
+					java_lang_Class._java_lang_Class_getTypeName._ptr)
+
+				env:_deleteLocalRef(methodParamType)
+
+				sig:insert(env:_fromJString(paramClassPath))
+
+				env:_deleteLocalRef(paramClassPath)
 			end
+			env:_deleteLocalRef(paramTypes)
 
-			local modifiers = java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers(method)
+			-- int
+			local modifiers = envptr[0].CallIntMethod(
+				envptr,
+				method,
+				java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers._ptr)
 --DEBUG:print('modifiers', modifiers)
 
-			local jmethodID = env._ptr[0].FromReflectedMethod(env._ptr, method._ptr)
+			local jmethodID = envptr[0].FromReflectedMethod(envptr, method)
+			env:_deleteLocalRef(method)
 --DEBUG:print('jmethodID', jmethodID)
 
 			assert(jmethodID ~= nil, "couldn't get jmethodID from reflect constructor")
@@ -333,6 +438,7 @@ function JavaClass:_setupReflection()
 				self._ctors:insert(defaultCtorMethod)
 			end
 		end
+		env:_deleteLocalRef(jobjectCtors)
 	end
 
 

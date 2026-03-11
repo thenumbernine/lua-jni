@@ -450,6 +450,16 @@ function JNIEnv:_str(s, len)
 	return obj
 end
 
+-- convert Java String to Lua string
+function JNIEnv:_fromJString(jstring)
+	local envptr = self._ptr
+	local sptr = envptr[0].GetStringUTFChars(envptr, jstring, nil)
+	if sptr == nil then return nil end
+	local luastr = ffi.string(sptr)
+	envptr[0].ReleaseStringUTFChars(envptr, jstring, sptr)
+	return luastr
+end
+
 local newArrayForType = prims:mapi(function(name)
 	return 'New'..name:sub(1,1):upper()..name:sub(2)..'Array', name
 end):setmetatable(nil)

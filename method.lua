@@ -113,6 +113,7 @@ function JavaMethod:__call(thisOrClass, ...)
 --DEBUG:print('sigVarArgBase', sigVarArgBase)
 		local numVarArgs = numLuaArgs - numJavaNonVarArgs
 --DEBUG:print('numVarArgs ', numVarArgs )
+
 		local javaVarArgsObj = env:_newArray(sigVarArgBase, numVarArgs)
 		for i=1,numVarArgs do
 --DEBUG:print('converting lua arg', numJavaNonVarArgs + i, 'to java vararg index', i-1)
@@ -131,6 +132,8 @@ function JavaMethod:__call(thisOrClass, ...)
 			self._ptr,
 			table.unpack(javaArgObjs, 1, jargc)
 		)
+
+		-- TODO done with javaVarArgsObj java-array, free it
 	else
 		result = env._ptr[0][callName](
 			env._ptr,
