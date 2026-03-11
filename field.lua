@@ -1,3 +1,18 @@
+--[[
+TODO what should the scope of this class be?
+should it be long-term as members of java.class?
+if so then I should be giving this GlobalRef's
+but as it stands, i'm using too many GlobalRef's and it is overflowing on Android.
+so
+should this not hold GlobalRef's and just lookup when it finally needs to?
+Then this should contain all lookup info ...
+what would that be?
+- class(name), name, signature.
+... same for java.method.
+
+... oh interesting
+I'm reading that jfieldID and jmethodID do not need to be unloaded, and they exist until the class is unloaded.
+--]]
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'

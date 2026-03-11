@@ -99,8 +99,10 @@ end
 -- though technically obj:getClass() == obj:_getClass():_class() is equivalent to java's `object.getClass()`
 function JavaObject:_getClass()
 	local env = self._env
-	local jclass = env:_getObjClass(self._ptr)
-	return env:_fromJClass(jclass)
+	local jclass = env:_getObjectClass(self._ptr)
+	local cl = env:_fromJClass(jclass)
+	env:_deleteLocalRef(jclass)
+	return cl
 end
 
 -- shorthand for self:_getClass():_method(args)

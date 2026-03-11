@@ -217,6 +217,77 @@ function JNIEnv:init(args)
 	self._classesLoaded.void = ffi.typeof'void'
 end
 
+---------------- JNIEnv WRAPPER ----------------
+-- just to save on one extra arg passing every single time...
+
+-- get a jclass pointer for a jobject pointer
+-- returns a local ref pointer
+-- (needs to be deleted)
+function JNIEnv:_getObjectClass(...)
+	local envptr = self._ptr
+	return envptr[0].GetObjectClass(envptr, ...)
+end
+
+function JNIEnv:_capiFindClass(...)
+	local envptr = self._ptr
+	return envptr[0].FindClass(envptr, ...)
+end
+
+-- deletes a local pointer
+function JNIEnv:_deleteLocalRef(...)
+	local envptr = self._ptr
+	return envptr[0].DeleteLocalRef(envptr, ...)
+end
+
+function JNIEnv:_version(...)
+	local envptr = self._ptr
+	return envptr[0].GetVersion(envptr, ...)
+end
+
+function JNIEnv:_exceptionClear(...)
+	local envptr = self._ptr
+	return envptr[0].ExceptionClear(envptr, ...)
+end
+
+function JNIEnv:_capiExceptionOccurred(...)
+	local envptr = self._ptr
+	return envptr[0].ExceptionOccurred(envptr, ...)
+end
+
+function JNIEnv:_capiIsAssignableFrom(...)
+	local envptr = self._ptr
+	return envptr[0].IsAssignableFrom(envptr, ...)
+end
+
+function JNIEnv:_capiDefineClass(...)
+	local envptr = self._ptr
+	return envptr[0].DefineClass(envptr, ...)
+end
+
+function JNIEnv:_newObject(...)
+	local envptr = self._ptr
+	return envptr[0].NewObject(envptr, ...)
+end
+
+---------------- JNI C API but with minimal arg tweaks ----------------
+
+function JNIEnv:_throw(e)
+	local envptr = self._ptr
+	return envptr[0].Throw(envptr, e._ptr)
+end
+
+-- for classes
+function JNIEnv:_throwNew(cl)
+	local envptr = self._ptr
+	return envptr[0].ThrowNew(envptr, cl._ptr)
+end
+
+---------------- SUPPORT FUNCTIONS ----------------
+
+--[[
+TODO name, make JNIEnv:_findClass just call envptr[0].FindClass as per my naming scheme
+ but then that means naming this function something else...
+--]]
 function JNIEnv:_findClass(classpath)
 	self:_checkExceptions()
 
@@ -259,7 +330,7 @@ I think nobody of competence came up with Android's spec.  Especially their segf
 			slashClassPath = getJNISig(classpath)
 		end
 		local envptr = self._ptr
-		local jclass = envptr[0].FindClass(envptr, slashClassPath)
+		local jclass = self:_capiFindClass(slashClassPath)
 		if jclass == nil then
 			-- I think this throws an exception?
 			local ex = self:_exceptionOccurred()
@@ -269,6 +340,7 @@ I think nobody of competence came up with Android's spec.  Especially their segf
 			ptr = jclass,
 			classpath = classpath,
 		}
+		self:_deleteLocalRef(jclass)
 		assert(classObj)
 	end
 
@@ -317,19 +389,15 @@ assert.eq(classObj._classpath, classpath)
 	return classObj
 end
 
--- get a jclass pointer for a jobject pointer
-function JNIEnv:_getObjClass(objPtr)
-	local envptr = self._ptr
-	return envptr[0].GetObjectClass(envptr, objPtr)
-end
-
 -- Get a classpath for a jobject pointer
 -- Only used in _exceptionOccurred
 -- This is just obj:_getClass():getTypeName()
 -- but with maybe a few less calls
 function JNIEnv:_getObjClassPath(objPtr)
-	local jclass = self:_getObjClass(objPtr)
-	return self:_getJClassClasspath(jclass), jclass
+	local jclass = self:_getObjectClass(objPtr)
+	local classpath = self:_getJClassClasspath(jclass)
+	self:_deleteLocalRef(jclass)
+	return classpath
 end
 
 -- Accepts JNI jclass cdata
@@ -339,11 +407,6 @@ function JNIEnv:_getJClassClasspath(jclass)
 	local javaTypeName = self._java_lang_Class._java_lang_Class_getTypeName(jclass)
 	if javaTypeName == nil then return nil end
 	return tostring(javaTypeName)
-end
-
-function JNIEnv:_version()
-	local envptr = self._ptr
-	return envptr[0].GetVersion(envptr)
 end
 
 function JNIEnv:_fromJObject(jobject)
@@ -378,12 +441,13 @@ function JNIEnv:_str(s, len)
 	if jstring == nil
 		then error("NewString failed")
 	end
-	local resultClassPath = 'java.lang.String'
-	return JavaObject._createObjectForClassPath{
+	local obj = JavaObject._createObjectForClassPath{
 		env = self,
 		ptr = jstring,
-		classpath = resultClassPath,
+		classpath = 'java.lang.String',
 	}
+	self:_deleteLocalRef(jstring)
+	return obj
 end
 
 local newArrayForType = prims:mapi(function(name)
@@ -409,7 +473,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	end
 
 	local field = newArrayForType[jtype] or 'NewObjectArray'
-	local obj
+	local jobject
 	if field == 'NewObjectArray' then
 		local jclassObj = jtype
 		if type(jtype) == 'string' then
@@ -420,38 +484,27 @@ function JNIEnv:_newArray(jtype, length, objInit)
 		end
 		-- TODO objInit as JavaObject, but how to encode null?
 		-- am I going to need a java.null placeholder object?
-		obj = self._ptr[0].NewObjectArray(
+		jobject = self._ptr[0].NewObjectArray(
 			self._ptr,
 			length,
 			jclassObj._ptr,
 			self:_luaToJavaArg(objInit, jclassObj._classpath)
 		)
 	else
-		obj = self._ptr[0][field](self._ptr, length)
+		jobject = self._ptr[0][field](self._ptr, length)
 	end
 
 	local resultClassPath = jtype..'[]'
-	return JavaObject._createObjectForClassPath{
+	local obj = JavaObject._createObjectForClassPath{
 		env = self,
-		ptr = obj,
+		ptr = jobject,
 		classpath = resultClassPath,
 		-- how to handle classpaths of primitives ....
 		-- java as a langauge is a bit of a mess
 		elemClassPath = jtype,
 	}
-end
-
-function JNIEnv:_throw(e)
-	self._ptr[0].Throw(self._ptr, e._ptr)
-end
-
--- for classes
-function JNIEnv:_throwNew(cl)
-	self._ptr[0].ThrowNew(self._ptr, cl._ptr)
-end
-
-function JNIEnv:_exceptionClear()
-	self._ptr[0].ExceptionClear(self._ptr)
+	self:_deleteLocalRef(jobject)
+	return obj
 end
 
 -- check-and-return exceptions
@@ -462,10 +515,10 @@ function JNIEnv:_exceptionOccurred()
 	-- so during startup all exceptions just get deferred
 	if self._ignoringExceptions then return end
 
-	local e = self._ptr[0].ExceptionOccurred(self._ptr)
-	if e == nil then return nil end
+	local jthrowable = self:_capiExceptionOccurred()
+	if jthrowable == nil then return nil end
 
---DEBUG:print('got exception', e)
+--DEBUG:print('got exception', jthrowable)
 --DEBUG:print(debug.traceback())
 
 	if self._dontCheckExceptions then
@@ -478,10 +531,11 @@ function JNIEnv:_exceptionOccurred()
 
 	self:_exceptionClear()
 
---DEBUG:print('exception classpath', self:_getObjClassPath(e))
+--DEBUG:print('exception classpath', self:_getObjClassPath(jthrowable))
 --DEBUG:print(debug.traceback())
 
-	local result = self:_fromJObject(e)
+	local result = self:_fromJObject(jthrowable)
+	self:_deleteLocalRef(jthrowable)
 
 	self._dontCheckExceptions = false
 
@@ -660,15 +714,16 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 
 			-- if its class is a java.lang.Class then use it for assignability test
 			-- otherwise use its class for assignability test
-			local jclassToTest
-			local jclass = envptr[0].GetObjectClass(envptr, jobject)
+			local jclass = self:_getObjectClass(jobject)
+			local result
 			if jclass == self._java_lang_Class._ptr then
-				jclassToTest = jobject
+				result = 0 ~= self:_capiIsAssignableFrom(jobject, toClassObj._ptr)
 			else
-				jclassToTest = jclass
+				result = 0 ~= self:_capiIsAssignableFrom(jclass, toClassObj._ptr)
 			end
+			self:_deleteLocalRef(jclass)
 
-			return 0 ~= envptr[0].IsAssignableFrom(envptr, jclassToTest, toClassObj._ptr)
+			return result
 		end
 
 		return false
@@ -891,8 +946,7 @@ function JNIEnv:_defineClass(asm, newClassName)
 
 		local loader = self.Thread:currentThread():getContextClassLoader()
 		self:_checkExceptions()
-		local jclass = self._ptr[0].DefineClass(
-			self._ptr,
+		local jclass = self:_capiDefineClass(
 			newClassNameSlashSep,
 			loader._ptr,
 			code,
@@ -903,7 +957,9 @@ function JNIEnv:_defineClass(asm, newClassName)
 		if jclass == nil then
 			error("JNI DefineClass failed to load "..tostring(newClassName))
 		end
-		return self:_fromJClass(jclass)
+		local cl = self:_fromJClass(jclass)
+		self:_deleteLocalRef(jclass)
+		return cl
 	end
 end
 

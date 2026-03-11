@@ -47,20 +47,20 @@ local c = TestInheritenceC()
 
 -- J.TestInheritenceA is our TestInheritenceA class
 -- J.TestInheritenceB
-local jclass_a = J:_getObjClass(a._ptr)
-local jclass_b = J:_getObjClass(b._ptr)
-local jclass_c = J:_getObjClass(c._ptr)
-print('J:_getObjClass(a._ptr)', jclass_a)
-print('J:_getObjClass(b._ptr)', jclass_b)
-print('J:_getObjClass(c._ptr)', jclass_c)
+local jclass_a = J:_getObjectClass(a._ptr)
+local jclass_b = J:_getObjectClass(b._ptr)
+local jclass_c = J:_getObjectClass(c._ptr)
+print('J:_getObjectClass(a._ptr)', jclass_a)
+print('J:_getObjectClass(b._ptr)', jclass_b)
+print('J:_getObjectClass(c._ptr)', jclass_c)
 
 local jclass_a_sig = J:_getJClassClasspath(jclass_a)
 local jclass_b_sig = J:_getJClassClasspath(jclass_b)
 local jclass_c_sig = J:_getJClassClasspath(jclass_c)
 
-print('J:_getJClassClasspath(J:_getObjClass(a._ptr))', jclass_a_sig)
-print('J:_getJClassClasspath(J:_getObjClass(b._ptr))', jclass_b_sig)
-print('J:_getJClassClasspath(J:_getObjClass(c._ptr))', jclass_c_sig)
+print('J:_getJClassClasspath(J:_getObjectClass(a._ptr))', jclass_a_sig)
+print('J:_getJClassClasspath(J:_getObjectClass(b._ptr))', jclass_b_sig)
+print('J:_getJClassClasspath(J:_getObjectClass(c._ptr))', jclass_c_sig)
 
 print('a:_getClass()', a:_getClass())
 print('b:_getClass()', b:_getClass())

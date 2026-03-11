@@ -189,6 +189,10 @@ function JavaClass:_setupReflection()
 				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
 				isEnum = 0 ~= bit.band(modifiers, 0x4000),
 			}
+			-- TODO delete 
+			-- ... but JavaField doesn't duplicate jfieldID to a GlobalRef, 
+			-- ... so that would force java.field to segfault upon use ...
+			-- so TODO change java.field and java.method to *NOT STORE jfieldID/jmethodID's
 
 			self._fields[name] = self._fields[name] or table()
 			self._fields[name]:insert(fieldObj)

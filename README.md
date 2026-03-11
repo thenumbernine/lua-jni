@@ -84,9 +84,9 @@ J.System.out:println("hello java")
 
 - `obj = J:_fromJObject(jobject)` = gets the JavaObject (or subclass) Lua object for a jobject JNI pointer.
 
-- `jclass = J:_getObjClass(jobject)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
+- `jclass = J:_getObjectClass(jobject)` = returns a `jclass` pointer for a `jobject` pointer.  Wrapper for C API `JNIEnv.GetObjectClass`.
 
-- `classpath, jclass = J:_getObjClassPath(jobject)` = returns a Lua string of the classpath and `jclass` for the jobject in `jobject`.
+- `classpath = J:_getObjClassPath(jobject)` = returns a Lua string of the classpath.
 
 - `classObj = J:_saveJClassForClassPath(args)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
 
@@ -414,3 +414,5 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - JavaObject `.this` and `.super` for nonvirtual qualified lookup wrapper.
 - type-inference in text-based assembler
 - TODO dex assembler methods, maybe use android studio disasm's `invoke-direct {args...} Lclass/path;->functionname(methodig)return`
+- looks like Android's 51200 GlobalRef's fills up very fast with my reflection implementation of storing each JavaField and JavaMethod in the JavaClass reflection...
+	... so to fix this, I guess I had better store some kind of method-but-not-jmethod or field-but-not-jfield...

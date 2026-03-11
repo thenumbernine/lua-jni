@@ -76,25 +76,28 @@ function JavaArray:_get(i)
 	if i < 0 or i >= #self then error("index out of bounds "..tostring(i)) end
 
 	local getArrayElements = getArrayElementsField[self._elemClassPath]
+	local result
 	if getArrayElements then
 		local releaseArrayElements = releaseArrayElementsField[self._elemClassPath]
 		local arptr = env._ptr[0][getArrayElements](env._ptr, self._ptr, nil)
 		if arptr == nil then error("array index null pointer exception") end
-		local result = ffi.cast(self._elemFFIType_ptr, arptr)[i]
+		result = ffi.cast(self._elemFFIType_ptr, arptr)[i]
 		env._ptr[0][releaseArrayElements](env._ptr, self._ptr, arptr, 0)
-		return result
 	else
 		local elemClassPath = self._elemClassPath
 		local elemPtr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i)
 		if elemPtr == nil then return nil end
-		return JavaObject._createObjectForClassPath{
+		result = JavaObject._createObjectForClassPath{
 			env = env,
 			ptr = elemPtr,
 			classpath = elemClassPath,
 		}
+		env:_deleteLocalRef(elemPtr)
 	end
 
 	env:_checkExceptions()
+
+	return result
 end
 
 local setArrayRegionField = prims:mapi(function(name)
