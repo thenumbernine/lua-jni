@@ -341,11 +341,6 @@ Notice that the names in instructions are slash-separated unlike the dot-separat
 Same as JavaASMClass but for `.dex` files.
 
 
-### NativeCallback
-`NativeCallback = require 'java.nativecallback`
-
-This is a helper class to call native callbacks that are either C or LuaJIT function closures.  It is generated with JavaASMClass/JavaASMDex at runtime, and loaded using `JNIEnv:_defineClass()`.
-
 <hr>
 
 Also for JNI, JavaClass, and JavaObject (and subclasses JavaString and JavaArray),
@@ -363,7 +358,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 
 - [lua-ext](http://github.com/thenumbernine/lua-ext) - For some basic utility functions.
 - [lua-struct](http://github.com/thenumbernine/struct-lua) - Using with the ASM file formats.
-- [lua-template](http://github.com/thenumbernine/lua-template) - Using with my ASM writing in places like `java/nativecallback.lua`. 
 - [lua-stl](http://github.com/thenumbernine/lua-stl) - I tried hard not to use this, but here it is, used in the ASM file blob reader/writers, for the stl-vector implementation.  Maybe I'll replace it with a luajit string.buffer.
 - [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use 'newLuaState' for sub-Lua-state encapsulation for multithreading.
 - [lua-make](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the `java/build.lua` file to invoke javac or gcc.

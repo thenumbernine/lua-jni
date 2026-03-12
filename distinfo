@@ -20,7 +20,6 @@ files = {
 	"jnienv.lua",
 	"luaclass.lua",
 	"method.lua",
-	"nativecallback.lua",
 	"object.lua",
 	"string.lua",
 	"tests/applet-lambdas/applet_lambdas.lua",
@@ -98,7 +97,6 @@ deps = {
 	"sha2",	-- used by java/asmdex.lua
 	"stl",	-- java/blob.lua, which is used by java/asmclass.lua or java/asmdex.lua
 	"struct",	-- slowly incorporating this into the asm reader/writers
-	"template",	-- now that I'm writing java asm, template is useful.  java/nativeclass.lua
 	"thread",	-- for use with java.saferunnable
 }
 generateBindings = ||{

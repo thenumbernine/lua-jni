@@ -3,7 +3,7 @@
 local path = require 'ext.path'
 local JavaASMClass = require 'java.asmclass'
 return function(J)
-	local NativeCallback = require 'java.nativecallback'(J)
+	local NativeCallback = require 'java.tests.asmclass.nativecallback_asmclass'(J)
 
 	local newClassName = 'io.github.thenumbernine.NativeActionListener'
 
