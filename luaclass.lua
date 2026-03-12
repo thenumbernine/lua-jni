@@ -14,6 +14,16 @@ local getJNISig = java_util .getJNISig
 local infoForPrims = java_util.infoForPrims
 
 
+local LiteThread = require 'thread.lite'
+-- TODO , __gc on litethreads and luastates is causing javavm segfaults
+-- they are collecting too quickly and i can't seem to pin them correctly to keep them from collecting
+-- so here is me just disabling their __gc
+LiteThread = LiteThread:subclass()
+function LiteThread:__gc() end
+LiteThread.Lua = LiteThread.Lua:subclass()
+function LiteThread.Lua:__gc() end
+
+
 local uniqueNameCounter = 1
 
 table.union(infoForPrims.boolean, {
@@ -44,7 +54,7 @@ table.union(infoForPrims.double, {
 
 -- Where to put the saved closures?
 -- I'd put them in the JavaClass object but I'm sure it would go out of scope too quickly
--- So I'll put them here with key = classname
+-- So I'll put them here with key = classpath
 local M = {}
 M.savedClosures = {}
 M.classnameBase = 'io.github.thenumbernine.LuaJavaClass_'
@@ -85,6 +95,10 @@ args:
 			isStatic
 			isPublic
 			isPrivate
+			...
+
+			newLuaState = set to 'true' to have the native callback run in a new sub-Lua-state.
+				This is necessary for functions that will run in separate threads from their callers, i.e. Runnable.run(), javafx's Application.start(), etc.
 		}
 	}
 
@@ -100,9 +114,9 @@ function M:run(args)
 	local isAndroid = env._usingAndroidJNI
 	local NativeCallback = require 'java.nativecallback'(env)
 
-	local classname = args.name
-	if not classname then
-		classname = M.classnameBase
+	local classpath = args.name
+	if not classpath then
+		classpath = M.classnameBase
 			..bit.tohex(ffi.cast('uint64_t', env._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
 			..'_'..uniqueNameCounter
 		uniqueNameCounter = uniqueNameCounter + 1
@@ -128,14 +142,14 @@ function M:run(args)
 	end
 
 	local closures = table()	-- to-free
-	M.savedClosures[classname] =  closures
+	M.savedClosures[classpath] =  closures
 
 
 	local asmClassArgs = {
 		version = 0x41,
 		isPublic = true,
 		isSuper = true,				-- .class only
-		thisClass = classname,
+		thisClass = classpath,
 		superClass = parentClass,
 		interfaces = interfaces,
 		fields = table(),
@@ -215,6 +229,8 @@ function M:run(args)
 		end
 	end
 
+	-- this is currently only used for ctors
+	-- TODO give ctors a native method like I do for all other methods below, and get rid of this cuz its bloated and has lots of asm
 	local function buildLuaWrapperMethod(method)
 		fixMethodSig(method)
 		local sig = method.sig
@@ -588,6 +604,11 @@ return
 		end
 	else
 		for _,ctor in ipairs(args.ctors) do
+			if type(ctor) == 'function' then
+				ctor = {
+					value = ctor,
+				}
+			end
 			ctor.name = '<init>'
 			ctor.sig = ctor.sig or {'void'}
 			ctor.sig[1] = 'void'		-- ctor must return void
@@ -613,10 +634,7 @@ return
 				end
 			end
 			assert.type(method, 'table')
-			--[=[ don't build a lua wrapper in java asm...
-			buildLuaWrapperMethod(method)
-			--]=]
-			-- [=[ instead just flag the methods as native and pass your own lua unwrapper
+
 			method.isNative = true
 			if method.isPublic == nil then method.isPublic = true end
 			method.code = nil
@@ -627,26 +645,20 @@ return
 			local nativeMethod = nativeMethods:emplace_back()
 			nativeMethod.name = method.name
 			nativeMethod.signature = method.jniSig	-- built in fixMethodSig()
-			if type(func) == 'cdata' then
-				-- assume whoever passes this knows what they are doing...
-				nativeMethod.fnPtr = ffi.cast('void*', func)
---DEBUG:io.stderr:write("!!! DANGER !!! I just got rid of the translation layer for cdata function pointers...\n")
-			else
-				local function jniTypeForSig(s)
-					if s == 'void 'then return 'void' end
-					if s == 'java.lang.String' then return 'jstring' end
-					local primInfo = infoForPrims[s]
-					if primInfo then return 'j'..s end
-					return 'jobject'
-				end
 
-				local sig = method.sig
-				local returnType = sig[1]
+			local function jniTypeForSig(s)
+				if s == 'void 'then return 'void' end
+				if s == 'java.lang.String' then return 'jstring' end
+				local primInfo = infoForPrims[s]
+				if primInfo then return 'j'..s end
+				return 'jobject'
+			end
 
+			local function getCFuncTypeForSig(sig)
 				-- build wrapper for args here:
 				local jniCSig = table()
 				jniCSig:insert(jni.JNIEXPORT..' ')
-				jniCSig:insert(jniTypeForSig(returnType))
+				jniCSig:insert(jniTypeForSig(sig[1]))
 				jniCSig:insert(' '..jni.JNICALL)
 				jniCSig:insert'(*)(JNIEnv*'	-- function args begin
 				if method.isStatic then
@@ -659,9 +671,125 @@ return
 				end
 				jniCSig:insert')'		-- function args end
 --DEBUG:print('for method', method.isStatic and 'static' or '', 'sig', require 'ext.tolua'(method.sig))
-				local cfuncType = jniCSig:concat()
---DEBUG:print('got c sig', cfuncType)
-				-- cfuncType will tell LuaJIT how to translate arguments to JNI types
+				return jniCSig:concat()
+			end
+
+
+			if method.newLuaState then
+				assert.type(func, 'function', "newLuaState requires a Lua function")
+
+				-- Make a new lite-thread and sub-lua-state for this method
+				-- TODO should it be one per method or one per class?
+				-- TODO some kind of better mix and match of sub-lua-states and methods.
+				-- another TODO ... this will be one sub-Lua-state per-class, which means it will be shared with all objects ...
+				local thread = LiteThread{
+
+					-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
+					threadFuncTypeName = getCFuncTypeForSig(method.sig),
+
+					-- callback prefix code.
+					-- I need to require java.ffi.jni in here,
+					--  or the ffi.cast(threadFuncTypeName) won't work
+					init = function(thread)
+						-- have to define this before pushing data of its cdata type into the new Lua state...
+						thread.lua[[
+-- this is needed for the ffi.cast threadFuncTypeName declaration
+require 'java.ffi.jni'
+]]
+
+						thread.lua([[
+local func,
+	jvmPtr,
+	sig,
+	isStatic,
+	classpath = ...
+
+-- rebuild the JavaVM here, once
+-- but I can't rebuild it without the jnienv
+-- and the vm won't create a new jnienv until a new thread is made
+-- and the new thread won't be made until after the method call happens
+-- and we're still in init
+-- so instead for now here just make a function for creating it or returning it
+local reg = debug.getregistry()
+reg.java_callback = func
+reg.method = {sig=sig, isStatic=isStatic}
+reg.classpath = classpath
+reg.getJVM = function(envPtr)
+	if not reg.jvm then
+		reg.jvm = require 'java.vm'{
+			ptr = jvmPtr,
+			jniEnv = {
+				ptr = envPtr,
+			},
+		}
+	end
+	return reg.jvm
+end
+
+]],
+	func,	-- convert to bytecode and pass into the child Lua state:
+	env._vm._ptr,
+	method.sig,
+	method.isStatic,
+	classpath)
+
+					end,
+					-- callback function:
+					func = function(envPtr, thisOrClass, ...)
+						-- THIS IS RUN ON A SEPARATE THREAD AND IN THE CHILD LUA STATE
+
+						-- rebuild env from envPtr in case it's on a new thread
+						-- but we can use the same jvm pointer
+						local reg = debug.getregistry()
+						local method = reg.method
+						local classpath = reg.classpath
+						local jvm = reg.getJVM(envPtr)
+						local func = reg.java_callback
+						local env = jvm.jniEnv
+						local sig = method.sig
+						local table = require 'ext.table'
+
+						-- rebuild args
+
+						if method.isStatic then
+							-- TODO this method but also with a class helper?
+							thisOrClass = env:_fromJClass(thisOrClass)
+						else
+							thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
+						end
+						local args = table.pack(...)
+						for i=1,args.n do
+							args[i] = env:_javaToLuaArg(args[i], sig[i+1])
+						end
+
+						local result = func(env, thisOrClass, args:unpack(1, args.n))
+
+						if sig[1] == 'void' then return end
+						if result == nil then return nil end
+
+						return env:_luaToJavaArg(result, sig[1])
+					end,
+				}
+
+				-- do this but after done running
+				-- or TODO somehow allow the caller access to it
+				--thread:showErr()
+
+				-- save the thread so it doesn't collect
+				closures:insert{thread=thread}
+
+				-- use the thread's wrapper's function pointer
+				func = thread.funcptr
+			end
+
+
+			if type(func) == 'cdata' then
+				-- assume whoever passes this knows what they are doing...
+				nativeMethod.fnPtr = ffi.cast('void*', func)
+--DEBUG:io.stderr:write("!!! DANGER !!! I just got rid of the translation layer for cdata function pointers...\n")
+			else
+				local sig = method.sig
+
 				-- the wrapper should be similar to the ctor implementaiton but without the Object[] and boxing/unboxing
 				local wrapper = function(envPtr, thisOrClass, ...)
 					--[[ this is somewhat thread-safe since JNI will call the C func with a new envPtr when we are crossing threads
@@ -675,7 +803,7 @@ return
 						-- TODO this method but also with a class helper?
 						thisOrClass = env:_fromJClass(thisOrClass)
 					else
-						thisOrClass = env:_javaToLuaArg(thisOrClass, classname)
+						thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
 					end
 					local args = table.pack(...)
 					for i=1,args.n do
@@ -684,12 +812,17 @@ return
 
 					local result = func(thisOrClass, args:unpack(1, args.n))
 
-					if returnType == 'void' then return end
+					if sig[1] == 'void' then return end
 					if result == nil then return nil end
 
 					return env:_luaToJavaArg(result, sig[1])
 				end
+
+				local cfuncType = getCFuncTypeForSig(method.sig)
+--DEBUG:print('got c sig', cfuncType)
+				-- cfuncType will tell LuaJIT how to translate arguments to JNI types
 				local closure = ffi.cast(cfuncType, wrapper)
+
 				closures:insert{
 					wrapper = wrapper,
 					closure = closure,
@@ -697,9 +830,9 @@ return
 					name = method.name,
 					sig = method.jniSig,
 				}
+
 				nativeMethod.fnPtr = ffi.cast('void*', closure)
 			end
-			--]=]
 		end
 	end
 

@@ -4,13 +4,11 @@ javafx demo but with java.luaclass
 --]]
 local thread = require 'thread.lite'{
 	code = [=[
+	
+
 	print('Application:start(stage) callback')
 	local J = require 'java.vm'{ptr=jvmPtr}.jniEnv
 	print('J._ptr', J._ptr)	-- changes from the vm's GetEnv call, which wouldn't happen if it was run on the same thread...
-
-	local pthread = require 'ffi.req' 'c.pthread'
-	local callbackThread = pthread.pthread_self()
-	print('callback thread, pthread_self', callbackThread)
 
 	-- typically JavaLuaClass does this, but since we handed off a thread, we have to ourselves
 	-- that's why I am tempted to do a TODO JavaThread wrapper to do this for us.
@@ -50,11 +48,6 @@ print('JNIEnv', J._ptr)
 local ffi = require 'ffi'
 thread.lua([[ jvmPtr = ... ]], ffi.cast('uint64_t', J._vm._ptr))
 
--- show the main thread is one thread
-local pthread = require 'ffi.req' 'c.pthread'
-local parentThread = pthread.pthread_self()
-print('parent thread, pthread_self', parentThread)
-
 -- the java-asm one loads a static field funcptr and calls it with NativeCallback
 -- this is going to use closures.
 local ThisApplication = require 'java.luaclass'{
@@ -68,7 +61,7 @@ local ThisApplication = require 'java.luaclass'{
 			isPublic = true,
 			name = 'start',
 			sig = {'void', 'javafx.stage.Stage'},
-			value = thread.funcptr,	-- thread will get called with 'stage'
+			value = thread.funcptr,	-- thread will get called with 'stage' jobject
 		},
 	},
 }

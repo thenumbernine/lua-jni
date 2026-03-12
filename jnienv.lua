@@ -1058,11 +1058,11 @@ function Name:init(args)
 	rawset(self, '_name', assert.index(args, 'name'))
 
 	-- dont' allow writes
-	setmetatable(self, table(Name, {
+	setmetatable(self, table.union({}, Name, {
 		__newindex = function(k,v)
 			error("namespace object is write-protected")
 		end,
-	}):setmetatable(nil))
+	}))
 end
 
 function Name:__tostring()

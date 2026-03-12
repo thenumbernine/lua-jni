@@ -2,6 +2,7 @@
 This is a wrapper for an object in Java, i.e. a jobject in JNI
 --]]
 require 'ext.gc'
+local ffi = require 'ffi'
 local class = require 'ext.class'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
@@ -20,6 +21,12 @@ JavaObject.subclass = nil	-- make room for Java instances with fields named 'sub
 --JavaObject.isa = nil -- handled in __index
 --JavaObject.isaSet = nil -- handled in __index
 
+-- Set to true to convert all jobjects to GlobalRef's upon ctor
+--  and DeleteGlobalRef them upon their __gc
+-- Set to false to just use LocalRefs, and not __gc them,
+--  because in theory Java VM will clean them all itself when we "return from JNI",
+--  ... which will never happen of course.
+JavaObject._makeGlobalRef = true
 
 function JavaObject:init(args)
 	local env = assert.index(args, 'env')
@@ -28,11 +35,16 @@ function JavaObject:init(args)
 
 	local ptr = assert.index(args, 'ptr')
 
-	if ptr ~= nil then
-		self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
-	else
+	if ptr == nil then
 		error("no nil JavaObjects, just use nil itself")
-		--self._ptr = nil
+	end
+
+	local makeGlobalRef = args.globalRef
+	if makeGlobalRef == nil then
+		makeGlobalRef = self._makeGlobalRef
+	end
+	if makeGlobalRef then
+		self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
 	end
 
 	-- TODO detect if not provided?
@@ -46,7 +58,7 @@ function JavaObject:init(args)
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
-	setmetatable(self, table(mt, {
+	setmetatable(self, table.union({}, mt, {
 		__newindex = function(self, k, v)
 			--see if we are trying to write to a Java field
 			if type(k) == 'string'
@@ -70,7 +82,7 @@ function JavaObject:init(args)
 			-- finally do our write
 			rawset(self, k, v)
 		end,
-	}):setmetatable(nil))
+	}))
 end
 
 -- static helper
@@ -292,8 +304,10 @@ function JavaObject:__gc()
 			and vmptr[0] ~= nil
 			then
 				local envptr = env._ptr
+				if envptr[0].GetObjectRefType(envptr, ptr) == ffi.C.JNIGlobalRefType then
 --DEBUG:print('obj shutting down with vm ptr', vmptr, vmptr[0])
-				envptr[0].DeleteGlobalRef(envptr, ptr)
+					envptr[0].DeleteGlobalRef(envptr, ptr)
+				end
 				rawset(self, '_ptr', false)
 			end
 		end

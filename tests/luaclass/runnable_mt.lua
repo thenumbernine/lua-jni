@@ -12,12 +12,20 @@ local runnable = J:_safeRunnable(function(J, this)
 	J.System.out:println("LuaJIT -> Java -> JNI -> (new thread) -> LuaJIT -> Java -> printing here")
 
 	J:_checkExceptions()
-
 end)
 local th = J.Thread(runnable)
 
 print('thread', th)
+
 th:start()
 th:join()
-runnable._thread:showErr()
+
+for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) do
+	if cls.thread then
+		cls.thread:showErr()
+	end
+end
+
+
+
 print'DONE'

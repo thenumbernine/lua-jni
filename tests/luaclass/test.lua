@@ -26,6 +26,11 @@ local Test = require 'java.luaclass'{
 		},
 		'loo',	-- key=seq int, value=string, use name for value
 	},
+	ctors = {
+		function(this)
+			print"in custom ctor!"
+		end,
+	},
 	methods = {
 		-- [[
 		toString = function(this)

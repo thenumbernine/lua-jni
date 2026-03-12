@@ -66,7 +66,7 @@ function JavaVM:init(args)
 
 			if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
 
-			local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
+			local jniEnvArgs = table.union({}, args.jniEnv)
 			jniEnvArgs.vm = self
 			jniEnvArgs.ptr = jniEnvPtrArr[0]
 			jniEnvArgs.usingAndroidJNI = self.usingAndroidJNI
@@ -128,7 +128,7 @@ function JavaVM:init(args)
 		if jniEnvPtrArr[0] == nil then error("failed to find a JNIEnv*") end
 
 		assert(not JNIEnv:isa(args.jniEnv))
-		local jniEnvArgs = table(args.jniEnv):setmetatable(nil)
+		local jniEnvArgs = table.union({}, args.jniEnv)
 		jniEnvArgs.vm = self
 		jniEnvArgs.ptr = jniEnvPtrArr[0]
 		jniEnvArgs.usingAndroidJNI = self.usingAndroidJNI

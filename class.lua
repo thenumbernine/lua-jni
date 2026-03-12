@@ -83,7 +83,7 @@ function JavaClass:init(args)
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
-	setmetatable(self, table(mt, {
+	setmetatable(self, table.union({}, mt, {
 		__newindex = function(self, k, v)
 			--see if we are trying to write to a Java field
 			if type(k) == 'string'
@@ -106,7 +106,7 @@ function JavaClass:init(args)
 			-- finally do our write
 			rawset(self, k, v)
 		end,
-	}):setmetatable(nil))
+	}))
 end
 
 -- call this after creating JavaClass to fill its reflection contents
@@ -695,8 +695,12 @@ assert.eq(true, env._ignoringExceptions)
 	if cl then return cl end
 end
 
--- build the subclass used for _cb()
-function JavaClass:_cbClass(func)
+--[[
+build the subclass used for _cb()
+- func = callback
+- safe = whether invoking this function should use a new lite-thread and new lua state or not.
+--]]
+function JavaClass:_cbClass(func, safe)
 	local env = self._env
 
 	local samMethod = self._samMethod
@@ -719,6 +723,7 @@ function JavaClass:_cbClass(func)
 				name = samMethod._name,
 				sig = samMethod._sig,
 				value = func,
+				newLuaState = safe,
 			},
 		},
 	}
