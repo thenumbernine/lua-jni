@@ -24,32 +24,70 @@ LiteThread.Lua = LiteThread.Lua:subclass()
 function LiteThread.Lua:__gc() end
 
 
-local uniqueNameCounter = 1
-
 table.union(infoForPrims.boolean, {
-	returnOp = 'ireturn',
+	asmClassReturnOp = 'ireturn',
 })
 table.union(infoForPrims.char, {
-	returnOp = 'ireturn',
+	asmClassReturnOp = 'ireturn',
 })
 table.union(infoForPrims.byte, {
-	returnOp = 'ireturn',
+	asmClassReturnOp = 'ireturn',
 })
 table.union(infoForPrims.short, {
-	returnOp = 'ireturn',
+	asmClassReturnOp = 'ireturn',
 })
 table.union(infoForPrims.int, {
-	returnOp = 'ireturn',
+	asmClassReturnOp = 'ireturn',
 })
 table.union(infoForPrims.long, {
-	returnOp = 'lreturn',
+	asmClassReturnOp = 'lreturn',
 })
 table.union(infoForPrims.float, {
-	returnOp = 'freturn',
+	asmClassReturnOp = 'freturn',
 })
 table.union(infoForPrims.double, {
-	returnOp = 'dreturn',
+	asmClassReturnOp = 'dreturn',
 })
+
+
+local function jniTypeForSig(s)
+	if s == 'void 'then return 'void' end
+	if s == 'java.lang.String' then return 'jstring' end
+	local primInfo = infoForPrims[s]
+	if primInfo then return 'j'..s end
+	return 'jobject'
+end
+
+local function getCFuncTypeForSig(sig, isStatic)
+	-- build wrapper for args here:
+	local jniCSig = table()
+	jniCSig:insert(jni.JNIEXPORT..' ')
+	jniCSig:insert(jniTypeForSig(sig[1]))
+	jniCSig:insert(' '..jni.JNICALL)
+	jniCSig:insert'(*)(JNIEnv*'	-- function args begin
+	if isStatic then
+		jniCSig:insert', jclass'	-- calling class
+	else
+		jniCSig:insert', jobject'	-- this
+	end
+	for i=2,#sig do
+		jniCSig:insert(', '..jniTypeForSig(sig[i]))
+	end
+	jniCSig:insert')'		-- function args end
+--DEBUG:print('for method', isStatic and 'static' or '', 'sig', require 'ext.tolua'(sig))
+	return jniCSig:concat()
+end
+
+
+local uniqueNameCounter = 1
+
+local function generateName(base, ptr)
+	local name = base
+		..'_'..bit.tohex(ffi.cast('uint64_t', ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
+		..'_'..uniqueNameCounter
+	uniqueNameCounter = uniqueNameCounter + 1
+	return name
+end
 
 
 -- Where to put the saved closures?
@@ -112,14 +150,10 @@ args:
 function M:run(args)
 	local env = assert.index(args, 'env')
 	local isAndroid = env._usingAndroidJNI
-	local NativeCallback = require 'java.nativecallback'(env)
 
 	local classpath = args.name
 	if not classpath then
-		classpath = M.classnameBase
-			..bit.tohex(ffi.cast('uint64_t', env._ptr), bit.lshift(ffi.sizeof'intptr_t', 1))
-			..'_'..uniqueNameCounter
-		uniqueNameCounter = uniqueNameCounter + 1
+		classpath = generateName(M.classnameBase, env._ptr)
 	end
 
 	local parentClass = args.extends or 'java.lang.Object'
@@ -229,348 +263,6 @@ function M:run(args)
 		end
 	end
 
-	-- this is currently only used for ctors
-	-- TODO give ctors a native method like I do for all other methods below, and get rid of this cuz its bloated and has lots of asm
-	local function buildLuaWrapperMethod(method)
-		fixMethodSig(method)
-		local sig = method.sig
-		local returnType = sig[1]
-
-		-- map from arg # (1-based) to stack or register index # (0-based)
-		local argIndex = table()
-		-- in android do static methods have a 'this' equivalent, like 'class', like the JNI static calls do?
-		local maxArgIndex = method.isStatic and 0 or 1
-		for i=2,#sig do
-			local sigi = sig[i]
-			argIndex[i-1] = maxArgIndex
-			maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
-		end
---DEBUG:print('method', method.name, require 'ext.tolua'(method.sig))
---DEBUG:print('argIndex', require 'ext.tolua'(argIndex))
-
-		local sigNumArgs = #sig-1
---DEBUG:print('sigNumArgs', sigNumArgs)
-		local argArraySize = sigNumArgs
-			-- +1 for 'this' unless it's static
-			+ (method.isStatic and 0 or 1)
-
-		--[[
-		me learning android
-		maybe this is wrong
-		but
-		maxRegs = # used for calling out (regsOut) ... at the beginning
-			+ any local use only regs ... go next
-			+ # used for being called (regIn, determined by arg types + static or not) ... go at the end
-		--]]
-		if isAndroid then
-			-- v2 for Object[] list
-			-- v0 & v1 for funcptr
-			method.regsOut = 3
-			-- v3 = local for array index
-			-- so that means 'this' is at v4
-			-- and the rest of the args are past v3 ...
-			-- ... right?
-			method.regsIn = maxArgIndex
-			local numLocals = 1
-			method.maxRegs = method.regsOut + numLocals + method.regsIn
-		end
-
-		local code = table()
-
-		-- .class-only, since .dex doesn't use a stack
-		local function pushConstInt(value)
-			if value == -1 then
-				code:insert{'iconst_m1'}
-			elseif value >= 0 and value <= 5 then
-				code:insert{'iconst_'..value}
-			else
-				const:insert{'bipush', value}
-			end
-		end
-
-		-- special for ctors, call parent
-		if method.name == '<init>' then
-			if isAndroid then
-				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v4'}	-- v4 has 'this'
-			else
-				code:insert{'aload_0'}		-- push 'this' onto the stack
-				-- TODO This always calls the parent-class's <init>().  what about dif args?
-				code:insert{'invokespecial', parentClass, '<init>', '()V'}
-			end
-		end
-
-		local func = assert.index(method, 'value')
-		-- if it's cdata then use it as-is
-		local funcptr
-		if type(func) == 'cdata' then
-		-- if it's a function then wrap it in a conversion layer
-			funcptr = func
-		elseif type(func) == 'function' then
-			local wrapper = function(args)
---DEBUG:print('wrapper args', args)
-				local result
---DEBUG:print('wrapper calling sig', require 'ext.tolua'(sig))
-				if args ~= nil then
-					-- args should be Object[] always, and for members it will have args[0]==this
-					args = env:_javaToLuaArg(args, 'java.lang.Object[]')
-					result = func(args:_unpack())
-				else
-					result = func()
-				end
-				if returnType == 'void' then
-					return nil
-				else
-					-- return a boxed type
-					local primInfo = infoForPrims[returnType]
-					local boxedSig = primInfo and primInfo.boxedType or returnType
---DEBUG:print('converting from', result, type(result), 'to sig', returnType, 'to (boxed?)', boxedSig)
-					-- will be a java.lang.Object here no matter what
-					-- so the jobject(jobject) funcptr sig can handle it
-					return env:_luaToJavaArg(result, boxedSig)
-				end
-			end
-			local closure = ffi.cast('void*(*)(void*)', wrapper)
-			closures:insert(closure)
-			funcptr = closure
-		else
-			error("idk how to handle method value of type "..type(func))
-		end
-
-		-- now native callback will get ...
-		-- 1) a funcptr from a closure
-		if isAndroid then
-			-- v4 has 'this' ... or 'class'? or null?
-			-- v5... have all the arguments ....
-			-- v0&v1 get jlong funcptr
-
-			-- TODO should I add a type arg to .dex const-wide?
-			--  or should I change .class to detect and remove the type arg?
-			code:insert{'const-wide', 'v0', ffi.cast('jlong', funcptr)}
-		else
-			-- stack:
-			code:insert{'ldc2_w', 'long', ffi.cast('jlong', funcptr)}
-			-- stack: long funcptr
-		end
-
-		-- 2) an Object[] of {this, ... rest of args of the method}
-		if isAndroid then
-			if argArraySize < 8 then
-				code:insert{'const/4', 'v2', argArraySize}
-			else
-				assert(argArraySize < 128, 'more plz')
-				code:insert{'const/8', 'v2', argArraySize}
-			end
-			-- v2 gets Object[] args
-			code:insert{'new-array', 'v2', 'v2', '[java/lang/Object;'}
-		else
-			-- stack: [Object this], long funcptr
-			pushConstInt(argArraySize)
-			code:insert{'anewarray', 'java/lang/Object'}
-			-- stack: long funcptr, Object[] args
-		end
-
-		-- set args[0] = this
-		-- if it's static, what to do?
-		-- TODO pass the JavaObject of the java.lang.Class?
-		local localVarIndex = 0
-		local argArrayIndex = 0
-		if isAndroid then
-			localVarIndex = 4	-- pass our 3 outgoing and 1 local
-		end
-		-- to skip 'this' ... right?
-		if not method.isStatic then
-			if isAndroid then
-				--v3 = argArrayIndex
-				code:insert{'const', 'v3', argArrayIndex}
-				code:insert{
-					'aput-object',
-					'v'..localVarIndex,		-- reg with value to push: 'this'
-					'v2',	-- reg with array
-					'v3',	-- reg with array index
-				}
-			else
-				code:insert{'dup'}
-				-- stack: funcptr, args, args
-				pushConstInt(argArrayIndex)				-- array index ...?
-				-- stack: funcptr, args, args, argArrayIndex
-				code:insert{'aload_'..localVarIndex}	-- local index (0 for 'this')
-				-- stack: funcptr, args, args, argArrayIndex, this
-				code:insert{'aastore'}
-				-- stack: funcptr, args ... args[argArrayIndex] = this
-			end
-			localVarIndex = localVarIndex + 1	-- start us at 1
-			argArrayIndex = argArrayIndex + 1
-		end
-
-		if sigNumArgs > 0 then
-			for i=0,sigNumArgs-1 do		-- 0-based argument index
-
-				local argSig = sig[i+2]
-				local primInfo = infoForPrims[argSig]
-
-				if isAndroid then
-					if primInfo then
-						-- call 'valueOf' to box before storing
-						code:insert{
-							'invoke-static',
-							getJNISig(primInfo.boxedType),					-- class
-							'valueOf',										-- method name
-							getJNISig{primInfo.boxedType, primInfo.name},	-- signature
-							'v'..localVarIndex,								-- argument
-							(argSig == 'long' or argSig == 'double') and 'v'..(localVarIndex+1) or nil
-						}
-						code:insert{
-							'move-result-object',
-							'v'..localVarIndex,			-- can I do it destructively and overwrite the argument?
-						}
-					end
-					--v3 = argArrayIndex
-					code:insert{'const', 'v3', argArrayIndex}
-					code:insert{
-						'aput-object',
-						'v'..localVarIndex,		-- reg with value to push: local #localVarIndex
-						'v2',					-- reg with array
-						'v3',					-- reg with array index
-					}
-				else
-					code:insert{'dup'}
-					-- stack: funcptr, args, args
-					pushConstInt(argArrayIndex)
-					-- stack: funcptr, args, args, argArrayIndex
-
-					local argOpcode
-					if primInfo then
-						if argSig == 'long' then
-							argOpcode = 'lload'
-						elseif argSig == 'double' then
-							argOpcode = 'dload'
-						elseif argSig == 'float' then
-							argOpcode = 'fload'
-						else	-- all other prims: int
-							argOpcode = 'iload'
-						end
-					else	-- all non-prims: Object
-						argOpcode = 'aload'
-					end
-
-					if localVarIndex < 4 then
-						-- aload, iload, etc have 0123 as separate commands:
-						code:insert{argOpcode..'_'..localVarIndex}
-					else
-						code:insert{argOpcode, localVarIndex}
-					end
-					-- stack: funcptr, args, args, argArrayIndex, local[localVarIndex]
-
-					if primInfo then
-						code:insert{
-							'invokestatic',
-							primInfo.boxedType,
-							'valueOf',
-							getJNISig{primInfo.boxedType, argSig}
-						}
-					end
-					code:insert{'aastore'}
-					-- stack: funcptr, args ... args[argArrayIndex] = local[localVarIndex]
-				end
-
-				if argSig == 'long' or argSig == 'double' then
-					localVarIndex = localVarIndex + 2
-				else
-					localVarIndex = localVarIndex + 1
-				end
-				argArrayIndex = argArrayIndex + 1
-			end
-		end
-
-		-- call `NativeCallback.run(funcptr, Object[]{this, args...})`
-		local callbackClassPath = NativeCallback._classpath
-		local runMethodName = assert(NativeCallback._runMethodName)
-		local runMethodSig = '(JLjava/lang/Object;)Ljava/lang/Object;'
-		if isAndroid then
-			code:insert{
-				'invoke-static',
-				getJNISig(callbackClassPath),
-				runMethodName,
-				runMethodSig,
-				'v0',		-- jlong funcptr
-				'v1',
-				'v2'		-- Object[] args index
-			}
-		else
-			code:insert{
-				'invokestatic',
-				callbackClassPath,
-				runMethodName,
-				runMethodSig,
-			}
-		end
-
-		-- now on the stack is a java.lang.Object from NativeCallback.run()
-		-- next, convert it depending on this function's return type
---DEBUG:print('returnType', returnType)
-		local primInfo = infoForPrims[returnType]
-		if returnType == 'void' then
-			code:insert{'return-void'}	-- aliased on .class to 'return'
-		elseif primInfo then
-			if isAndroid then
-				-- cast to boxed type
-				code:insert{'move-result-object', 'v0'}
-				code:insert{'check-cast', 'v0', getJNISig(primInfo.boxedType)}
-				-- convert back to value
-				code:insert{
-					'invoke-virtual',
-					getJNISig(primInfo.boxedType),
-					primInfo.name..'Value',
-					getJNISig{primInfo.name},
-					'v0',
-				}
-				if primInfo.name == 'long' or primInfo.name == 'double' then
-					code:insert{'move-result-wide', 'v0'}
-					code:insert{'return-wide', 'v0'}
-				else
-					code:insert{'move-result', 'v0'}
-					code:insert{'return', 'v0'}
-				end
-			else
-				-- cast to boxed type
-				code:insert{'checkcast', primInfo.boxedType}
-				-- convert back to value
-				code:insert{
-					'invokevirtual',
-					primInfo.boxedType,
-					primInfo.name..'Value',
-					getJNISig{primInfo.name},
-				}
-				code:insert{primInfo.returnOp}
-			end
-		else
-			if isAndroid then
-				code:insert{'move-result-object', 'v0'}
-				code:insert{
-					'check-cast',
-					'v0',
-					getJNISig(returnType)
-				}
-				code:insert{'return-object', 'v0'}
-			else
-				code:insert{
-					'checkcast',
-					(returnType:gsub('%.', '/')),
-				}
-				code:insert{'areturn'}
-			end
-		end
-
-		if method.isPublic == nil then method.isPublic = true end
-		method.value = nil
-		method.code = code
-
-		--method.maxStack = 6	-- always? or will it be sig dependent? esp for long/double?
-		method.maxLocals = localVarIndex
-
-		asmClassArgs.methods:insert(method)
-	end
-
 	local srcCtors = args.ctors
 	if not srcCtors or #srcCtors == 0 then
 		-- provide a default ctor, no need for closure or callback
@@ -603,18 +295,139 @@ return
 			}
 		end
 	else
+		args.methods = table(args.methods)	-- will be using this
 		for _,ctor in ipairs(args.ctors) do
 			if type(ctor) == 'function' then
 				ctor = {
 					value = ctor,
 				}
 			end
+
+			assert.type(ctor.value, 'function')
+
 			ctor.name = '<init>'
 			ctor.sig = ctor.sig or {'void'}
 			ctor.sig[1] = 'void'		-- ctor must return void
 			ctor.isStatic = false		-- ctor must not be static
 			ctor.isConstructor = true	-- .dex only
-			buildLuaWrapperMethod(ctor)
+
+			fixMethodSig(ctor)
+			local sig = ctor.sig
+			local returnType = sig[1]
+
+			local ctorFwdMethodName = generateName('ctorFwdMethod', env._ptr)
+			args.methods:insert{
+				name = ctorFwdMethodName,
+				isPrivate = true,
+				sig = table(sig),
+				value = ctor.value,	-- passed value goes here.
+			}
+
+
+			-- map from arg # (1-based) to stack or register index # (0-based)
+			local argIndex = table()
+			local maxArgIndex = 1
+			for i=2,#sig do
+				local sigi = sig[i]
+				argIndex[i-1] = maxArgIndex
+				maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
+			end
+
+			local sigNumArgs = #sig-1
+			local argArraySize = sigNumArgs+1	-- +1 for 'this' unless it's static
+
+			if isAndroid then
+				ctor.regsOut = 1
+				ctor.regsIn = maxArgIndex
+				ctor.maxRegs = maxArgIndex
+			end
+
+			local code = table()
+
+			-- .class-only, since .dex doesn't use a stack
+			local function pushConstInt(value)
+				if value == -1 then
+					code:insert{'iconst_m1'}
+				elseif value >= 0 and value <= 5 then
+					code:insert{'iconst_'..value}
+				else
+					const:insert{'bipush', value}
+				end
+			end
+
+			-- special for ctors, call parent
+			if isAndroid then
+				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v0'}	-- v0 has 'this'
+
+				if #argIndex <= 4 then
+					code:insert(table{
+						'invoke-virtual',
+						getJNISig(classpath),
+						ctorFwdMethodName,
+						getJNISig(sig),
+						'v0',	-- this
+					}:append(
+						argIndex:mapi(function(i) return 'v'..i end)
+					))
+				else
+					error'TODO invoke-virtual/range'
+				end
+				code:insert{'return-void'}	-- no return type
+			else
+				code:insert{'aload_0'}		-- push 'this' onto the stack
+				-- TODO This always calls the parent-class's <init>().  what about dif ctor sigs?
+				code:insert{'invokespecial', parentClass, '<init>', '()V'}
+
+				-- load all args
+				code:insert{'aload_0'}
+				for i=1,sigNumArgs do		-- 1-based argument index
+					local argSig = sig[i+1]
+					local argOpcode = 'aload'	-- default ot all non-prims: Object
+					if infoForPrims[argSig] then
+						if argSig == 'long' then
+							argOpcode = 'lload'
+						elseif argSig == 'double' then
+							argOpcode = 'dload'
+						elseif argSig == 'float' then
+							argOpcode = 'fload'
+						else	-- all other prims: int
+							argOpcode = 'iload'
+						end
+					end
+
+					local localVarIndex = argIndex[i]
+					if localVarIndex < 4 then
+						-- aload, iload, etc have 0123 as separate commands:
+						code:insert{argOpcode..'_'..localVarIndex}
+					else
+						code:insert{argOpcode, localVarIndex}
+					end
+				end
+
+				-- call our native fwd method
+				code:insert{
+					'invokevirtual',
+					classpath,
+					ctorFwdMethodName,
+					getJNISig(sig),
+				}
+				code:insert{'return'}	-- no return type
+			end
+
+			if ctor.isPublic == nil
+			and ctor.isPrivate == nil
+			and ctor.isProtected == nil
+			then
+				ctor.isPublic = true 	--- default.  i know i should let this fall back on package-scope i.e. no public/private/protected.  meh.
+			end
+
+			ctor.value = nil
+			ctor.code = code
+
+			--ctor.maxStack = 6	-- always? or will it be sig dependent? esp for long/double?
+			ctor.maxLocals = localVarIndex
+
+			asmClassArgs.methods:insert(ctor)
 		end
 	end
 
@@ -636,7 +449,12 @@ return
 			assert.type(method, 'table')
 
 			method.isNative = true
-			if method.isPublic == nil then method.isPublic = true end
+			if method.isPublic == nil
+			and method.isPrivate == nil
+			and method.isProtected == nil
+			then
+				method.isPublic = true
+			end
 			method.code = nil
 			asmClassArgs.methods:insert(method)
 
@@ -645,35 +463,6 @@ return
 			local nativeMethod = nativeMethods:emplace_back()
 			nativeMethod.name = method.name
 			nativeMethod.signature = method.jniSig	-- built in fixMethodSig()
-
-			local function jniTypeForSig(s)
-				if s == 'void 'then return 'void' end
-				if s == 'java.lang.String' then return 'jstring' end
-				local primInfo = infoForPrims[s]
-				if primInfo then return 'j'..s end
-				return 'jobject'
-			end
-
-			local function getCFuncTypeForSig(sig)
-				-- build wrapper for args here:
-				local jniCSig = table()
-				jniCSig:insert(jni.JNIEXPORT..' ')
-				jniCSig:insert(jniTypeForSig(sig[1]))
-				jniCSig:insert(' '..jni.JNICALL)
-				jniCSig:insert'(*)(JNIEnv*'	-- function args begin
-				if method.isStatic then
-					jniCSig:insert', jclass'	-- calling class
-				else
-					jniCSig:insert', jobject'	-- this
-				end
-				for i=2,#sig do
-					jniCSig:insert(', '..jniTypeForSig(sig[i]))
-				end
-				jniCSig:insert')'		-- function args end
---DEBUG:print('for method', method.isStatic and 'static' or '', 'sig', require 'ext.tolua'(method.sig))
-				return jniCSig:concat()
-			end
-
 
 			if method.newLuaState then
 				assert.type(func, 'function', "newLuaState requires a Lua function")
@@ -685,7 +474,7 @@ return
 				local thread = LiteThread{
 
 					-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
-					threadFuncTypeName = getCFuncTypeForSig(method.sig),
+					threadFuncTypeName = getCFuncTypeForSig(method.sig, method.isStatic),
 
 					-- callback prefix code.
 					-- I need to require java.ffi.jni in here,
@@ -695,6 +484,8 @@ return
 						thread.lua[[
 -- this is needed for the ffi.cast threadFuncTypeName declaration
 require 'java.ffi.jni'
+
+table = require 'ext.table'
 ]]
 
 						thread.lua([[
@@ -747,7 +538,6 @@ end
 						local func = reg.java_callback
 						local env = jvm.jniEnv
 						local sig = method.sig
-						local table = require 'ext.table'
 
 						-- rebuild args
 
@@ -757,7 +547,8 @@ end
 						else
 							thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
 						end
-						local args = table.pack(...)
+
+						local args = _G.table.pack(...)	-- _G to look in child therad sub lua state's global, or else it'll look for a non-existent upvalue...
 						for i=1,args.n do
 							args[i] = env:_javaToLuaArg(args[i], sig[i+1])
 						end
@@ -813,7 +604,7 @@ end
 					return env:_luaToJavaArg(result, sig[1])
 				end
 
-				local cfuncType = getCFuncTypeForSig(method.sig)
+				local cfuncType = getCFuncTypeForSig(method.sig, method.isStatic)
 --DEBUG:print('got c sig', cfuncType)
 				-- cfuncType will tell LuaJIT how to translate arguments to JNI types
 				local closure = ffi.cast(cfuncType, wrapper)

@@ -28,8 +28,14 @@ local Test = require 'java.luaclass'{
 	},
 	ctors = {
 		function(this)
-			print"in custom ctor!"
+			print"in custom ctor #1!"
 		end,
+		{
+			sig = {'void', 'double'},
+			value = function(this, x)
+				print("in custom ctor #2 with double", x)
+			end,
+		},
 	},
 	methods = {
 		-- [[
@@ -41,7 +47,7 @@ local Test = require 'java.luaclass'{
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
 			value = function(this, ...)
 				print('this=', this)
-				print('here with args:', ...)
+				print('in Test.testFunc with args:', ...)
 				return 42
 			end,
 		},
@@ -62,7 +68,7 @@ local Test = require 'java.luaclass'{
 			isStatic = true,
 			sig = {'void', 'double'},
 			value = function(...)
-				print('static method here with args:', ...)
+				print('in static Test.testStatic with args:', ...)
 			end,
 		}
 		--]]
@@ -104,5 +110,9 @@ assert.eq(test2.doo, test.doo)	-- make sure static field is shared between objec
 assert.eq(test.baz, 137LL)
 assert.eq(test2.baz, 137LL)
 print('test.baz', test.baz)
+
+print('test:testFunc()', assert.eq(test:testFunc("", nil), 42))
+
+Test(2)
 
 test:testStatic(math.pi)
