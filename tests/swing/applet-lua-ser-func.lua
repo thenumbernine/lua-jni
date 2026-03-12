@@ -2,7 +2,7 @@
 -- use our thread-safe-runnable wrapper...
 local jni = require 'java.ffi.jni'
 local J = require 'java'
-local runnable = J:_safeRunnable(function(J, this)
+local runnable = J.Runnable:_cbClass(function(J, this)
 	-- THIS IS RUN FROM ANOTHER THREAD AND LUA STATE
 
 	local JFrame = J.javax.swing.JFrame
@@ -75,7 +75,7 @@ local runnable = J:_safeRunnable(function(J, this)
 	frame:setVisible(true)				-- shows it
 
 	print'THREAD DONE'
-end)
+end, true)()	-- true means make it thread-safe with a sub Lua state
 J.javax.swing.SwingUtilities:invokeAndWait(runnable)
 
 for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) do
@@ -83,4 +83,4 @@ for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) 
 		cls.thread:showErr()
 	end
 end
-print'PARENT DONE'
+print'DONE'

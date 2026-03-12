@@ -792,13 +792,8 @@ end
 
 				-- the wrapper should be similar to the ctor implementaiton but without the Object[] and boxing/unboxing
 				local wrapper = function(envPtr, thisOrClass, ...)
-					--[[ this is somewhat thread-safe since JNI will call the C func with a new envPtr when we are crossing threads
-					-- but I've already got java/saferunnable.lua for handling that, with its new Lua state.
-					--  (it is why method.value can accept cdata)
-					-- so here I wont do this and I'll just use closure env
-					local env = JNIEnv{ptr=envPtr, vm=env._vm, usingAndroidJNI=env._usingAndroidJNI}
-					--]]
-					-- lazy for now while I debug this:
+					-- this wrapper will assume we are using the same JNIEnv i.e. on same-state
+					-- if you want a new state, use the 'newLuaState' flag which is handled above
 					if method.isStatic then
 						-- TODO this method but also with a class helper?
 						thisOrClass = env:_fromJClass(thisOrClass)

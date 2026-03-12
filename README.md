@@ -289,6 +289,9 @@ This acts on top of `JavaASMClass` to build a translation layer for converting a
 - - fields: (optional) either a list of tables of field properties passed to JavaASMClass, or optionally key/value fields will use the key for the name, or if the key is the name and the value is a string then the value will be the type, or if the key is sequential and the value is a string then maybe the value will be the name.
 - - methods: (optional) either a list of tables of method properties passed to JavaASMClass, or optionally key/value methods will use the key for the name.  Implicit key is name, implicit function value is function.
 - - ctors: (optional) list of properties to pass for constructors.  If none are provided then a default constructor is created.
+- - - methods are implemented as native and cast from LuaJIT-to-C closures.
+- - - Pass the flag "newLuaState" to create a new LiteThread sub-Lua-state that will provide a safe callback when invoked in Java on new threads.  The callback will be created with a new sub-Lua-state to prevent unsafe access of a single-threaded Lua state.
+
 
 ### JavaASMClass
 `JavaASMClass = require 'java.asmclass'`
@@ -343,12 +346,6 @@ Same as JavaASMClass but for `.dex` files.
 
 This is a helper class to call native callbacks that are either C or LuaJIT function closures.  It is generated with JavaASMClass/JavaASMDex at runtime, and loaded using `JNIEnv:_defineClass()`.
 
-### SafeRunnable
-- `SafeRunnable = require 'java.saferunnable`
-- `env:_safeRunnable(function(newThreadEnv) ... end)`
-
-This creates a subclass of `java.lang.Runnable` that provides a safe callback when invoked in Java on new threads.  The callback will be created with a new sub-Lua-state to prevent unsafe access of a single-threaded Lua state.
-
 <hr>
 
 Also for JNI, JavaClass, and JavaObject (and subclasses JavaString and JavaArray),
@@ -368,8 +365,7 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - [lua-struct](http://github.com/thenumbernine/struct-lua) - Using with the ASM file formats.
 - [lua-template](http://github.com/thenumbernine/lua-template) - Using with my ASM writing in places like `java/nativecallback.lua`. 
 - [lua-stl](http://github.com/thenumbernine/lua-stl) - I tried hard not to use this, but here it is, used in the ASM file blob reader/writers, for the stl-vector implementation.  Maybe I'll replace it with a luajit string.buffer.
-- [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use `java.lang.Thread` or `java/saferunnable.lua`.
-- [lua-lua](https://github.com/thenumbernine/lua-lua) - optional, if you want to use `java.lang.Thread` or `java/saferunnable.lua`.
+- [lua-thread](https://github.com/thenumbernine/lua-thread) - optional, if you want to use 'newLuaState' for sub-Lua-state encapsulation for multithreading.
 - [lua-make](https://github.com/thenumbernine/lua-make) - optional, if you plan to use the `java/build.lua` file to invoke javac or gcc.
 - [SHA2](https://github.com/Egor-Skriptunoff/pure_lua_SHA) - optional, but required if you are using `java/asmdex.lua`.
 

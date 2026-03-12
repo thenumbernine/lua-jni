@@ -973,18 +973,6 @@ function JNIEnv:_defineClass(asm, newClassName)
 	end
 end
 
--- wrap a Lua function  in a lite-thread sub-Lua-state
--- and return the java.lang.Runnable JavaObject that contains a callback to it
--- such that it is multithread-safe even in single-threaded LuaJIT
-function JNIEnv:_safeRunnable(func)
-	assert.type(func, 'function')
-	local JavaSafeRunnable = require 'java.saferunnable'
-	return JavaSafeRunnable{
-		env = self,
-		func = func,
-	}
-end
-
 function JNIEnv:__tostring()
 	return self.__name..'('..tostring(self._ptr)..')'
 end
