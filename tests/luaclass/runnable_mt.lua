@@ -26,6 +26,4 @@ for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) 
 	end
 end
 
-
-
 print'DONE'

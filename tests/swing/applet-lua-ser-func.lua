@@ -77,4 +77,10 @@ local runnable = J:_safeRunnable(function(J, this)
 	print'THREAD DONE'
 end)
 J.javax.swing.SwingUtilities:invokeAndWait(runnable)
-runnable._thread:showErr()
+
+for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) do
+	if cls.thread then
+		cls.thread:showErr()
+	end
+end
+print'PARENT DONE'
