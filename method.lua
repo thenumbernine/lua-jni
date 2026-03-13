@@ -76,20 +76,19 @@ function JavaMethod:callNonVirtual(thisOrClass, nonVirtualClass, ...)
 
 	local returnType = self._sig[1]
 	local callName
-	if self._isStatic then
-assert.eq(nonVirtualClass, nil, "can't call a static method as a non-virtual method, use a static call without a non-virtual class.")
-		callName = callStaticNameForReturnType[returnType]
-			or callStaticNameForReturnType.object
-	elseif nonVirtualClass then
+	if nonVirtualClass then
 		callName = callNonvirtualNameForReturnType[returnType]
 			or callNonvirtualNameForReturnType.object
+	elseif self._isStatic then
+		callName = callStaticNameForReturnType[returnType]
+			or callStaticNameForReturnType.object
 	else
 		callName = callNameForReturnType[returnType]
 			or callNameForReturnType.object
 	end
 
-print('method callName', callName)
-print(debug.traceback())
+--DEBUG:print('method callName', callName)
+--DEBUG:print(debug.traceback())
 
 	-- only table.pack our args if necessary
 	local result
@@ -137,7 +136,7 @@ print(debug.traceback())
 				nonVirtualClass._ptr,
 				self._ptr,
 				table.unpack(javaArgObjs, 1, jargc)
-			)	
+			)
 		else
 			result = env._ptr[0][callName](
 				env._ptr,

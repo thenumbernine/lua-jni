@@ -28,8 +28,8 @@ JavaObject.subclass = nil	-- make room for Java instances with fields named 'sub
 --  ... which will never happen of course.
 JavaObject._makeGlobalRef = true
 
--- make some kind of call-scope object that, 
--- if someone invokes object.super, 
+-- make some kind of call-scope object that,
+-- if someone invokes object.super,
 -- then all calls from it are fixed in their scope to that specific class i.e. non-virtual.
 -- ... I was expecting '.this' to do the same thing, but lo and behold it doesn't, you can only non-virtual-call the parent-class, not the current-class.  way to go java smh.
 -- ... I could also allow for obj.super.field = value etc but nah, what's the point.
@@ -172,7 +172,7 @@ end
 
 -- calls in java `obj.toString()`
 function JavaObject:_javaToString()
-	-- [[
+	--[[
 	-- I'm going to hide exceptions for this too
 	-- because it's used internally, specifically, with Lua __tostring
 	-- so if you want your Java toString to throw then call obj:toString() and not tostring(obj)
@@ -185,6 +185,27 @@ function JavaObject:_javaToString()
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
 	return str
+	--]]
+	-- [[ and same but without creating a new JavaObject ...
+
+	local env = self._env
+	env:_checkExceptions()
+	local pushIgnore = env._ignoringExceptions
+	env._ignoringExceptions = true
+
+	local str
+	do
+		local jstring = env:_callObjectMethod(self._ptr, env._java_lang_Object._java_lang_Object_toString._ptr)
+		if jstring ~= nil then
+			str = env:_fromJString(jstring)
+			env:_deleteLocalRef(jstring)
+		end
+	end
+
+	env._ignoringExceptions = pushIgnore
+	env:_exceptionClear()
+	return str
+
 	--]]
 	--[[ same but throws exceptions in Java
 	return tostring(self:toString())

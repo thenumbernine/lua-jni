@@ -558,10 +558,12 @@ end
 
 -- calls in java `class.getTypeName()`
 function JavaClass:_name()
-	local classObj = self._env._java_lang_Class
-	local classpath = classObj._java_lang_Class_getTypeName(self)
-	if classpath == nil then return nil end
-	return tostring(classpath)
+	local env = self._env
+	local jstringClasspath = env:_callObjectMethod(self._ptr, env._java_lang_Class._java_lang_Class_getTypeName._ptr)
+	if jstringClasspath == nil then return nil end
+	local classpath = env:_fromJString(jstringClasspath)
+	env:_deleteLocalRef(jstringClasspath)
+	return classpath
 end
 
 function JavaClass:_throwNew()

@@ -52,6 +52,7 @@ local JavaVM_ptr_1 = ffi.typeof'JavaVM*[1]'
 
 local bootstrapClasses = {
 	['java.lang.Class'] = true,
+	['java.lang.Object'] = true,
 	['java.lang.reflect.Field'] = true,
 	['java.lang.reflect.Method'] = true,
 	['java.lang.reflect.Constructor'] = true,
@@ -187,6 +188,12 @@ function JNIEnv:init(args)
 		sig = {'int'},
 	})
 
+	self._java_lang_Object = self:import'java.lang.Object'
+	self._java_lang_Object._java_lang_Object_toString = assert(self._java_lang_Object:_method{
+		name = 'toString',
+		sig = {'java.lang.String'},
+	})
+
 	-- now that reflection is setup, we can start JavaObject-wrapping excpetions
 	assert.eq(true, self._ignoringExceptions)
 	self._ignoringExceptions = false
@@ -200,6 +207,7 @@ function JNIEnv:init(args)
 	self._java_lang_reflect_Field:_setupReflection()
 	self._java_lang_reflect_Method:_setupReflection()
 	self._java_lang_reflect_Constructor:_setupReflection()
+	self._java_lang_Object:_setupReflection()
 
 	-- now that we're done bootloading, just cache String because it is useful
 	self._java_lang_String = self:import'java.lang.String'
@@ -341,9 +349,11 @@ end
 -- returns classpath
 -- uses java.lang.Class.getTypeName
 function JNIEnv:_getJClassClasspath(jclass)
-	local javaTypeName = self._java_lang_Class._java_lang_Class_getTypeName(jclass)
-	if javaTypeName == nil then return nil end
-	return tostring(javaTypeName)
+	local jstringClasspath = self:_callObjectMethod(jclass, self._java_lang_Class._java_lang_Class_getTypeName._ptr)
+	if jstringClasspath == nil then return nil end
+	local classpath = self:_fromJString(jstringClasspath)
+	self:_deleteLocalRef(jstringClasspath)
+	return classpath
 end
 
 function JNIEnv:_fromJObject(jobject)
