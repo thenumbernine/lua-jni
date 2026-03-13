@@ -77,9 +77,5 @@ local runnable = J.Runnable:_cb(function(J, this)
 end, true)	-- true means make it thread-safe with a sub Lua state
 J.javax.swing.SwingUtilities:invokeAndWait(runnable)
 
-for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) do
-	if cls.thread then
-		cls.thread:showErr()
-	end
-end
+runnable:_getClass():_showLuaThreadErrors()
 print'DONE'

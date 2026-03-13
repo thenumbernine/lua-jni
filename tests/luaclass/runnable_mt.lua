@@ -19,11 +19,5 @@ print('thread', th)
 
 th:start()
 th:join()
-
-for _,cls in ipairs(require 'java.luaclass'.savedClosures[runnable._classpath]) do
-	if cls.thread then
-		cls.thread:showErr()
-	end
-end
-
+runnable:_getClass():_showLuaThreadErrors()
 print'DONE'

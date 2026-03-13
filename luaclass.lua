@@ -192,6 +192,9 @@ function M:run(args)
 
 	local nativeMethods = vector'JNINativeMethod'
 
+	-- for JavaClass in case we are using newLuaState
+	local usingNewLuaState
+
 	-- pairs() order is non-deterministic
 	-- but I think pairs() does ipairs integer indexes in order at least?
 	if args.fields then
@@ -570,6 +573,7 @@ end
 
 				-- save the thread so it doesn't collect
 				closures:insert{thread=thread}
+				usingNewLuaState = true
 
 				-- use the thread's wrapper's function pointer
 				func = thread.funcptr
@@ -640,6 +644,19 @@ end
 --DEBUG:	print(n.fnPtr, ffi.string(n.name), ffi.string(n.signature))
 --DEBUG:end
 		env:_registerNatives(cl._ptr, nativeMethods.v, #nativeMethods)
+	end
+
+	-- in case we used newLuaState ...
+	-- This is a helper function that is assigned to the JavaClass but only accessible from the thread/JNIEnv of its creation
+	-- which shows any errors that might have been invoked on the sub-Lua-state in the new thread.
+	if usingNewLuaState then
+		rawset(cl, '_showLuaThreadErrors', function(self)
+			for _,cls in ipairs(closures) do
+				if cls.thread then
+					cls.thread:showErr()
+				end
+			end
+		end)
 	end
 
 	return cl

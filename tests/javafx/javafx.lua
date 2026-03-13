@@ -46,10 +46,4 @@ local ThisApplication = LuaClass{
 
 --ThisApplication:launch()	-- "JVM java.lang.RuntimeException: Error: unable to determine Application class"
 ThisApplication:launch(ThisApplication.class)
-
--- TODO better way to show errors ...
-for _,cls in ipairs(LuaClass.savedClosures[ThisApplication._classpath]) do
-	if cls.thread then
-		cls.thread:showErr()
-	end
-end
+ThisApplication:_showLuaThreadErrors()
