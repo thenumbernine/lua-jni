@@ -188,9 +188,9 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_class()` = the method underlying `cl.class`.
 
-- `cl:_cb(func)` = for single-abstract-method classes, create a subclass that calls the function and return a `JavaObject` instance of that anonymous subclass.
+- `cl:_cb(func, [newLuaState])` = for single-abstract-method classes, create a subclass that calls the function and return a `JavaObject` instance of that anonymous subclass.
 
-- `cl:_cbClass(func)` = build a Java subclass of this class with the `_samMethod` overridden.
+- `cl:_cbClass(func, [newLuaState])` = build a Java subclass of this class with the `_samMethod` overridden.  Pass `newLuaState` to the method upon creation, i.e. set it to `true` to use this method in separate threads.
 
 - `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
 

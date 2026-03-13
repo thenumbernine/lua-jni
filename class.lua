@@ -631,9 +631,9 @@ end
 --[[
 build the subclass used for _cb()
 - func = callback
-- safe = whether invoking this function should use a new lite-thread and new lua state or not.
+- newLuaState = whether invoking this function should use a new lite-thread and new lua state or not.
 --]]
-function JavaClass:_cbClass(func, safe)
+function JavaClass:_cbClass(func, newLuaState)
 	local env = self._env
 
 	local samMethod = self._samMethod
@@ -656,7 +656,7 @@ function JavaClass:_cbClass(func, safe)
 				name = samMethod._name,
 				sig = samMethod._sig,
 				value = func,
-				newLuaState = safe,
+				newLuaState = newLuaState,
 			},
 		},
 	}
@@ -665,8 +665,8 @@ function JavaClass:_cbClass(func, safe)
 end
 
 -- build a subclass of "single-abstract-method" class for a Java-lamdba-equivalent for a Lua-function
-function JavaClass:_cb(func, ...)
-	return self:_cbClass(func)(...)
+function JavaClass:_cb(func, newLuaState, ...)
+	return self:_cbClass(func, newLuaState)(...)
 end
 
 -- if this calls parent class __tostring, that will call JavaObject:__tostring(), which calls the Java .toString(), but it will be on a jclass pointer...
