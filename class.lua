@@ -28,10 +28,9 @@ function JavaClass:init(args)
 	-- matches JavaObject, its superclass, but here I'm not calling JavaObject:init...
 	local env = assert.index(args, 'env')
 	self._env = env
-	local envptr = env._ptr
 
 	local ptr = assert.index(args, 'ptr')
-	self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
+	self._ptr = env:_newGlobalRef(ptr)
 
 	self._classpath = assert.index(args, 'classpath')
 
@@ -48,17 +47,14 @@ function JavaClass:init(args)
 	-- modifiers
 	-- TODO should the caller do this? like is done with reflection ... hmm
 	-- caller is just JNIEnv:import
-	local envptr = self._env._ptr
 	-- hmm, if I store java/lang/Class instead of retrieve it here every time then I get segafults
 	-- why?  I even went out of my way to start NewGlobalRef'ing all my java classes & objects ....
 	-- (fun fact, never NewGlobalRef'ing them never once caused a segfault, and now that I assumed it was I implemented it and the segfault turned out to be something else)
-	local modifiersMethodID = envptr[0].GetMethodID(
-		envptr,
-		envptr[0].FindClass(envptr, 'java/lang/Class'),
+	local modifiersMethodID = env:_getMethodID(
+		env:_findClass'java/lang/Class',
 		'getModifiers',
 		'()I')
-	local modifiers = envptr[0].CallIntMethod(
-		envptr,
+	local modifiers = env:_callIntMethod(
 		self._ptr,
 		modifiersMethodID)
 
@@ -121,7 +117,6 @@ end
 -- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env
-	local envptr = env._ptr
 
 	-- throw any excpetions occurred so far
 	-- because from here on out in setupReflection I will be throwing exceptions away (java.lang.NoSuchMethodError, etc)
@@ -136,24 +131,15 @@ function JavaClass:_setupReflection()
 	local java_lang_reflect_Method = env._java_lang_reflect_Method
 	local java_lang_reflect_Constructor = env._java_lang_reflect_Constructor
 
-	local jobjectFields = envptr[0].CallObjectMethod(
-		envptr,
-		self._ptr,
-		java_lang_Class._java_lang_Class_getFields._ptr)
-	local numFields = envptr[0].GetArrayLength(envptr, jobjectFields)
+	local jobjectFields = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getFields._ptr)
+	local numFields = env:_getArrayLength(jobjectFields)
 
-	local jobjectMethods = envptr[0].CallObjectMethod(
-		envptr,
-		self._ptr,
-		java_lang_Class._java_lang_Class_getMethods._ptr)
-	local numMethods = envptr[0].GetArrayLength(envptr, jobjectMethods)
+	local jobjectMethods = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getMethods._ptr)
+	local numMethods = env:_getArrayLength(jobjectMethods)
 
 	-- manually handling memory during _setupReflection()
-	local jobjectCtors = envptr[0].CallObjectMethod(
-		envptr,
-		self._ptr,
-		java_lang_Class._java_lang_Class_getConstructors._ptr)
-	local numCtors = envptr[0].GetArrayLength(envptr, jobjectCtors)
+	local jobjectCtors = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getConstructors._ptr)
+	local numCtors = env:_getArrayLength(jobjectCtors)
 
 --DEBUG:print(self._classpath..' has '..numFields..' fields and '..numMethods..' methods and '..numCtors..' constructors')
 
@@ -163,46 +149,29 @@ function JavaClass:_setupReflection()
 	else
 		for i=0,numFields-1 do
 			-- Field
-			local field = envptr[0].GetObjectArrayElement(
-				envptr,
-				jobjectFields,
-				i)
+			local field = env:_getObjectArrayElement(jobjectFields, i)
 
 			-- String
-			local jstringName = envptr[0].CallObjectMethod(
-				envptr,
-				field,
-				java_lang_reflect_Field._java_lang_reflect_Field_getName._ptr)
+			local jstringName = env:_callObjectMethod(field, java_lang_reflect_Field._java_lang_reflect_Field_getName._ptr)
 			local name = env:_fromJString(jstringName)
 			env:_deleteLocalRef(jstringName)
 
 			-- Class
-			local fieldType = envptr[0].CallObjectMethod(
-				envptr,
-				field,
-				java_lang_reflect_Field._java_lang_reflect_Field_getType._ptr)
+			local fieldType = env:_callObjectMethod(field, java_lang_reflect_Field._java_lang_reflect_Field_getType._ptr)
 
 			-- String
-			local jstringFieldClassPath = envptr[0].CallObjectMethod(
-				envptr,
-				fieldType,
-				java_lang_Class._java_lang_Class_getTypeName._ptr)
+			local jstringFieldClassPath = env:_callObjectMethod(fieldType, java_lang_Class._java_lang_Class_getTypeName._ptr)
 			env:_deleteLocalRef(fieldType)
 
 			local fieldClassPath = env:_fromJString(jstringFieldClassPath)
 			env:_deleteLocalRef(jstringFieldClassPath)
 --DEBUG:print('fieldType', fieldClassPath)
 
-			local modifiers = envptr[0].CallIntMethod(
-				envptr,
-				field,
-				java_lang_reflect_Field._java_lang_reflect_Field_getModifiers._ptr)
+			local modifiers = env:_callIntMethod(field, java_lang_reflect_Field._java_lang_reflect_Field_getModifiers._ptr)
 --DEBUG:print('modifiers', modifiers)
 
 			-- ok now switch this reflect field obj to a jni jfieldID
-			local jfieldID = envptr[0].FromReflectedField(
-				envptr,
-				field)
+			local jfieldID = env:_fromReflectedField(field)
 			env:_deleteLocalRef(field)
 
 --DEBUG:print('jfieldID', jfieldID)
@@ -243,32 +212,20 @@ function JavaClass:_setupReflection()
 	else
 		for i=0,numMethods-1 do
 			-- Method
-			local method = envptr[0].GetObjectArrayElement(
-				envptr,
-				jobjectMethods,
-				i)
+			local method = env:_getObjectArrayElement(jobjectMethods, i)
 
 			-- String
-			local jstringName = envptr[0].CallObjectMethod(
-				envptr,
-				method,
-				java_lang_reflect_Method._java_lang_reflect_Method_getName._ptr)
+			local jstringName = env:_callObjectMethod(method, java_lang_reflect_Method._java_lang_reflect_Method_getName._ptr)
 			local name = env:_fromJString(jstringName)
 			env:_deleteLocalRef(jstringName)
 
 			local sig = table()
 
 			-- Class
-			local methodReturnType = envptr[0].CallObjectMethod(
-				envptr,
-				method,
-				java_lang_reflect_Method._java_lang_reflect_Method_getReturnType._ptr)
+			local methodReturnType = env:_callObjectMethod(method, java_lang_reflect_Method._java_lang_reflect_Method_getReturnType._ptr)
 
 			-- String
-			local jstringReturnTypeClassPath = envptr[0].CallObjectMethod(
-				envptr,
-				methodReturnType,
-				java_lang_Class._java_lang_Class_getTypeName._ptr)
+			local jstringReturnTypeClassPath = env:_callObjectMethod(methodReturnType, java_lang_Class._java_lang_Class_getTypeName._ptr)
 			env:_deleteLocalRef(methodReturnType)
 
 			local returnTypeClassPath = env:_fromJString(jstringReturnTypeClassPath)
@@ -277,21 +234,15 @@ function JavaClass:_setupReflection()
 			sig:insert(returnTypeClassPath)
 
 			-- Class[]
-			local paramTypes = envptr[0].CallObjectMethod(
-				envptr,
-				method,
-				java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes._ptr)
-			local numParamTypes = envptr[0].GetArrayLength(envptr, paramTypes)
+			local paramTypes = env:_callObjectMethod(method, java_lang_reflect_Method._java_lang_reflect_Method_getParameterTypes._ptr)
+			local numParamTypes = env:_getArrayLength(paramTypes)
 
 			for j=0,numParamTypes-1 do
 				-- Class
-				local methodParamType = envptr[0].GetObjectArrayElement(envptr, paramTypes, j)
+				local methodParamType = env:_getObjectArrayElement(paramTypes, j)
 
 				-- String
-				local paramClassPath = envptr[0].CallObjectMethod(
-					envptr,
-					methodParamType,
-					java_lang_Class._java_lang_Class_getTypeName._ptr)
+				local paramClassPath = env:_callObjectMethod(methodParamType, java_lang_Class._java_lang_Class_getTypeName._ptr)
 				env:_deleteLocalRef(methodParamType)
 
 				sig:insert(env:_fromJString(paramClassPath))
@@ -301,14 +252,9 @@ function JavaClass:_setupReflection()
 			env:_deleteLocalRef(paramTypes)
 
 			-- int
-			local modifiers = envptr[0].CallIntMethod(
-				envptr,
-				method,
-				java_lang_reflect_Method._java_lang_reflect_Method_getModifiers._ptr)
+			local modifiers = env:_callIntMethod(method, java_lang_reflect_Method._java_lang_reflect_Method_getModifiers._ptr)
 
-			local jmethodID = envptr[0].FromReflectedMethod(
-				envptr,
-				method)
+			local jmethodID = env:_fromReflectedMethod(method)
 			env:_deleteLocalRef(method)
 
 --DEBUG:print('jmethodID', jmethodID)
@@ -349,26 +295,20 @@ function JavaClass:_setupReflection()
 		local foundDefaultCtor
 		for i=0,numCtors-1 do
 			-- Constructor
-			local method = envptr[0].GetObjectArrayElement(envptr, jobjectCtors, i)
+			local method = env:_getObjectArrayElement(jobjectCtors, i)
 
 			local sig = table()
 			sig:insert'void'	-- constructor signature has void return type
 
 			-- Class[]
-			local paramTypes = envptr[0].CallObjectMethod(
-				envptr,
-				method,
-				java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes._ptr)
-			local numParamTypes = envptr[0].GetArrayLength(envptr, paramTypes)
+			local paramTypes = env:_callObjectMethod(method, java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes._ptr)
+			local numParamTypes = env:_getArrayLength(paramTypes)
 
 			for j=0,numParamTypes-1 do
-				local methodParamType = envptr[0].GetObjectArrayElement(envptr, paramTypes, j)
+				local methodParamType = env:_getObjectArrayElement(paramTypes, j)
 
 				-- String
-				local paramClassPath = envptr[0].CallObjectMethod(
-					envptr,
-					methodParamType,
-					java_lang_Class._java_lang_Class_getTypeName._ptr)
+				local paramClassPath = env:_callObjectMethod(methodParamType, java_lang_Class._java_lang_Class_getTypeName._ptr)
 
 				env:_deleteLocalRef(methodParamType)
 
@@ -379,13 +319,10 @@ function JavaClass:_setupReflection()
 			env:_deleteLocalRef(paramTypes)
 
 			-- int
-			local modifiers = envptr[0].CallIntMethod(
-				envptr,
-				method,
-				java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers._ptr)
+			local modifiers = env:_callIntMethod(method, java_lang_reflect_Constructor._java_lang_reflect_Constructor_getModifiers._ptr)
 --DEBUG:print('modifiers', modifiers)
 
-			local jmethodID = envptr[0].FromReflectedMethod(envptr, method)
+			local jmethodID = env:_fromReflectedMethod(method)
 			env:_deleteLocalRef(method)
 --DEBUG:print('jmethodID', jmethodID)
 
@@ -508,9 +445,9 @@ function JavaClass:_method(args)
 
 	local jmethodID
 	if isStatic then
-		jmethodID = env._ptr[0].GetStaticMethodID(env._ptr, self._ptr, funcname, sigstr)
+		jmethodID = env:_getStaticMethodID(self._ptr, funcname, sigstr)
 	else
-		jmethodID = env._ptr[0].GetMethodID(env._ptr, self._ptr, funcname, sigstr)
+		jmethodID = env:_getMethodID(self._ptr, funcname, sigstr)
 	end
 	-- will this throw an exception? probably.
 	if jmethodID == nil then
@@ -548,9 +485,9 @@ function JavaClass:_field(args)
 	local isStatic = args.isStatic
 	local jfieldID
 	if isStatic then
-		jfieldID = env._ptr[0].GetStaticFieldID(env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = env:_getStaticFieldID(self._ptr, fieldname, sigstr)
 	else
-		jfieldID = env._ptr[0].GetFieldID(env._ptr, self._ptr, fieldname, sigstr)
+		jfieldID = env:_getFieldID(self._ptr, fieldname, sigstr)
 	end
 	if jfieldID == nil then
 		local ex = env:_getException()
@@ -594,7 +531,7 @@ end
 
 function JavaClass:_super()
 	local env = self._env
-	local jsuper = env._ptr[0].GetSuperclass(env._ptr, self._ptr)
+	local jsuper = env:_getSuperclass(self._ptr)
 	return env:_fromJClass(jsuper)
 end
 
@@ -616,11 +553,7 @@ function JavaClass:_isAssignableFrom(classTo)
 	else
 		error("can't cast to non-class "..tostring(classTo))
 	end
-	local canCast = env._ptr[0].IsAssignableFrom(
-		env._ptr,
-		self._ptr,
-		classTo._ptr
-	)
+	local canCast = env:_isAssignableFrom(self._ptr, classTo._ptr)
 	return canCast ~= 0, classTo
 end
 

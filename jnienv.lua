@@ -89,7 +89,7 @@ function JNIEnv:init(args)
 	if not self._vm then
 		-- make a JavaVM object around the pointer
 		local jvmPtrArr = JavaVM_ptr_1()
-		assert.eq(ffi.C.JNI_OK, self._ptr[0].GetJavaVM(self._ptr, jvmPtrArr))
+		assert.eq(ffi.C.JNI_OK, self:_getJavaVM(jvmPtrArr))
 		local jvmPtr = jvmPtrArr[0]
 		if jvmPtr == nil then
 			-- if I can't get the JavaVM* back then no problem, except that I can't do multithreading
@@ -241,17 +241,17 @@ Wait it just got even dumber on Google's part.
 
 Here's desktop compat. It makes sense.  It uses either slash-separated, or L-slash-semicolon JNI-signature-style , but only L-slash-semicolon for array-types:
 
-	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object')		<- cdata<void *>: 0x5d3ba1cccaf8
-	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object[]')		<- cdata<void *>: NULL
-	> J._ptr[0].FindClass(J._ptr, 'Ljava/lang/Object;')		<- cdata<void *>: 0x5d3ba1cccb00
-	> J._ptr[0].FindClass(J._ptr, '[Ljava/lang/Object;')	<- cdata<void *>: 0x5d3ba1cccb08
+	> J:_findClass'java/lang/Object'		<- cdata<void *>: 0x5d3ba1cccaf8
+	> J:_findClass'java/lang/Object[]'		<- cdata<void *>: NULL
+	> J:_findClass'Ljava/lang/Object;'		<- cdata<void *>: 0x5d3ba1cccb00
+	> J:_findClass'[Ljava/lang/Object;'		<- cdata<void *>: 0x5d3ba1cccb08
 
 Here's Android.  It's nonsense.  It *must* be slash, without L-slash-semicolon, *except* for arrays:
 
-	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object')		<- works
-	> J._ptr[0].FindClass(J._ptr, 'java/lang/Object[]')		<- segfaults
-	> J._ptr[0].FindClass(J._ptr, 'Ljava/lang/Object;')		<- segfaults
-	> J._ptr[0].FindClass(J._ptr, '[Ljava/lang/Object;')	<- WORKS ... ??!??!?
+	> J:_findClass'java/lang/Object'		<- works
+	> J:_findClass'java/lang/Object[]'		<- segfaults
+	> J:_findClass'Ljava/lang/Object;'		<- segfaults
+	> J:_findClass'[Ljava/lang/Object;'		<- WORKS ... ??!??!?
 
 I think nobody of competence came up with Android's spec.  Especially their segfault-on-error.
 		--]]
@@ -366,14 +366,14 @@ function JNIEnv:_str(s, len)
 			for i=0,len-1 do
 				jstr[i] = s:byte(i+1)
 			end
-			jstring = self._ptr[0].NewString(self._ptr, jstr, len)
+			jstring = self:_newString(jstr, len)
 		else
 			-- cdata + len, use as-is
-			jstring = self._ptr[0].NewString(self._ptr, s, len)
+			jstring = self:_newString(s, len)
 		end
 	else
 		-- assume it's a lua string or char* cdata
-		jstring = self._ptr[0].NewStringUTF(self._ptr, s)
+		jstring = self:_newStringUTF(s)
 	end
 	if jstring == nil
 		then error("NewString failed")
@@ -389,11 +389,10 @@ end
 
 -- convert Java String to Lua string
 function JNIEnv:_fromJString(jstring)
-	local envptr = self._ptr
-	local sptr = envptr[0].GetStringUTFChars(envptr, jstring, nil)
+	local sptr = self:_getStringUTFChars(jstring, nil)
 	if sptr == nil then return nil end
 	local luastr = ffi.string(sptr)
-	envptr[0].ReleaseStringUTFChars(envptr, jstring, sptr)
+	self:_releaseStringUTFChars(jstring, sptr)
 	return luastr
 end
 
@@ -431,8 +430,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 		end
 		-- TODO objInit as JavaObject, but how to encode null?
 		-- am I going to need a java.null placeholder object?
-		jobject = self._ptr[0].NewObjectArray(
-			self._ptr,
+		jobject = self:_newObjectArray(
 			length,
 			jclassObj._ptr,
 			self:_luaToJavaArg(objInit, jclassObj._classpath)

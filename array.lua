@@ -85,7 +85,7 @@ function JavaArray:_get(i)
 		env._ptr[0][releaseArrayElements](env._ptr, self._ptr, arptr, 0)
 	else
 		local elemClassPath = self._elemClassPath
-		local elemPtr = env._ptr[0].GetObjectArrayElement(env._ptr, self._ptr, i)
+		local elemPtr = env:_getObjectArrayElement(self._ptr, i)
 		if elemPtr == nil then return nil end
 		result = JavaObject._createObjectForClassPath{
 			env = env,
@@ -124,8 +124,7 @@ function JavaArray:_set(i, v)
 --DEBUG:print('type(v)', type(v))
 --DEBUG:print('self._elemClassPath', self._elemClassPath)
 --DEBUG:assert.type(self._elemClassPath, 'string')
-		env._ptr[0].SetObjectArrayElement(
-			env._ptr,
+		env:_setObjectArrayElement(
 			self._ptr,
 			i,
 			env:_luaToJavaArg(v, self._elemClassPath)

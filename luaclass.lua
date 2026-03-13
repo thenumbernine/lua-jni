@@ -638,7 +638,7 @@ end
 --DEBUG:	local n = nativeMethods.v + i
 --DEBUG:	print(n.fnPtr, ffi.string(n.name), ffi.string(n.signature))
 --DEBUG:end
-		env._ptr[0].RegisterNatives(env._ptr, cl._ptr, nativeMethods.v, #nativeMethods)
+		env:_registerNatives(cl._ptr, nativeMethods.v, #nativeMethods)
 	end
 
 	return cl

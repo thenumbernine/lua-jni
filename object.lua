@@ -44,7 +44,7 @@ function JavaObject:init(args)
 		makeGlobalRef = self._makeGlobalRef
 	end
 	if makeGlobalRef then
-		self._ptr = envptr[0].NewGlobalRef(envptr, ptr)
+		self._ptr = env:_newGlobalRef(ptr)
 	end
 
 	-- TODO detect if not provided?
@@ -199,7 +199,7 @@ function JavaObject.__eq(a,b)
 	end
 	assert(env, "tried to use JavaObject to compare two non-JavaObject's")
 	-- assert they are cdata or nil ...
-	return 0 ~= env._ptr[0].IsSameObject(env._ptr, a, b)
+	return 0 ~= env:_isSameObject(a, b)
 end
 
 function JavaObject:__index(k)
@@ -276,13 +276,13 @@ function JavaObject:_iter()
 end
 
 function JavaObject:__len()
-	local envptr = self._env._ptr
+	local env = self._env
 	-- TODO a better array detection
 	if self._classpath:match'%[%]$' then
-		return envptr[0].GetArrayLength(envptr, self._ptr)
+		return env:_getArrayLength(self._ptr)
 	elseif self._classpath == 'java.lang.String' then
 		-- String is final, so it's ok
-		return envptr[0].GetStringLength(envptr, self._ptr)
+		return env:_getStringLength(self._ptr)
 	else
 		local classObj = self:_getClass()
 
@@ -309,10 +309,9 @@ function JavaObject:__gc()
 			if vmptr
 			and vmptr[0] ~= nil
 			then
-				local envptr = env._ptr
-				if envptr[0].GetObjectRefType(envptr, ptr) == ffi.C.JNIGlobalRefType then
+				if env:_getObjectRefType(ptr) == ffi.C.JNIGlobalRefType then
 --DEBUG:print('obj shutting down with vm ptr', vmptr, vmptr[0])
-					envptr[0].DeleteGlobalRef(envptr, ptr)
+					env:_deleteGlobalRef(ptr)
 				end
 				rawset(self, '_ptr', false)
 			end
