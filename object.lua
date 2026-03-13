@@ -168,8 +168,8 @@ function JavaObject:_cast(classTo)
 	}
 end
 
-function JavaObject:_throw()
-	self._env:_throw(self)
+function JavaObject:throw()
+	self._env:throw(self)
 end
 
 function JavaObject:_getDebugStr()

@@ -11,7 +11,7 @@ require 'java.build'.java{
 local ffi = require 'ffi'
 local J = require 'java'
 print('JNIEnv', J)
-print('JNI version', ('%x'):format(J:_version()))
+print('JNI version', ('%x'):format(J:_getVersion()))
 
 print('java.lang.Object', J:import'java.lang.Object')
 print('java.lang.Class', J:import'java.lang.Class')

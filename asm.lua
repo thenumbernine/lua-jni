@@ -71,9 +71,9 @@ function JavaASM:fromArgs(args)
 	end
 end
 
--- shorthand for env:_defineClass(self, ...)
-function JavaASM:_defineClass(env, ...)
-	return env:_defineClass(self, ...)
+-- shorthand for env:_loadClass(self, ...)
+function JavaASM:_loadClass(env, ...)
+	return env:_loadClass(self, ...)
 end
 
 

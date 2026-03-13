@@ -63,7 +63,7 @@ J.System.out:println("hello java")
 
 - `J._classesLoaded` = internal cache of loaded class-wrappers
 
-- `J:_version()` = returns the JNIEnv version, usually a hex number.
+- `J:_getVersion()` = returns the JNIEnv version, usually a hex number.
 
 - `J:_str(s)`
 - - if `s` is a string, returns a JavaObject wrapping a `java.lang.String` of the Lua-string contents of `s` using C API `JNIEnv.NewStringUTF`.
@@ -98,7 +98,7 @@ J.System.out:println("hello java")
 
 - `ex = J:_exceptionOccurred()` = if an exception occurred then returns the exception JavaObject.
 
-- `J:_throw(obj)` = throw in the JNI a exception jobject.
+- `J:throw(obj)` = throw in the JNI a exception jobject.
 
 - `J:_throwNew(cl)` = throw in the JNI a exception from a new'd jclass.
 
@@ -112,8 +112,8 @@ J.System.out:println("hello java")
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
 - - ex: `J.java.lang.String` retrieves the JavaClass `java.lang.String`
 
-- `cl = J:_defineClass(asmClass)` = generate a new class at runtime from a JavaASMClass object.
-- `cl = J:_defineClass(bytecode, newClassName)` = same but with bytecode as a Lua string, and new class name.
+- `cl = J:_loadClass(asmClass)` = generate a new class at runtime from a JavaASMClass object.
+- `cl = J:_loadClass(bytecode, newClassName)` = same but with bytecode as a Lua string, and new class name.
 
 I put primitives in the root namespace to map to LuaJIT FFI cdata types.
 This way it is consistent that the J.path.to.class matches with whatever the Lua functions expect as input/output.
@@ -139,7 +139,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `castObj = obj:_cast(classTo)` = cast obj to class `classTo`.  Accepts a JavaClass, a string for a classpath, or a cdata of a jclass.
 
-- `obj:_throw()` = throw this object.
+- `obj:throw()` = throw this object.
 
 - `method = obj:_method(args)` = shorthand for `obj:_getClass():_method(args)`.
 
@@ -332,7 +332,7 @@ Notice that the names in instructions are slash-separated unlike the dot-separat
 
 - `bytecode = asmClass:compile()` = compiles the properties of a `JavaASMClass` object into Java bytecode, suitable for a `.class` file.
 
-- `cl = asmClass:_defineClass(env)` = shorthand for `JNIEnv:_defineClass`.
+- `cl = asmClass:_loadClass(env)` = shorthand for `JNIEnv:_loadClass`.
 
 
 ### JavaASMDex

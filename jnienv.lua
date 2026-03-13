@@ -220,66 +220,265 @@ end
 ---------------- JNIEnv WRAPPER ----------------
 -- just to save on one extra arg passing every single time...
 
--- get a jclass pointer for a jobject pointer
--- returns a local ref pointer
--- (needs to be deleted)
-function JNIEnv:_getObjectClass(...)
-	local envptr = self._ptr
-	return envptr[0].GetObjectClass(envptr, ...)
+for f in ([[
+GetVersion
+DefineClass
+FindClass
+FromReflectedMethod
+FromReflectedField
+ToReflectedMethod
+GetSuperclass
+IsAssignableFrom
+ToReflectedField
+Throw
+ThrowNew
+ExceptionOccurred
+ExceptionDescribe
+ExceptionClear
+FatalError
+PushLocalFrame
+PopLocalFrame
+NewGlobalRef
+DeleteGlobalRef
+DeleteLocalRef
+IsSameObject
+NewLocalRef
+EnsureLocalCapacity
+AllocObject
+NewObject
+NewObjectV
+NewObjectA
+GetObjectClass
+IsInstanceOf
+GetMethodID
+CallObjectMethod
+CallObjectMethodV
+CallObjectMethodA
+CallBooleanMethod
+CallBooleanMethodV
+CallBooleanMethodA
+CallByteMethod
+CallByteMethodV
+CallByteMethodA
+CallCharMethod
+CallCharMethodV
+CallCharMethodA
+CallShortMethod
+CallShortMethodV
+CallShortMethodA
+CallIntMethod
+CallIntMethodV
+CallIntMethodA
+CallLongMethod
+CallLongMethodV
+CallLongMethodA
+CallFloatMethod
+CallFloatMethodV
+CallFloatMethodA
+CallDoubleMethod
+CallDoubleMethodV
+CallDoubleMethodA
+CallVoidMethod
+CallVoidMethodV
+CallVoidMethodA
+CallNonvirtualObjectMethod
+CallNonvirtualObjectMethodV
+CallNonvirtualObjectMethodA
+CallNonvirtualBooleanMethod
+CallNonvirtualBooleanMethodV
+CallNonvirtualBooleanMethodA
+CallNonvirtualByteMethod
+CallNonvirtualByteMethodV
+CallNonvirtualByteMethodA
+CallNonvirtualCharMethod
+CallNonvirtualCharMethodV
+CallNonvirtualCharMethodA
+CallNonvirtualShortMethod
+CallNonvirtualShortMethodV
+CallNonvirtualShortMethodA
+CallNonvirtualIntMethod
+CallNonvirtualIntMethodV
+CallNonvirtualIntMethodA
+CallNonvirtualLongMethod
+CallNonvirtualLongMethodV
+CallNonvirtualLongMethodA
+CallNonvirtualFloatMethod
+CallNonvirtualFloatMethodV
+CallNonvirtualFloatMethodA
+CallNonvirtualDoubleMethod
+CallNonvirtualDoubleMethodV
+CallNonvirtualDoubleMethodA
+CallNonvirtualVoidMethod
+CallNonvirtualVoidMethodV
+CallNonvirtualVoidMethodA
+GetFieldID
+GetObjectField
+GetBooleanField
+GetByteField
+GetCharField
+GetShortField
+GetIntField
+GetLongField
+GetFloatField
+GetDoubleField
+SetObjectField
+SetBooleanField
+SetByteField
+SetCharField
+SetShortField
+SetIntField
+SetLongField
+SetFloatField
+SetDoubleField
+GetStaticMethodID
+CallStaticObjectMethod
+CallStaticObjectMethodV
+CallStaticObjectMethodA
+CallStaticBooleanMethod
+CallStaticBooleanMethodV
+CallStaticBooleanMethodA
+CallStaticByteMethod
+CallStaticByteMethodV
+CallStaticByteMethodA
+CallStaticCharMethod
+CallStaticCharMethodV
+CallStaticCharMethodA
+CallStaticShortMethod
+CallStaticShortMethodV
+CallStaticShortMethodA
+CallStaticIntMethod
+CallStaticIntMethodV
+CallStaticIntMethodA
+CallStaticLongMethod
+CallStaticLongMethodV
+CallStaticLongMethodA
+CallStaticFloatMethod
+CallStaticFloatMethodV
+CallStaticFloatMethodA
+CallStaticDoubleMethod
+CallStaticDoubleMethodV
+CallStaticDoubleMethodA
+CallStaticVoidMethod
+CallStaticVoidMethodV
+CallStaticVoidMethodA
+GetStaticFieldID
+GetStaticObjectField
+GetStaticBooleanField
+GetStaticByteField
+GetStaticCharField
+GetStaticShortField
+GetStaticIntField
+GetStaticLongField
+GetStaticFloatField
+GetStaticDoubleField
+SetStaticObjectField
+SetStaticBooleanField
+SetStaticByteField
+SetStaticCharField
+SetStaticShortField
+SetStaticIntField
+SetStaticLongField
+SetStaticFloatField
+SetStaticDoubleField
+NewString
+GetStringLength
+GetStringChars
+ReleaseStringChars
+NewStringUTF
+GetStringUTFLength
+GetStringUTFChars
+ReleaseStringUTFChars
+GetArrayLength
+NewObjectArray
+GetObjectArrayElement
+SetObjectArrayElement
+NewBooleanArray
+NewByteArray
+NewCharArray
+NewShortArray
+NewIntArray
+NewLongArray
+NewFloatArray
+NewDoubleArray
+GetBooleanArrayElements
+GetByteArrayElements
+GetCharArrayElements
+GetShortArrayElements
+GetIntArrayElements
+GetLongArrayElements
+GetFloatArrayElements
+GetDoubleArrayElements
+ReleaseBooleanArrayElements
+ReleaseByteArrayElements
+ReleaseCharArrayElements
+ReleaseShortArrayElements
+ReleaseIntArrayElements
+ReleaseLongArrayElements
+ReleaseFloatArrayElements
+ReleaseDoubleArrayElements
+GetBooleanArrayRegion
+GetByteArrayRegion
+GetCharArrayRegion
+GetShortArrayRegion
+GetIntArrayRegion
+GetLongArrayRegion
+GetFloatArrayRegion
+GetDoubleArrayRegion
+SetBooleanArrayRegion
+SetByteArrayRegion
+SetCharArrayRegion
+SetShortArrayRegion
+SetIntArrayRegion
+SetLongArrayRegion
+SetFloatArrayRegion
+SetDoubleArrayRegion
+RegisterNatives
+UnregisterNatives
+MonitorEnter
+MonitorExit
+GetJavaVM
+GetStringRegion
+GetStringUTFRegion
+GetPrimitiveArrayCritical
+ReleasePrimitiveArrayCritical
+GetStringCritical
+ReleaseStringCritical
+NewWeakGlobalRef
+DeleteWeakGlobalRef
+ExceptionCheck
+NewDirectByteBuffer
+GetDirectBufferAddress
+GetDirectBufferCapacity
+GetObjectRefType
+]]):gmatch'%S+' do
+	JNIEnv['_capi'..f] = function(self, ...)
+		local envptr = self._ptr
+		return envptr[0][f](envptr, ...)
+	end
 end
 
-function JNIEnv:_capiFindClass(...)
-	local envptr = self._ptr
-	return envptr[0].FindClass(envptr, ...)
-end
-
--- deletes a local pointer
-function JNIEnv:_deleteLocalRef(...)
-	local envptr = self._ptr
-	return envptr[0].DeleteLocalRef(envptr, ...)
-end
-
-function JNIEnv:_version(...)
-	local envptr = self._ptr
-	return envptr[0].GetVersion(envptr, ...)
-end
-
-function JNIEnv:_exceptionClear(...)
-	local envptr = self._ptr
-	return envptr[0].ExceptionClear(envptr, ...)
-end
-
-function JNIEnv:_capiExceptionOccurred(...)
-	local envptr = self._ptr
-	return envptr[0].ExceptionOccurred(envptr, ...)
-end
-
-function JNIEnv:_capiIsAssignableFrom(...)
-	local envptr = self._ptr
-	return envptr[0].IsAssignableFrom(envptr, ...)
-end
-
-function JNIEnv:_capiDefineClass(...)
-	local envptr = self._ptr
-	return envptr[0].DefineClass(envptr, ...)
-end
-
-function JNIEnv:_newObject(...)
-	local envptr = self._ptr
-	return envptr[0].NewObject(envptr, ...)
-end
+-- I need to find a consistent name scheme to separate JNI API calls from my own wrappers of them...
+-- these are methods I had defined which now just do what the C API did:
+JNIEnv._getObjectClass = JNIEnv._capiGetObjectClass
+JNIEnv._findClass = JNIEnv._capiFindClass
+JNIEnv._deleteLocalRef = JNIEnv._capiDeleteLocalRef
+JNIEnv._getVersion = JNIEnv._capiGetVersion
+JNIEnv._exceptionClear = JNIEnv._capiExceptionClear
+JNIEnv._newObject = JNIEnv._capiNewObject
+--[[ these are methods with same names that I have doing something different:
+JNIEnv._exceptionOccurred
+--]]
 
 ---------------- JNI C API but with minimal arg tweaks ----------------
 
-function JNIEnv:_throw(e)
-	local envptr = self._ptr
-	return envptr[0].Throw(envptr, e._ptr)
+-- use this wth a jobject
+function JNIEnv:throw(e)
+	return self:_capiThrow(e._ptr)
 end
 
--- for classes
+-- use this with a jclass
 function JNIEnv:_throwNew(cl)
-	local envptr = self._ptr
-	return envptr[0].ThrowNew(envptr, cl._ptr)
+	return self:_capiThrowNew(cl._ptr)
 end
 
 ---------------- SUPPORT FUNCTIONS ----------------
@@ -325,8 +524,7 @@ I think nobody of competence came up with Android's spec.  Especially their segf
 		else
 			slashClassPath = getJNISig(classpath)
 		end
-		local envptr = self._ptr
-		local jclass = self:_capiFindClass(slashClassPath)
+		local jclass = self:_findClass(slashClassPath)
 		if jclass == nil then
 			-- I think this throws an exception?
 			local ex = self:_exceptionOccurred()
@@ -904,12 +1102,12 @@ function JNIEnv:_javaToLuaArg(value, returnType)
 	}
 end
 
--- _defineClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
+-- _loadClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
 --[[
 'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)
 'newClassName' = classname, not necessary if using a JavaASMClass/JavaASMDex object.
 --]]
-function JNIEnv:_defineClass(asm, newClassName)
+function JNIEnv:_loadClass(asm, newClassName)
 	local code
 	if type(asm) == 'string' then
 		code = asm
@@ -922,7 +1120,7 @@ function JNIEnv:_defineClass(asm, newClassName)
 --DEBUG:print(require 'ext.string'.hexdump(code))
 		newClassName = newClassName or asm.thisClass
 	else
-		error('JNIEnv:_defineClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
+		error('JNIEnv:_loadClass() accepts JavaASMClass/JavaASMDex objects or Lua strings')
 	end
 
 	if self._usingAndroidJNI then
