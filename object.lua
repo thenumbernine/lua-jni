@@ -62,7 +62,9 @@ function JavaObject:init(args)
 		__newindex = function(self, k, v)
 			--see if we are trying to write to a Java field
 			if type(k) == 'string'
+			--[[ write protect and only allow _ lua vars
 			and not k:match'^_'
+			--]]
 			then
 				local classObj = self:_getClass()
 
@@ -76,7 +78,9 @@ function JavaObject:init(args)
 				if methodsForName then
 					error("can't overwrite a Java method "..k)
 				end
+				--[[ write protect and only allow _ lua vars
 				error("JavaObject.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
+				--]]
 			end
 
 			-- finally do our write
@@ -216,8 +220,10 @@ function JavaObject:__index(k)
 
 	-- don't build namespaces off private vars
 	if k:match'^_' then
+		--[[ write protect and only allow _ lua vars
 		print('JavaObject.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
 		print(debug.traceback())
+		--]]
 		return
 	end
 

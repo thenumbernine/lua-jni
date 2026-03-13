@@ -38,9 +38,9 @@ function JavaClass:init(args)
 	-- locking namespace for java name resolve,
 	-- so define all to-be-used variables here,
 	-- even as 'false' for the if-exists tests to fail:
-	self._fields = false
-	self._methods = false
-	self._ctors = false
+	self._fields = {}		-- self._fields[fieldname][index] = JavaField
+	self._methods = {}		-- self._methods[fieldname][index] = JavaMethod
+	self._ctors = table()	-- self._ctors[index] = JavaMethod
 
 	-- TODO save ctors, methods, and fields separately?
 	-- then no need to class-detect upon __index...
@@ -87,7 +87,9 @@ function JavaClass:init(args)
 		__newindex = function(self, k, v)
 			--see if we are trying to write to a Java field
 			if type(k) == 'string'
+			--[[ write protect and only allow _ lua vars
 			and not k:match'^_'
+			--]]
 			then
 				local fieldsForName = self._fields[k]
 				if fieldsForName then
@@ -100,7 +102,9 @@ function JavaClass:init(args)
 				if methodsForName then
 					error("can't overwrite a Java method "..k)
 				end
+				--[[ write protect and only allow _ lua vars
 				error("JavaClass.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
+				--]]
 			end
 
 			-- finally do our write
@@ -126,12 +130,6 @@ function JavaClass:_setupReflection()
 	env._ignoringExceptions = true
 
 --DEBUG:print('calling setupReflect on', self._classpath)
-	assert.eq(false, self._fields, "_setupReflection expected _fields to be false")
-	assert.eq(false, self._methods, "_setupReflection expected _methods to be false")
-	assert.eq(false, self._ctors, "_setupReflection expected _ctors to be false")
-	self._fields = {}		-- self._fields[fieldname][index] = JavaField
-	self._methods = {}		-- self._methods[fieldname][index] = JavaMethod
-	self._ctors = table()	-- self._ctors[index] = JavaMethod
 
 	local java_lang_Class = env._java_lang_Class
 	local java_lang_reflect_Field = env._java_lang_reflect_Field
@@ -190,7 +188,7 @@ function JavaClass:_setupReflection()
 				fieldType,
 				java_lang_Class._java_lang_Class_getTypeName._ptr)
 			env:_deleteLocalRef(fieldType)
-			
+
 			local fieldClassPath = env:_fromJString(jstringFieldClassPath)
 			env:_deleteLocalRef(jstringFieldClassPath)
 --DEBUG:print('fieldType', fieldClassPath)
@@ -226,8 +224,8 @@ function JavaClass:_setupReflection()
 				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
 				isEnum = 0 ~= bit.band(modifiers, 0x4000),
 			}
-			-- TODO delete 
-			-- ... but JavaField doesn't duplicate jfieldID to a GlobalRef, 
+			-- TODO delete
+			-- ... but JavaField doesn't duplicate jfieldID to a GlobalRef,
 			-- ... so that would force java.field to segfault upon use ...
 			-- so TODO change java.field and java.method to *NOT STORE jfieldID/jmethodID's
 
@@ -265,7 +263,7 @@ function JavaClass:_setupReflection()
 				envptr,
 				method,
 				java_lang_reflect_Method._java_lang_reflect_Method_getReturnType._ptr)
-			
+
 			-- String
 			local jstringReturnTypeClassPath = envptr[0].CallObjectMethod(
 				envptr,
@@ -295,9 +293,9 @@ function JavaClass:_setupReflection()
 					methodParamType,
 					java_lang_Class._java_lang_Class_getTypeName._ptr)
 				env:_deleteLocalRef(methodParamType)
-				
+
 				sig:insert(env:_fromJString(paramClassPath))
-				
+
 				env:_deleteLocalRef(paramClassPath)
 			end
 			env:_deleteLocalRef(paramTypes)
@@ -653,12 +651,14 @@ function JavaClass:__index(k)
 		return self:_class()
 	end
 
+	--[[ write protect and only allow _ lua vars
 	-- don't build namespaces off private vars
 	if k:match'^_' then
 		print('JavaClass.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
 		print(debug.traceback())
 		return
 	end
+	--]]
 
 	-- now check fields/methods
 --DEBUG:print('here', self._classpath)

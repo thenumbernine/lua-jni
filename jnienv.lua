@@ -996,12 +996,14 @@ function JNIEnv:__index(k)
 
 	if type(k) ~= 'string' then return end
 
+	--[[ write protect and only allow _ lua vars
 	-- don't build namespaces off private vars
 	if k:match'^_' then
 		print('JNIEnv.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
 		print(debug.traceback())
 		return
 	end
+	--]]
 
 	-- alright this is anything not in self and not in the class
 	-- do automatic namespace lookup here
@@ -1066,6 +1068,7 @@ function Name:__index(k)
 		if v ~= nil then return v end
 	end
 
+	--[[ write protect and only allow _ lua vars
 	-- don't build namespaces off private vars
 	-- this is really here to prevent stackoverflows during __index operations
 	if k:match'^_' then
@@ -1073,6 +1076,7 @@ function Name:__index(k)
 		print(debug.traceback())
 		return
 	end
+	--]]
 
 	local env = rawget(self, '_env')
 	local classpath = rawget(self, '_name')..'.'..k
