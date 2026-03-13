@@ -13,7 +13,7 @@ return function(J, jsuperclass)
 	local newClassName = 'io/github/thenumbernine/NativeActionListener'
 
 	-- check if it's already loaded
-	local cl = J:_findClass(newClassName)
+	local cl = J:import(newClassName)
 	if cl then return cl end
 
 	local ClassWriter = J.org.objectweb.asm.ClassWriter

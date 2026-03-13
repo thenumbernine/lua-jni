@@ -47,7 +47,7 @@ function JavaClass:init(args)
 
 	-- modifiers
 	-- TODO should the caller do this? like is done with reflection ... hmm
-	-- caller is just JNIEnv:_findClass
+	-- caller is just JNIEnv:import
 	local envptr = self._env._ptr
 	-- hmm, if I store java/lang/Class instead of retrieve it here every time then I get segafults
 	-- why?  I even went out of my way to start NewGlobalRef'ing all my java classes & objects ....
@@ -604,7 +604,7 @@ function JavaClass:_isAssignableFrom(classTo)
 	local env = self._env
 	if type(classTo) == 'string' then
 		local classpath = classTo
-		classTo = env:_findClass(classpath)
+		classTo = env:import(classpath)
 		if classTo == nil then
 			error("tried to cast to an unknown class "..classpath)
 		end
@@ -688,7 +688,7 @@ function JavaClass:__index(k)
 	env:_checkExceptions()
 assert.eq(false, env._ignoringExceptions)
 	env._ignoringExceptions = true
-	local cl = env:_findClass(classpath)
+	local cl = env:import(classpath)
 assert.eq(true, env._ignoringExceptions)
 	env._ignoringExceptions = false
 	env:_exceptionClear()

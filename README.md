@@ -90,7 +90,7 @@ J.System.out:println("hello java")
 
 - `classObj = J:_saveJClassForClassPath(args)` = always creates a new JavaClass object for the `jclass` pointer, and saves it in this env's `_classesLoaded` table for this `classpath`.
 
-- `J:_findClass(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
+- `J:import(classpath)` = look up a Java class using C API `JNIEnv.FindClass`.
 
 - `classpath = J:_getJClassClasspath(jclass)` = uses java.lang.Class.getTypeName() to determine the classname of the JNI jclass pointer.
 

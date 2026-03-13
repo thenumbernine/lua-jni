@@ -12,8 +12,8 @@ local String = J.java.lang.String
 print('java.lang.String', String)
 assert.eq(String, J.String)
 
-local String2 = J:_findClass'java.lang.String'
-print('J:_findClass"java.lang.String"', String2)
+local String2 = J:import'java.lang.String'
+print('J:import"java.lang.String"', String2)
 assert.eq(String, String2)
 
 print('String:_isAssignableFrom(String)', String:_isAssignableFrom(String))
@@ -81,7 +81,7 @@ arr[0] = nil
 print('arr[0]', arr[0])
 
 -- [[ needs this to work
-print('java.lang.String', J:_findClass'java.lang.String')
+print('java.lang.String', J:import'java.lang.String')
 -- [=[ so FindClass accepts signature based Ljava/lang/String; and just regular slash-separated java/lang/String ...
 local String1 = J._ptr[0].FindClass(J._ptr, 'Ljava/lang/String;')
 print('java.lang.String[] from JNIEnv->FindClass("Ljava/lang/String;")', String1)
@@ -90,7 +90,7 @@ print('java.lang.String[] from JNIEnv->FindClass("java/lang/String")', String2)
 print('same?', J._ptr[0].IsSameObject(J._ptr, String1, String2))
 --]=]
 print('java.lang.String[] from String.class.arrayType()', J.String.class:arrayType())
-print('java.lang.String[] from J:_findClass()', J:_findClass'java.lang.String[]')
+print('java.lang.String[] from J:import()', J:import'java.lang.String[]')
 print('java.lang.String[] from JNIEnv->FindClass("[Ljava/lang/String;")', J._ptr[0].FindClass(J._ptr, '[Ljava/lang/String;'))
 --print('JNIEnv->FindClass("I")', J._ptr[0].FindClass(J._ptr, 'I'))
 --print('JNIEnv->FindClass("int")', J._ptr[0].FindClass(J._ptr, 'int'))

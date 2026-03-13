@@ -9,7 +9,7 @@ require 'java.build'.java{
 print('InnerClassTest', J.InnerClassTest)
 
 -- [[ the manual way? 
-local cl = J:_findClass'InnerClassTest$InnerClass'
+local cl = J:import'InnerClassTest$InnerClass'
 print('InnerClassTest.InnerClass', cl)
 --]]
 

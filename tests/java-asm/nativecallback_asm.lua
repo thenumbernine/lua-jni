@@ -39,7 +39,7 @@ function M:run(J)
 	local newClassName = 'io/github/thenumbernine/NativeCallback'
 
 	-- check if it's already loaded
-	local cl = J:_findClass(newClassName)
+	local cl = J:import(newClassName)
 	if cl then
 		rawset(cl, '_runMethodName', 'run')
 		return cl

@@ -117,7 +117,7 @@ function JNIEnv:init(args)
 	-- TODO better would be to just not make/use the cache until after building these classes and methods
 	-- we need these for later:
 	-- TODO a way to cache method names, but we've got 3 things to identify them by: name, signature, static
-	self._java_lang_Class = self:_findClass'java.lang.Class'
+	self._java_lang_Class = self:import'java.lang.Class'
 	self._java_lang_Class._java_lang_Class_getTypeName = assert(self._java_lang_Class:_method{
 		name = 'getTypeName',
 		sig = {'java.lang.String'},
@@ -140,7 +140,7 @@ function JNIEnv:init(args)
 		sig = {'java.lang.reflect.Constructor[]'},
 	})
 
-	self._java_lang_reflect_Field = self:_findClass'java.lang.reflect.Field'
+	self._java_lang_reflect_Field = self:import'java.lang.reflect.Field'
 	self._java_lang_reflect_Field._java_lang_reflect_Field_getName = assert(self._java_lang_reflect_Field:_method{
 		name = 'getName',
 		sig = {'java.lang.String'},
@@ -155,7 +155,7 @@ function JNIEnv:init(args)
 	})
 
 	-- only now that we got these methods can we do this
-	self._java_lang_reflect_Method = self:_findClass'java.lang.reflect.Method'
+	self._java_lang_reflect_Method = self:import'java.lang.reflect.Method'
 --DEBUG:print('JNIEnv:init self._java_lang_reflect_Method', self._java_lang_reflect_Method)
 	self._java_lang_reflect_Method._java_lang_reflect_Method_getName = assert(self._java_lang_reflect_Method:_method{
 		name = 'getName',
@@ -177,7 +177,7 @@ function JNIEnv:init(args)
 	-- so if Method and Constructor both inherit from Executable, and it has getName, getParameterTypes, getModifiers, can I just get those methods from it and use on both?
 	-- or does the jmethodID not do vtable lookup?
 	-- I won't risk it
-	self._java_lang_reflect_Constructor = self:_findClass'java.lang.reflect.Constructor'
+	self._java_lang_reflect_Constructor = self:import'java.lang.reflect.Constructor'
 	self._java_lang_reflect_Constructor._java_lang_reflect_Constructor_getParameterTypes = assert(self._java_lang_reflect_Constructor:_method{
 		name = 'getParameterTypes',
 		sig = {'java.lang.Class[]'},
@@ -202,7 +202,7 @@ function JNIEnv:init(args)
 	self._java_lang_reflect_Constructor:_setupReflection()
 
 	-- now that we're done bootloading, just cache String because it is useful
-	self._java_lang_String = self:_findClass'java.lang.String'
+	self._java_lang_String = self:import'java.lang.String'
 
 
 	-- TODO in the J namespace, for the primitive names,
@@ -284,11 +284,7 @@ end
 
 ---------------- SUPPORT FUNCTIONS ----------------
 
---[[
-TODO name, make JNIEnv:_findClass just call envptr[0].FindClass as per my naming scheme
- but then that means naming this function something else...
---]]
-function JNIEnv:_findClass(classpath)
+function JNIEnv:import(classpath)
 	self:_checkExceptions()
 
 	local classObj = self._classesLoaded[classpath]
@@ -371,7 +367,7 @@ end
 
 -- makes a JavaClass object for a jclass pointer
 -- saves it in _classesLoaded
--- used by _findClass and _fromJClass
+-- used by import and _fromJClass
 function JNIEnv:_saveJClassForClassPath(args)
 	local classpath = args.classpath
 	args.env = self
@@ -487,7 +483,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 	if field == 'NewObjectArray' then
 		local jclassObj = jtype
 		if type(jtype) == 'string' then
-			jclassObj = self:_findClass(jclassObj)
+			jclassObj = self:import(jclassObj)
 		else
 			assert(JavaClass:isa(jclassObj), "JNIEnv:_newArray expects a classpath or a JavaClass object")
 			jtype = jclassObj._classpath
@@ -573,7 +569,7 @@ end
 -- shorthand
 function JNIEnv:_new(classObj, ...)
 	if type(classObj) == 'string' then
-		classObj = self:_findClass(classObj)
+		classObj = self:import(classObj)
 	end
 	return classObj:_new(...)
 end
@@ -716,7 +712,7 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 				return false
 			end
 
-			local toClassObj = self:_findClass(sig)
+			local toClassObj = self:import(sig)
 
 			local jobject = arg
 			-- how to determine if it is a class or not
@@ -865,7 +861,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 		local unboxedSig = getUnboxedPrimitiveForClasspath[sig]
 		if unboxedSig then
 --DEBUG:print('is boxed, returning', sig)
-			local toClassObj = self:_findClass(sig)
+			local toClassObj = self:import(sig)
 --DEBUG:print('got class', toClassObj._classpath)
 			local obj = toClassObj(arg)
 --DEBUG:print('_luaToJavaArg result', obj._ptr, obj._classpath, 'for', sig)
@@ -1017,7 +1013,7 @@ function JNIEnv:__index(k)
 	self:_checkExceptions()
 assert.eq(false, self._ignoringExceptions)
 	self._ignoringExceptions = true
-	local cl = self:_findClass(k)
+	local cl = self:import(k)
 assert.eq(true, self._ignoringExceptions)
 	self._ignoringExceptions = false
 	self:_exceptionClear()
@@ -1027,7 +1023,7 @@ assert.eq(true, self._ignoringExceptions)
 	self:_checkExceptions()
 assert.eq(false, self._ignoringExceptions)
 	self._ignoringExceptions = true
-	local cl = self:_findClass('java.lang.'..k)
+	local cl = self:import('java.lang.'..k)
 assert.eq(true, self._ignoringExceptions)
 	self._ignoringExceptions = false
 	self:_exceptionClear()
@@ -1085,7 +1081,7 @@ function Name:__index(k)
 	env:_checkExceptions()
 assert.eq(false, env._ignoringExceptions)
 	env._ignoringExceptions = true
-	local cl = env:_findClass(classpath)
+	local cl = env:import(classpath)
 assert.eq(true, env._ignoringExceptions)
 	env._ignoringExceptions = false
 	env:_exceptionClear()

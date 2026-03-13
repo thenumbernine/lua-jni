@@ -111,7 +111,7 @@ assert.eq(test.baz, 137LL)
 assert.eq(test2.baz, 137LL)
 print('test.baz', test.baz)
 
-print('test:testFunc()', assert.eq(test:testFunc("", nil), 42))
+print('test:testFunc()', assert.eq(test:testFunc("", "testing"), 42))
 
 Test(2)
 

@@ -25,9 +25,9 @@ print('C', C)
 
 
 
-print("J:_findClass'TestInheritenceA'", J:_findClass'TestInheritenceA')
-print("J:_findClass'TestInheritenceB'", J:_findClass'TestInheritenceB')
-print("J:_findClass'TestInheritenceC'", J:_findClass'TestInheritenceC')
+print("J:import'TestInheritenceA'", J:import'TestInheritenceA')
+print("J:import'TestInheritenceB'", J:import'TestInheritenceB')
+print("J:import'TestInheritenceC'", J:import'TestInheritenceC')
 
 local TestInheritenceA = J.TestInheritenceA
 local TestInheritenceB = J.TestInheritenceB
