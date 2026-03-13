@@ -625,10 +625,10 @@ end
 	local cl
 	if isAndroid then
 		local JavaASMDex = require 'java.asmdex'
-		cl = env:_defineClass(JavaASMDex(asmClassArgs))
+		cl = env:_loadClass(JavaASMDex(asmClassArgs))
 	else
 		local JavaASMClass = require 'java.asmclass'
-		cl = env:_defineClass(JavaASMClass(asmClassArgs))
+		cl = env:_loadClass(JavaASMClass(asmClassArgs))
 	end
 	if not cl then return nil, "failed to define class" end
 
