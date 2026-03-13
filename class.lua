@@ -633,34 +633,28 @@ build the subclass used for _cb()
 - newLuaState = whether invoking this function should use a new lite-thread and new lua state or not.
 --]]
 function JavaClass:_cbClass(func, newLuaState)
-	local env = self._env
-
-	local samMethod = self._samMethod
-
-	local parentClass, interfaces
-	if self._isInterface then
-		parentClass = 'java.lang.Object'
-		interfaces = {self._classpath}
-	else
-		parentClass = self._classpath
-	end
-
 	local JavaLuaClass = require 'java.luaclass'
-	local cl = JavaLuaClass{
-		env = env,
-		extends = parentClass,
-		implements = interfaces,
+	return self:_subclass{
 		methods = {
 			{
-				name = samMethod._name,
-				sig = samMethod._sig,
+				name = self._samMethod._name,
+				sig = self._samMethod._sig,
 				value = func,
 				newLuaState = newLuaState,
 			},
 		},
 	}
+end
 
-	return cl
+function JavaClass:_subclass(args)
+	args.env = self._env
+	if self._isInterface then
+		args.implements = {self._classpath}
+	else
+		args.extends = self._classpath
+	end
+	local JavaLuaClass = require 'java.luaclass'
+	return JavaLuaClass(args)
 end
 
 -- build a subclass of "single-abstract-method" class for a Java-lamdba-equivalent for a Lua-function
