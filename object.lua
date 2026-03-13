@@ -34,37 +34,8 @@ JavaObject._makeGlobalRef = true
 -- ... I was expecting '.this' to do the same thing, but lo and behold it doesn't, you can only non-virtual-call the parent-class, not the current-class.  way to go java smh.
 -- ... I could also allow for obj.super.field = value etc but nah, what's the point.
 -- I will allow .super.super tho
-local function makeSuperAccess(args)
-	return setmetatable({
-		_env = args.env,
-		_obj = args.obj,
-		_classObj = args.classObj,
-	}, {
-		__index = function(self,k)
-			if type(k) ~= 'string' then return end
-
-			if k == 'super' then
-				return makeSuperAccess{
-					env = self._env,
-					obj = self._obj,
-					classObj = self._classObj:_super(),
-				}
-			end
-
-			local classObj = assert.index(self, '_classObj')
-			local methodsForName = classObj._methods[k]
-			if methodsForName then
-print('super', k, #methodsForName)
-				return JavaCallResolve{
-					name = k,
-					caller = self._obj,
-					options = methodsForName,
-					classObj = classObj,
-				}
-			end
-		end,
-	})
-end
+-- last twist to this is that JNIEnv:_luaToJavaArg needs to know to convert this to its object...
+-- ... or I could just make this a subclass of object but with a class override hmm
 
 function JavaObject:init(args)
 	local env = assert.index(args, 'env')
@@ -72,7 +43,6 @@ function JavaObject:init(args)
 	local envptr = env._ptr
 
 	local ptr = assert.index(args, 'ptr')
-
 	if ptr == nil then
 		error("no nil JavaObjects, just use nil itself")
 	end
@@ -88,11 +58,10 @@ function JavaObject:init(args)
 	-- TODO detect if not provided?
 	self._classpath = assert.index(args, 'classpath')
 
--- I would like to always save the class here
--- but for the bootstrap classes, they need to call java functions, which wrap Java object results
--- and those would reach here before the bootstrapping of classes is done,
--- so env:import() wouldn't work
---	self._classObj = self._env:import(self._classpath)
+	-- This is an optional arg that specifies to use non-virtual
+	-- Keep it nil for dynamic access
+	-- Maybe later I'll keep this always and have a flag for 'isNonVirtual' or something idk
+	self._classObj = args.classObj
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
@@ -275,10 +244,13 @@ function JavaObject:__index(k)
 	end
 
 	if k == 'super' then
-		return makeSuperAccess{
+		-- same but with super as the classObj...
+		-- TODO TODO this method won't extend to multiple .super.super's ... hmm ...
+		return JavaObject{
 			env = self._env,
-			obj = self._obj,
-			classObj = self:_getClass(),
+			ptr = self._ptr,
+			classpath = self._classpath,
+			classObj = self:_getClass():_super(),
 		}
 	end
 
@@ -310,6 +282,7 @@ function JavaObject:__index(k)
 			name = k,
 			caller = self,
 			options = methodsForName,
+			classObj = self._classObj,
 		}
 	end
 end

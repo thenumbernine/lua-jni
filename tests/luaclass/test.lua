@@ -124,7 +124,7 @@ local Test2 = Test:_subclass{
 			value = function(this, s)
 print('this', this)
 print('this.super', this.super)
-				return this.super:testFunc("test", J.Object())
+				return 1+this.super:testFunc("test", J.Object())
 			end,
 		},
 	},
