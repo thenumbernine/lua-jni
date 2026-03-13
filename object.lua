@@ -28,6 +28,44 @@ JavaObject.subclass = nil	-- make room for Java instances with fields named 'sub
 --  ... which will never happen of course.
 JavaObject._makeGlobalRef = true
 
+-- make some kind of call-scope object that, 
+-- if someone invokes object.super, 
+-- then all calls from it are fixed in their scope to that specific class i.e. non-virtual.
+-- ... I was expecting '.this' to do the same thing, but lo and behold it doesn't, you can only non-virtual-call the parent-class, not the current-class.  way to go java smh.
+-- ... I could also allow for obj.super.field = value etc but nah, what's the point.
+-- I will allow .super.super tho
+local function makeSuperAccess(args)
+	return setmetatable({
+		_env = args.env,
+		_obj = args.obj,
+		_classObj = args.classObj,
+	}, {
+		__index = function(self,k)
+			if type(k) ~= 'string' then return end
+
+			if k == 'super' then
+				return makeSuperAccess{
+					env = self._env,
+					obj = self._obj,
+					classObj = self._classObj:_super(),
+				}
+			end
+
+			local classObj = assert.index(self, '_classObj')
+			local methodsForName = classObj._methods[k]
+			if methodsForName then
+print('super', k, #methodsForName)
+				return JavaCallResolve{
+					name = k,
+					caller = self._obj,
+					options = methodsForName,
+					classObj = classObj,
+				}
+			end
+		end,
+	})
+end
+
 function JavaObject:init(args)
 	local env = assert.index(args, 'env')
 	self._env = env
@@ -215,17 +253,22 @@ function JavaObject:__index(k)
 		return
 	end
 
-	-- TODO nonvirtual namespaces references,
-	--  handle "this" and "super"
+	if k == 'super' then
+		return makeSuperAccess{
+			env = self._env,
+			obj = self._obj,
+			classObj = self:_getClass(),
+		}
+	end
 
+	--[[ write protect and only allow _ lua vars
 	-- don't build namespaces off private vars
 	if k:match'^_' then
-		--[[ write protect and only allow _ lua vars
 		print('JavaObject.__index', k, "I am reserving underscores for private variables.  You were about to invoke a name resolve")
 		print(debug.traceback())
-		--]]
 		return
 	end
+	--]]
 
 	-- now check fields/methods
 	local classObj = self:_getClass()
@@ -241,7 +284,6 @@ function JavaObject:__index(k)
 	local methodsForName = classObj._methods[k]
 	if methodsForName then
 --DEBUG:print('#methodsForName', k, #methodsForName)
-		local method = methodsForName[1]
 		-- now our choice of methodsForName[] will depend on the calling args...
 		return JavaCallResolve{
 			name = k,

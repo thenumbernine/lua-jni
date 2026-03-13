@@ -45,9 +45,6 @@ function JavaMethod:init(args)
 	-- so maybe I don't want .class to be saved.
 	--self._class = assert.index(args, 'class')	-- JavaClass where the method came from ...
 
-	-- this is used in java wrt super.call ... is that the only time?
-	self._nonvirtual = not not args.nonvirtual
-
 	-- modifiers
 	self._isPublic = not not args.isPublic
 	self._isPrivate = not not args.isPrivate
@@ -63,7 +60,12 @@ function JavaMethod:init(args)
 	self._isSynthetic = not not args.isSynthetic
 end
 
-function JavaMethod:__call(thisOrClass, ...)
+--[[
+thisOrClass = this or class depending whether its member or static method
+nonVirtualClass = nil, unless this is a non-virtual call, then set it to the class to call from
+... = args to be converted from Lua to Java
+--]]
+function JavaMethod:callNonVirtual(thisOrClass, nonVirtualClass, ...)
 	local env = self._env
 
 	-- I don't want to clear exceptions
@@ -75,9 +77,10 @@ function JavaMethod:__call(thisOrClass, ...)
 	local returnType = self._sig[1]
 	local callName
 	if self._isStatic then
+assert.eq(nonVirtualClass, nil, "can't call a static method as a non-virtual method, use a static call without a non-virtual class.")
 		callName = callStaticNameForReturnType[returnType]
 			or callStaticNameForReturnType.object
-	elseif self._nonvirtual then
+	elseif nonVirtualClass then
 		callName = callNonvirtualNameForReturnType[returnType]
 			or callNonvirtualNameForReturnType.object
 	else
@@ -85,7 +88,8 @@ function JavaMethod:__call(thisOrClass, ...)
 			or callNameForReturnType.object
 	end
 
---DEBUG:print('callName', callName)
+print('method callName', callName)
+print(debug.traceback())
 
 	-- only table.pack our args if necessary
 	local result
@@ -126,26 +130,50 @@ function JavaMethod:__call(thisOrClass, ...)
 
 		-- if it's a static method then a class comes first
 		-- otherwise an object comes first
-		result = env._ptr[0][callName](
-			env._ptr,
-			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
-			self._ptr,
-			table.unpack(javaArgObjs, 1, jargc)
-		)
+		if nonVirtualClass then
+			result = env._ptr[0][callName](
+				env._ptr,
+				assert(env:_luaToJavaArg(thisOrClass)),
+				nonVirtualClass._ptr,
+				self._ptr,
+				table.unpack(javaArgObjs, 1, jargc)
+			)	
+		else
+			result = env._ptr[0][callName](
+				env._ptr,
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				self._ptr,
+				table.unpack(javaArgObjs, 1, jargc)
+			)
+		end
 
 		-- TODO done with javaVarArgsObj java-array, free it
 	else
-		result = env._ptr[0][callName](
-			env._ptr,
-			assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
-			self._ptr,
-			env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
-		)
+		if nonVirtualClass then
+			result = env._ptr[0][callName](
+				env._ptr,
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				nonVirtualClass._ptr,
+				self._ptr,
+				env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
+			)
+		else
+			result = env._ptr[0][callName](
+				env._ptr,
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				self._ptr,
+				env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
+			)
+		end
 	end
 
 	env:_checkExceptions()
 
 	return env:_javaToLuaArg(result, returnType)
+end
+
+function JavaMethod:__call(thisOrClass, ...)
+	return self:callNonVirtual(thisOrClass, nil, ...)
 end
 
 -- calls in Java `new classObj(...)`
@@ -181,7 +209,6 @@ function JavaMethod:__tostring()
 	return self.__name..'('
 		..tostring(self._ptr)
 		..(self._isStatic and ' static' or '')
-		..(self._nonvirtual and ' nonvirtual' or '')
 		..(self._isVarArgs and ' isVarArgs' or '')
 		..' '..tolua(self._sig)
 		..')'

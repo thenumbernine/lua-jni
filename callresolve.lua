@@ -12,14 +12,20 @@ JavaCallResolve.__name = 'JavaCallResolve'
 -- otherwise 1st arg mst be an object
 -- if you try to pass a class to a non-static method then JNI just segfaults
 function JavaCallResolve:init(args)
-	self._name = assert.index(args, 'name')
-	self._caller = assert.index(args, 'caller')
-	self._options = assert.index(args, 'options')
+	self._name = args.name
+	self._caller = args.caller
+	self._options = args.options
+	self._classObj = args.classObj	-- optional, specify for non-virtual calls
 end
 
-function JavaCallResolve:__call(...)
+function JavaCallResolve:__call(thisOrClass, ...)
 	-- TODO don't convert ... twice from Lua to Java
-	return assert(JavaCallResolve.resolve(self._name, self._options, ...))(...)
+	local bestOption = assert(JavaCallResolve.resolve(self._name, self._options, thisOrClass, ...))
+	if self._classObj then
+		return bestOption:callNonVirtual(thisOrClass, self._classObj, ...)
+	else
+		return bestOption(thisOrClass, ...)
+	end
 end
 
 -- static method, used by JavaClass.__new also

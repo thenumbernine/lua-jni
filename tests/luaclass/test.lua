@@ -3,8 +3,7 @@
 local assert = require 'ext.assert'
 local J = require 'java'
 
-local Test = require 'java.luaclass'{
-	env = J,
+local Test = J.Object:_subclass{
 	name = 'TestStatic',
 	fields = {
 		{		-- key=seq int, value=table, use as properties for JavaASMClass
@@ -116,3 +115,20 @@ print('test:testFunc()', assert.eq(test:testFunc("", "testing"), 42))
 Test(2)
 
 test:testStatic(math.pi)
+
+
+local Test2 = Test:_subclass{
+	methods = {
+		testFunc = {
+			sig = {'double', 'java.lang.String'},
+			value = function(this, s)
+print('this', this)
+print('this.super', this.super)
+				return this.super:testFunc("test", J.Object())
+			end,
+		},
+	},
+}
+local test2 = Test2()
+print('test2.baz', test2.baz)
+print('test2.testFunc', test2:testFunc('here'))

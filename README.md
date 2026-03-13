@@ -203,7 +203,6 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
 - args:
 - - `name` = the method name
-- - `nonvirtual` = forwards to `JavaMethod`
 - - all other args forwarded to JavaMethod
 
 - `cl:_field(args)` = returns a `JavaField` object for a `jfieldID`.
@@ -234,11 +233,12 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `env` = `JNIEnv`
 - - `ptr` = `jmethodID`
 - - `sig` = signature table, first argument is the return type (default `void`), rest are method arguments.
-- - `nonvirtual` = whether this method call will be nonvirtual or not.  Useful for `super.whatever` in Java which relies on non-polymorphic explicit class calls.
 - - `isVarArgs` = true when `Method.isVarArgs()` is true, means that the call will convert the args into an array before calling.
 - - `isStatic` = whether this method is static or not.
 
-- `result = method(...)` = invoke ` call on the method using C API `JNIEnv.Call*Method`.
+- `result = method(...)` = call on the method using C API `JNIEnv.Call*Method`.
+
+- `result = method:callNonVirtual(thisObj, classObj, ...)` = call the method using C API `JNIEnv.CallNonvirtual*Method`.
 
 - `obj = method:_new(...)` = for constructor methods, calls C API `JNIEnv.NewObject` on this method.
 
@@ -401,15 +401,8 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - generics
 - I'm not building proper reflection for arrays I think ... I'm using getFields()/getMethods(), but then I still have to explicitly grab the default ctor or the toString(), so maybe I should use getDeclaredFields()/getDeclaredMethods() and then manaully search inheritence myself? But then should I be caching the class tree refs to parent myself too?
 - call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
-- I'm setting up the initial classes used for java, reflection, etc in JNIEnv's ctor ... I'm using my class system itself to setup my class system ... I should just replace this with direct JNI calls to make everything less error prone.
-- some kind of Lua syntax sugar for easy nonvirtual calls ... right now you have to do something like `obj:_method{name=name, sig=sig, nonvirtual=true}(obj, ...)`
 - maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
-- Add fields to JavaClass, JavaField, and JavaMethod.  Weird that java.lang.reflect.Modifier doesn't have all modifier flags of things like fields ...
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? Then there's no more need for JavaLuaClass ...
-- JavaObject `.this` and `.super` for nonvirtual qualified lookup wrapper.
 - type-inference in text-based assembler
 - TODO dex assembler methods, maybe use android studio disasm's `invoke-direct {args...} Lclass/path;->functionname(methodig)return`
-- looks like Android's 51200 GlobalRef's fills up very fast with my reflection implementation of storing each JavaField and JavaMethod in the JavaClass reflection...
-	... so to fix this, I guess I had better store some kind of method-but-not-jmethod or field-but-not-jfield...
-- luaclass ctor call into an extra native method to work like the other methods.
 - reduce temp objects created, delete as often as possible.

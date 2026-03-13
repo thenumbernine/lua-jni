@@ -69,8 +69,7 @@ struct JNINativeInterface {
     void* reserved2;
     void* reserved3;
     jint (*GetVersion)(JNIEnv *);
-    jclass (*DefineClass)(JNIEnv*, const char*, jobject, const jbyte*,
-                        jsize);
+    jclass (*DefineClass)(JNIEnv*, const char*, jobject, const jbyte*, jsize);
     jclass (*FindClass)(JNIEnv*, const char*);
     jmethodID (*FromReflectedMethod)(JNIEnv*, jobject);
     jfieldID (*FromReflectedField)(JNIEnv*, jobject);
@@ -129,66 +128,36 @@ struct JNINativeInterface {
     void (*CallVoidMethod)(JNIEnv*, jobject, jmethodID, ...);
     void (*CallVoidMethodV)(JNIEnv*, jobject, jmethodID, va_list);
     void (*CallVoidMethodA)(JNIEnv*, jobject, jmethodID, const jvalue*);
-    jobject (*CallNonvirtualObjectMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jobject (*CallNonvirtualObjectMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jobject (*CallNonvirtualObjectMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jboolean (*CallNonvirtualBooleanMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jboolean (*CallNonvirtualBooleanMethodV)(JNIEnv*, jobject, jclass,
-                         jmethodID, va_list);
-    jboolean (*CallNonvirtualBooleanMethodA)(JNIEnv*, jobject, jclass,
-                         jmethodID, const jvalue*);
-    jbyte (*CallNonvirtualByteMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jbyte (*CallNonvirtualByteMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jbyte (*CallNonvirtualByteMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jchar (*CallNonvirtualCharMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jchar (*CallNonvirtualCharMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jchar (*CallNonvirtualCharMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jshort (*CallNonvirtualShortMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jshort (*CallNonvirtualShortMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jshort (*CallNonvirtualShortMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jint (*CallNonvirtualIntMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jint (*CallNonvirtualIntMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jint (*CallNonvirtualIntMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jlong (*CallNonvirtualLongMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jlong (*CallNonvirtualLongMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jlong (*CallNonvirtualLongMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jfloat (*CallNonvirtualFloatMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jfloat (*CallNonvirtualFloatMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jfloat (*CallNonvirtualFloatMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    jdouble (*CallNonvirtualDoubleMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    jdouble (*CallNonvirtualDoubleMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    jdouble (*CallNonvirtualDoubleMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
-    void (*CallNonvirtualVoidMethod)(JNIEnv*, jobject, jclass,
-                        jmethodID, ...);
-    void (*CallNonvirtualVoidMethodV)(JNIEnv*, jobject, jclass,
-                        jmethodID, va_list);
-    void (*CallNonvirtualVoidMethodA)(JNIEnv*, jobject, jclass,
-                        jmethodID, const jvalue*);
+    jobject (*CallNonvirtualObjectMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jobject (*CallNonvirtualObjectMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jobject (*CallNonvirtualObjectMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jboolean (*CallNonvirtualBooleanMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jboolean (*CallNonvirtualBooleanMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jboolean (*CallNonvirtualBooleanMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jbyte (*CallNonvirtualByteMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jbyte (*CallNonvirtualByteMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jbyte (*CallNonvirtualByteMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jchar (*CallNonvirtualCharMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jchar (*CallNonvirtualCharMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jchar (*CallNonvirtualCharMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jshort (*CallNonvirtualShortMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jshort (*CallNonvirtualShortMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jshort (*CallNonvirtualShortMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jint (*CallNonvirtualIntMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jint (*CallNonvirtualIntMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jint (*CallNonvirtualIntMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jlong (*CallNonvirtualLongMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jlong (*CallNonvirtualLongMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jlong (*CallNonvirtualLongMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jfloat (*CallNonvirtualFloatMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jfloat (*CallNonvirtualFloatMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jfloat (*CallNonvirtualFloatMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    jdouble (*CallNonvirtualDoubleMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    jdouble (*CallNonvirtualDoubleMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    jdouble (*CallNonvirtualDoubleMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
+    void (*CallNonvirtualVoidMethod)(JNIEnv*, jobject, jclass, jmethodID, ...);
+    void (*CallNonvirtualVoidMethodV)(JNIEnv*, jobject, jclass, jmethodID, va_list);
+    void (*CallNonvirtualVoidMethodA)(JNIEnv*, jobject, jclass, jmethodID, const jvalue*);
     jfieldID (*GetFieldID)(JNIEnv*, jclass, const char*, const char*);
     jobject (*GetObjectField)(JNIEnv*, jobject, jfieldID);
     jboolean (*GetBooleanField)(JNIEnv*, jobject, jfieldID);
@@ -213,8 +182,7 @@ struct JNINativeInterface {
     jobject (*CallStaticObjectMethodV)(JNIEnv*, jclass, jmethodID, va_list);
     jobject (*CallStaticObjectMethodA)(JNIEnv*, jclass, jmethodID, const jvalue*);
     jboolean (*CallStaticBooleanMethod)(JNIEnv*, jclass, jmethodID, ...);
-    jboolean (*CallStaticBooleanMethodV)(JNIEnv*, jclass, jmethodID,
-                        va_list);
+    jboolean (*CallStaticBooleanMethodV)(JNIEnv*, jclass, jmethodID, va_list);
     jboolean (*CallStaticBooleanMethodA)(JNIEnv*, jclass, jmethodID, const jvalue*);
     jbyte (*CallStaticByteMethod)(JNIEnv*, jclass, jmethodID, ...);
     jbyte (*CallStaticByteMethodV)(JNIEnv*, jclass, jmethodID, va_list);
@@ -240,8 +208,7 @@ struct JNINativeInterface {
     void (*CallStaticVoidMethod)(JNIEnv*, jclass, jmethodID, ...);
     void (*CallStaticVoidMethodV)(JNIEnv*, jclass, jmethodID, va_list);
     void (*CallStaticVoidMethodA)(JNIEnv*, jclass, jmethodID, const jvalue*);
-    jfieldID (*GetStaticFieldID)(JNIEnv*, jclass, const char*,
-                        const char*);
+    jfieldID (*GetStaticFieldID)(JNIEnv*, jclass, const char*, const char*);
     jobject (*GetStaticObjectField)(JNIEnv*, jclass, jfieldID);
     jboolean (*GetStaticBooleanField)(JNIEnv*, jclass, jfieldID);
     jbyte (*GetStaticByteField)(JNIEnv*, jclass, jfieldID);
@@ -288,56 +255,31 @@ struct JNINativeInterface {
     jlong* (*GetLongArrayElements)(JNIEnv*, jlongArray, jboolean*);
     jfloat* (*GetFloatArrayElements)(JNIEnv*, jfloatArray, jboolean*);
     jdouble* (*GetDoubleArrayElements)(JNIEnv*, jdoubleArray, jboolean*);
-    void (*ReleaseBooleanArrayElements)(JNIEnv*, jbooleanArray,
-                        jboolean*, jint);
-    void (*ReleaseByteArrayElements)(JNIEnv*, jbyteArray,
-                        jbyte*, jint);
-    void (*ReleaseCharArrayElements)(JNIEnv*, jcharArray,
-                        jchar*, jint);
-    void (*ReleaseShortArrayElements)(JNIEnv*, jshortArray,
-                        jshort*, jint);
-    void (*ReleaseIntArrayElements)(JNIEnv*, jintArray,
-                        jint*, jint);
-    void (*ReleaseLongArrayElements)(JNIEnv*, jlongArray,
-                        jlong*, jint);
-    void (*ReleaseFloatArrayElements)(JNIEnv*, jfloatArray,
-                        jfloat*, jint);
-    void (*ReleaseDoubleArrayElements)(JNIEnv*, jdoubleArray,
-                        jdouble*, jint);
-    void (*GetBooleanArrayRegion)(JNIEnv*, jbooleanArray,
-                        jsize, jsize, jboolean*);
-    void (*GetByteArrayRegion)(JNIEnv*, jbyteArray,
-                        jsize, jsize, jbyte*);
-    void (*GetCharArrayRegion)(JNIEnv*, jcharArray,
-                        jsize, jsize, jchar*);
-    void (*GetShortArrayRegion)(JNIEnv*, jshortArray,
-                        jsize, jsize, jshort*);
-    void (*GetIntArrayRegion)(JNIEnv*, jintArray,
-                        jsize, jsize, jint*);
-    void (*GetLongArrayRegion)(JNIEnv*, jlongArray,
-                        jsize, jsize, jlong*);
-    void (*GetFloatArrayRegion)(JNIEnv*, jfloatArray,
-                        jsize, jsize, jfloat*);
-    void (*GetDoubleArrayRegion)(JNIEnv*, jdoubleArray,
-                        jsize, jsize, jdouble*);
-    void (*SetBooleanArrayRegion)(JNIEnv*, jbooleanArray,
-                        jsize, jsize, const jboolean*);
-    void (*SetByteArrayRegion)(JNIEnv*, jbyteArray,
-                        jsize, jsize, const jbyte*);
-    void (*SetCharArrayRegion)(JNIEnv*, jcharArray,
-                        jsize, jsize, const jchar*);
-    void (*SetShortArrayRegion)(JNIEnv*, jshortArray,
-                        jsize, jsize, const jshort*);
-    void (*SetIntArrayRegion)(JNIEnv*, jintArray,
-                        jsize, jsize, const jint*);
-    void (*SetLongArrayRegion)(JNIEnv*, jlongArray,
-                        jsize, jsize, const jlong*);
-    void (*SetFloatArrayRegion)(JNIEnv*, jfloatArray,
-                        jsize, jsize, const jfloat*);
-    void (*SetDoubleArrayRegion)(JNIEnv*, jdoubleArray,
-                        jsize, jsize, const jdouble*);
-    jint (*RegisterNatives)(JNIEnv*, jclass, const JNINativeMethod*,
-                        jint);
+    void (*ReleaseBooleanArrayElements)(JNIEnv*, jbooleanArray, jboolean*, jint);
+    void (*ReleaseByteArrayElements)(JNIEnv*, jbyteArray, jbyte*, jint);
+    void (*ReleaseCharArrayElements)(JNIEnv*, jcharArray, jchar*, jint);
+    void (*ReleaseShortArrayElements)(JNIEnv*, jshortArray, jshort*, jint);
+    void (*ReleaseIntArrayElements)(JNIEnv*, jintArray, jint*, jint);
+    void (*ReleaseLongArrayElements)(JNIEnv*, jlongArray, jlong*, jint);
+    void (*ReleaseFloatArrayElements)(JNIEnv*, jfloatArray, jfloat*, jint);
+    void (*ReleaseDoubleArrayElements)(JNIEnv*, jdoubleArray, jdouble*, jint);
+    void (*GetBooleanArrayRegion)(JNIEnv*, jbooleanArray, jsize, jsize, jboolean*);
+    void (*GetByteArrayRegion)(JNIEnv*, jbyteArray, jsize, jsize, jbyte*);
+    void (*GetCharArrayRegion)(JNIEnv*, jcharArray, jsize, jsize, jchar*);
+    void (*GetShortArrayRegion)(JNIEnv*, jshortArray, jsize, jsize, jshort*);
+    void (*GetIntArrayRegion)(JNIEnv*, jintArray, jsize, jsize, jint*);
+    void (*GetLongArrayRegion)(JNIEnv*, jlongArray, jsize, jsize, jlong*);
+    void (*GetFloatArrayRegion)(JNIEnv*, jfloatArray, jsize, jsize, jfloat*);
+    void (*GetDoubleArrayRegion)(JNIEnv*, jdoubleArray, jsize, jsize, jdouble*);
+    void (*SetBooleanArrayRegion)(JNIEnv*, jbooleanArray, jsize, jsize, const jboolean*);
+    void (*SetByteArrayRegion)(JNIEnv*, jbyteArray, jsize, jsize, const jbyte*);
+    void (*SetCharArrayRegion)(JNIEnv*, jcharArray, jsize, jsize, const jchar*);
+    void (*SetShortArrayRegion)(JNIEnv*, jshortArray, jsize, jsize, const jshort*);
+    void (*SetIntArrayRegion)(JNIEnv*, jintArray, jsize, jsize, const jint*);
+    void (*SetLongArrayRegion)(JNIEnv*, jlongArray, jsize, jsize, const jlong*);
+    void (*SetFloatArrayRegion)(JNIEnv*, jfloatArray, jsize, jsize, const jfloat*);
+    void (*SetDoubleArrayRegion)(JNIEnv*, jdoubleArray, jsize, jsize, const jdouble*);
+    jint (*RegisterNatives)(JNIEnv*, jclass, const JNINativeMethod*, jint);
     jint (*UnregisterNatives)(JNIEnv*, jclass);
     jint (*MonitorEnter)(JNIEnv*, jobject);
     jint (*MonitorExit)(JNIEnv*, jobject);
