@@ -514,7 +514,7 @@ function JavaClass:_method(args)
 	end
 	-- will this throw an exception? probably.
 	if jmethodID == nil then
-		local ex = env:_exceptionOccurred()
+		local ex = env:_getException()
 		return
 			nil,
 			"failed to find method "..tostring(funcname)
@@ -553,7 +553,7 @@ function JavaClass:_field(args)
 		jfieldID = env._ptr[0].GetFieldID(env._ptr, self._ptr, fieldname, sigstr)
 	end
 	if jfieldID == nil then
-		local ex = env:_exceptionOccurred()
+		local ex = env:_getException()
 		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(isStatic and ' static' or ''), ex
 	end
 

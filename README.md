@@ -96,7 +96,7 @@ J.System.out:println("hello java")
 
 - `J:_exceptionClear()` = clears the exception in JNIEnv via JNIEnv.ExceptionClear.
 
-- `ex = J:_exceptionOccurred()` = if an exception occurred then returns the exception JavaObject.
+- `ex = J:_getException()` = if an exception occurred then returns the exception JavaObject.
 
 - `J:throw(obj)` = throw in the JNI a exception jobject.
 

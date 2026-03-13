@@ -162,7 +162,7 @@ function JavaMethod:_new(classObj, ...)
 		env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 	)
 	if jobject == nil then 	-- uhm when would this be?
-		local ex = env:_exceptionOccurred()
+		local ex = env:_getException()
 		return nil, 'failed to call ctor sig='..require 'ext.tolua'(self._sig), ex
 	end
 	-- fun fact, for java the ctor has return signature 'void'

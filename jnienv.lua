@@ -465,9 +465,6 @@ JNIEnv._deleteLocalRef = JNIEnv._capiDeleteLocalRef
 JNIEnv._getVersion = JNIEnv._capiGetVersion
 JNIEnv._exceptionClear = JNIEnv._capiExceptionClear
 JNIEnv._newObject = JNIEnv._capiNewObject
---[[ these are methods with same names that I have doing something different:
-JNIEnv._exceptionOccurred
---]]
 
 ---------------- JNI C API but with minimal arg tweaks ----------------
 
@@ -527,7 +524,7 @@ I think nobody of competence came up with Android's spec.  Especially their segf
 		local jclass = self:_findClass(slashClassPath)
 		if jclass == nil then
 			-- I think this throws an exception?
-			local ex = self:_exceptionOccurred()
+			local ex = self:_getException()
 			return nil, 'failed to find class '..tostring(classpath), ex
 		end
 		classObj = self:_saveJClassForClassPath{
@@ -584,7 +581,7 @@ assert.eq(classObj._classpath, classpath)
 end
 
 -- Get a classpath for a jobject pointer
--- Only used in _exceptionOccurred
+-- Only used in _getException
 -- This is just obj:_getClass():getTypeName()
 -- but with maybe a few less calls
 function JNIEnv:_getObjClassPath(objPtr)
@@ -712,7 +709,7 @@ function JNIEnv:_newArray(jtype, length, objInit)
 end
 
 -- check-and-return exceptions
-function JNIEnv:_exceptionOccurred()
+function JNIEnv:_getException()
 
 	-- during startup, reflection on base classes, I don't want this class' mechanism to be used for repackaging exceptions
 	-- while the classes they would be packaged with aren't yet fully initialized
@@ -748,7 +745,7 @@ end
 
 -- check-and-throw exception
 function JNIEnv:_checkExceptions()
-	local ex = self:_exceptionOccurred()
+	local ex = self:_getException()
 	-- but this calls toString, which could create its own exceptions ...
 	if not ex then return end
 
