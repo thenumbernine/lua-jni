@@ -529,6 +529,11 @@ end
 
 						-- rebuild env from envPtr in case it's on a new thread
 						-- but we can use the same jvm pointer
+						-- hmm possible TODO is
+						-- 1) cache the JNIEnv and use the 1st copy created always
+						-- 2) cache it per tonumber(envPtr) or tostring(envPtr)
+						-- 3) always rebuild the JavaVM and JNIEnv
+						-- 4) cache the JavaVM like I'm doing now
 						local reg = debug.getregistry()
 						local method = reg.method
 						local classpath = reg.classpath
