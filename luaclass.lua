@@ -484,8 +484,6 @@ return
 						thread.lua[[
 -- this is needed for the ffi.cast threadFuncTypeName declaration
 require 'java.ffi.jni'
-
-table = require 'ext.table'
 ]]
 
 						thread.lua([[
@@ -548,12 +546,11 @@ end
 							thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
 						end
 
-						local args = _G.table.pack(...)	-- _G to look in child therad sub lua state's global, or else it'll look for a non-existent upvalue...
-						for i=1,args.n do
-							args[i] = env:_javaToLuaArg(args[i], sig[i+1])
-						end
-
-						local result = func(env, thisOrClass, args:unpack(1, args.n))
+						local result = func(
+							env,
+							thisOrClass,
+							env:_javaToLuaArgs(2, sig, ...)
+						)
 
 						if sig[1] == 'void' then return end
 						if result == nil then return nil end
@@ -591,12 +588,11 @@ end
 					else
 						thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
 					end
-					local args = table.pack(...)
-					for i=1,args.n do
-						args[i] = env:_javaToLuaArg(args[i], sig[i+1])
-					end
 
-					local result = func(thisOrClass, args:unpack(1, args.n))
+					local result = func(
+						thisOrClass,
+						env:_javaToLuaArgs(2, sig, ...)
+					)
 
 					if sig[1] == 'void' then return end
 					if result == nil then return nil end

@@ -843,6 +843,12 @@ function JNIEnv:_javaToLuaArg(value, returnType)
 	}
 end
 
+function JNIEnv:_javaToLuaArgs(sigIndex, sig, ...)
+	if select('#', ...) == 0 then return end
+	return self:_javaToLuaArg(..., sig[sigIndex]),
+		self:_javaToLuaArgs(sigIndex+1, sig, select(2, ...))
+end
+
 -- _loadClass points to JavaASMClass = require 'java.asmclass' or JavaASMDex = require 'java.asmdex'
 --[[
 'asm' can be a JavaASMClass/JavaASMDex, or a Lua string of bytecode (returned with :compile() above)

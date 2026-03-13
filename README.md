@@ -107,6 +107,9 @@ J.System.out:println("hello java")
 - `J:_luaToJavaArg(arg, sig)` = convert a Lua object `arg` to a JNI pointer object. Preparation for the JNI API.  `sig` is a Java type to help in conversion, namely when `arg` is a number.
 - `J:_luaToJavaArgs(sigIndex, sig, ...)` = convert a vararg of Lua objects to JNI pointer objects.  `sig` is an array used for function signatures, `sigIndex` is the location in that array.
 
+- `J:_javaToLuaArg(arg, sig)` = convert a JavaObject , primitive, etc to a Lua value, i.e. convert values coming from JNI API to Lua.
+- `J:_javaToLuaArgs(sigIndex, sig, ...)` = convert a vararg of them.
+
 - `J:__index(k)` = if `J` is indexed with any other key then it is assumed to be a namespace lookup.
 - - ex: `J.java` retrieves the namespace `java.*`
 - - ex: `J.java.lang` retrieves the namespace `java.lang.*`
@@ -290,7 +293,7 @@ This acts on top of `JavaASMClass` to build a translation layer for converting a
 - - methods: (optional) either a list of tables of method properties passed to JavaASMClass, or optionally key/value methods will use the key for the name.  Implicit key is name, implicit function value is function.
 - - ctors: (optional) list of properties to pass for constructors.  If none are provided then a default constructor is created.
 - - - methods are implemented as native and cast from LuaJIT-to-C closures.
-- - - Pass the flag "newLuaState" to create a new LiteThread sub-Lua-state that will provide a safe callback when invoked in Java on new threads.  The callback will be created with a new sub-Lua-state to prevent unsafe access of a single-threaded Lua state.
+- - - Pass the flag "newLuaState" to create a new LiteThread sub-Lua-state that will provide a safe callback when invoked in Java on new threads.  The callback will be created with a new sub-Lua-state to prevent unsafe access of a single-threaded Lua state.  The callback function will be invoked with one extra `JNIEnv` Lua object containing what could be a new JNIEnv if it is invoked on a new thread.
 
 
 ### JavaASMClass
