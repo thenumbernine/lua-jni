@@ -881,11 +881,11 @@ function JNIEnv:_loadClass(asm, newClassName)
 		end
 
 		local ByteBuffer = self.java.nio.ByteBuffer
-		assert(ByteBuffer._exists, "failed to find java.nio.ByteBuffer")
+		assert(ByteBuffer._classpath, "failed to find java.nio.ByteBuffer")
 		local byteBuf = ByteBuffer:wrap(byteCodeArray)
 
 		local InMemoryDexClassLoader = self.dalvik.system.InMemoryDexClassLoader
-		assert(InMemoryDexClassLoader._exists, "failed to find dalvik.system.InMemoryDexClassLoader")
+		assert(InMemoryDexClassLoader._classpath, "failed to find dalvik.system.InMemoryDexClassLoader")
 		local dexLoader = InMemoryDexClassLoader(byteBuf, loader)
 		local clobj = dexLoader:loadClass(newClassName)
 		if not clobj then
@@ -983,7 +983,6 @@ Name = class()
 Name.__name = 'Name'
 Name.subclass = nil
 
-Name._exists = false 	-- query this to know the class you're looking for isn't there...
 function Name:init(args)
 	rawset(self, '_env', assert.index(args, 'env'))
 	rawset(self, '_name', assert.index(args, 'name'))
