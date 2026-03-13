@@ -217,265 +217,11 @@ function JNIEnv:init(args)
 	self._classesLoaded.void = ffi.typeof'void'
 end
 
----------------- JNIEnv WRAPPER ----------------
--- just to save on one extra arg passing every single time...
-
-for f in ([[
-GetVersion
-DefineClass
-FindClass
-FromReflectedMethod
-FromReflectedField
-ToReflectedMethod
-GetSuperclass
-IsAssignableFrom
-ToReflectedField
-Throw
-ThrowNew
-ExceptionOccurred
-ExceptionDescribe
-ExceptionClear
-FatalError
-PushLocalFrame
-PopLocalFrame
-NewGlobalRef
-DeleteGlobalRef
-DeleteLocalRef
-IsSameObject
-NewLocalRef
-EnsureLocalCapacity
-AllocObject
-NewObject
-NewObjectV
-NewObjectA
-GetObjectClass
-IsInstanceOf
-GetMethodID
-CallObjectMethod
-CallObjectMethodV
-CallObjectMethodA
-CallBooleanMethod
-CallBooleanMethodV
-CallBooleanMethodA
-CallByteMethod
-CallByteMethodV
-CallByteMethodA
-CallCharMethod
-CallCharMethodV
-CallCharMethodA
-CallShortMethod
-CallShortMethodV
-CallShortMethodA
-CallIntMethod
-CallIntMethodV
-CallIntMethodA
-CallLongMethod
-CallLongMethodV
-CallLongMethodA
-CallFloatMethod
-CallFloatMethodV
-CallFloatMethodA
-CallDoubleMethod
-CallDoubleMethodV
-CallDoubleMethodA
-CallVoidMethod
-CallVoidMethodV
-CallVoidMethodA
-CallNonvirtualObjectMethod
-CallNonvirtualObjectMethodV
-CallNonvirtualObjectMethodA
-CallNonvirtualBooleanMethod
-CallNonvirtualBooleanMethodV
-CallNonvirtualBooleanMethodA
-CallNonvirtualByteMethod
-CallNonvirtualByteMethodV
-CallNonvirtualByteMethodA
-CallNonvirtualCharMethod
-CallNonvirtualCharMethodV
-CallNonvirtualCharMethodA
-CallNonvirtualShortMethod
-CallNonvirtualShortMethodV
-CallNonvirtualShortMethodA
-CallNonvirtualIntMethod
-CallNonvirtualIntMethodV
-CallNonvirtualIntMethodA
-CallNonvirtualLongMethod
-CallNonvirtualLongMethodV
-CallNonvirtualLongMethodA
-CallNonvirtualFloatMethod
-CallNonvirtualFloatMethodV
-CallNonvirtualFloatMethodA
-CallNonvirtualDoubleMethod
-CallNonvirtualDoubleMethodV
-CallNonvirtualDoubleMethodA
-CallNonvirtualVoidMethod
-CallNonvirtualVoidMethodV
-CallNonvirtualVoidMethodA
-GetFieldID
-GetObjectField
-GetBooleanField
-GetByteField
-GetCharField
-GetShortField
-GetIntField
-GetLongField
-GetFloatField
-GetDoubleField
-SetObjectField
-SetBooleanField
-SetByteField
-SetCharField
-SetShortField
-SetIntField
-SetLongField
-SetFloatField
-SetDoubleField
-GetStaticMethodID
-CallStaticObjectMethod
-CallStaticObjectMethodV
-CallStaticObjectMethodA
-CallStaticBooleanMethod
-CallStaticBooleanMethodV
-CallStaticBooleanMethodA
-CallStaticByteMethod
-CallStaticByteMethodV
-CallStaticByteMethodA
-CallStaticCharMethod
-CallStaticCharMethodV
-CallStaticCharMethodA
-CallStaticShortMethod
-CallStaticShortMethodV
-CallStaticShortMethodA
-CallStaticIntMethod
-CallStaticIntMethodV
-CallStaticIntMethodA
-CallStaticLongMethod
-CallStaticLongMethodV
-CallStaticLongMethodA
-CallStaticFloatMethod
-CallStaticFloatMethodV
-CallStaticFloatMethodA
-CallStaticDoubleMethod
-CallStaticDoubleMethodV
-CallStaticDoubleMethodA
-CallStaticVoidMethod
-CallStaticVoidMethodV
-CallStaticVoidMethodA
-GetStaticFieldID
-GetStaticObjectField
-GetStaticBooleanField
-GetStaticByteField
-GetStaticCharField
-GetStaticShortField
-GetStaticIntField
-GetStaticLongField
-GetStaticFloatField
-GetStaticDoubleField
-SetStaticObjectField
-SetStaticBooleanField
-SetStaticByteField
-SetStaticCharField
-SetStaticShortField
-SetStaticIntField
-SetStaticLongField
-SetStaticFloatField
-SetStaticDoubleField
-NewString
-GetStringLength
-GetStringChars
-ReleaseStringChars
-NewStringUTF
-GetStringUTFLength
-GetStringUTFChars
-ReleaseStringUTFChars
-GetArrayLength
-NewObjectArray
-GetObjectArrayElement
-SetObjectArrayElement
-NewBooleanArray
-NewByteArray
-NewCharArray
-NewShortArray
-NewIntArray
-NewLongArray
-NewFloatArray
-NewDoubleArray
-GetBooleanArrayElements
-GetByteArrayElements
-GetCharArrayElements
-GetShortArrayElements
-GetIntArrayElements
-GetLongArrayElements
-GetFloatArrayElements
-GetDoubleArrayElements
-ReleaseBooleanArrayElements
-ReleaseByteArrayElements
-ReleaseCharArrayElements
-ReleaseShortArrayElements
-ReleaseIntArrayElements
-ReleaseLongArrayElements
-ReleaseFloatArrayElements
-ReleaseDoubleArrayElements
-GetBooleanArrayRegion
-GetByteArrayRegion
-GetCharArrayRegion
-GetShortArrayRegion
-GetIntArrayRegion
-GetLongArrayRegion
-GetFloatArrayRegion
-GetDoubleArrayRegion
-SetBooleanArrayRegion
-SetByteArrayRegion
-SetCharArrayRegion
-SetShortArrayRegion
-SetIntArrayRegion
-SetLongArrayRegion
-SetFloatArrayRegion
-SetDoubleArrayRegion
-RegisterNatives
-UnregisterNatives
-MonitorEnter
-MonitorExit
-GetJavaVM
-GetStringRegion
-GetStringUTFRegion
-GetPrimitiveArrayCritical
-ReleasePrimitiveArrayCritical
-GetStringCritical
-ReleaseStringCritical
-NewWeakGlobalRef
-DeleteWeakGlobalRef
-ExceptionCheck
-NewDirectByteBuffer
-GetDirectBufferAddress
-GetDirectBufferCapacity
-GetObjectRefType
-]]):gmatch'%S+' do
-	JNIEnv['_capi'..f] = function(self, ...)
-		local envptr = self._ptr
-		return envptr[0][f](envptr, ...)
-	end
-end
-
--- I need to find a consistent name scheme to separate JNI API calls from my own wrappers of them...
--- these are methods I had defined which now just do what the C API did:
-JNIEnv._getObjectClass = JNIEnv._capiGetObjectClass
-JNIEnv._findClass = JNIEnv._capiFindClass
-JNIEnv._deleteLocalRef = JNIEnv._capiDeleteLocalRef
-JNIEnv._getVersion = JNIEnv._capiGetVersion
-JNIEnv._exceptionClear = JNIEnv._capiExceptionClear
-JNIEnv._newObject = JNIEnv._capiNewObject
-
 ---------------- JNI C API but with minimal arg tweaks ----------------
 
 -- use this wth a jobject
 function JNIEnv:throw(e)
-	return self:_capiThrow(e._ptr)
-end
-
--- use this with a jclass
-function JNIEnv:_throwNew(cl)
-	return self:_capiThrowNew(cl._ptr)
+	return self:_throw(e._ptr)
 end
 
 ---------------- SUPPORT FUNCTIONS ----------------
@@ -716,7 +462,7 @@ function JNIEnv:_getException()
 	-- so during startup all exceptions just get deferred
 	if self._ignoringExceptions then return end
 
-	local jthrowable = self:_capiExceptionOccurred()
+	local jthrowable = self:_exceptionOccurred()
 	if jthrowable == nil then return nil end
 
 --DEBUG:print('got exception', jthrowable)
@@ -918,9 +664,9 @@ function JNIEnv:_canConvertLuaToJavaArg(arg, sig)
 			local jclass = self:_getObjectClass(jobject)
 			local result
 			if jclass == self._java_lang_Class._ptr then
-				result = 0 ~= self:_capiIsAssignableFrom(jobject, toClassObj._ptr)
+				result = 0 ~= self:_isAssignableFrom(jobject, toClassObj._ptr)
 			else
-				result = 0 ~= self:_capiIsAssignableFrom(jclass, toClassObj._ptr)
+				result = 0 ~= self:_isAssignableFrom(jclass, toClassObj._ptr)
 			end
 			self:_deleteLocalRef(jclass)
 
@@ -1147,7 +893,7 @@ function JNIEnv:_loadClass(asm, newClassName)
 
 		local loader = self.Thread:currentThread():getContextClassLoader()
 		self:_checkExceptions()
-		local jclass = self:_capiDefineClass(
+		local jclass = self:_defineClass(
 			newClassNameSlashSep,
 			loader._ptr,
 			code,
@@ -1285,6 +1031,250 @@ assert.eq(true, env._ignoringExceptions)
 
 --DEBUG:print('Name __index', k, 'classpath', classpath)
 	return Name{env=env, name=classpath}
+end
+
+
+---------------- JNIEnv WRAPPER ----------------
+-- just to save on one extra arg passing every single time...
+-- do this last and make sure I'm not overwriting any method I just defined...
+
+for f in ([[
+GetVersion
+DefineClass
+FindClass
+FromReflectedMethod
+FromReflectedField
+ToReflectedMethod
+GetSuperclass
+IsAssignableFrom
+ToReflectedField
+Throw
+ThrowNew
+ExceptionOccurred
+ExceptionDescribe
+ExceptionClear
+FatalError
+PushLocalFrame
+PopLocalFrame
+NewGlobalRef
+DeleteGlobalRef
+DeleteLocalRef
+IsSameObject
+NewLocalRef
+EnsureLocalCapacity
+AllocObject
+NewObject
+NewObjectV
+NewObjectA
+GetObjectClass
+IsInstanceOf
+GetMethodID
+CallObjectMethod
+CallObjectMethodV
+CallObjectMethodA
+CallBooleanMethod
+CallBooleanMethodV
+CallBooleanMethodA
+CallByteMethod
+CallByteMethodV
+CallByteMethodA
+CallCharMethod
+CallCharMethodV
+CallCharMethodA
+CallShortMethod
+CallShortMethodV
+CallShortMethodA
+CallIntMethod
+CallIntMethodV
+CallIntMethodA
+CallLongMethod
+CallLongMethodV
+CallLongMethodA
+CallFloatMethod
+CallFloatMethodV
+CallFloatMethodA
+CallDoubleMethod
+CallDoubleMethodV
+CallDoubleMethodA
+CallVoidMethod
+CallVoidMethodV
+CallVoidMethodA
+CallNonvirtualObjectMethod
+CallNonvirtualObjectMethodV
+CallNonvirtualObjectMethodA
+CallNonvirtualBooleanMethod
+CallNonvirtualBooleanMethodV
+CallNonvirtualBooleanMethodA
+CallNonvirtualByteMethod
+CallNonvirtualByteMethodV
+CallNonvirtualByteMethodA
+CallNonvirtualCharMethod
+CallNonvirtualCharMethodV
+CallNonvirtualCharMethodA
+CallNonvirtualShortMethod
+CallNonvirtualShortMethodV
+CallNonvirtualShortMethodA
+CallNonvirtualIntMethod
+CallNonvirtualIntMethodV
+CallNonvirtualIntMethodA
+CallNonvirtualLongMethod
+CallNonvirtualLongMethodV
+CallNonvirtualLongMethodA
+CallNonvirtualFloatMethod
+CallNonvirtualFloatMethodV
+CallNonvirtualFloatMethodA
+CallNonvirtualDoubleMethod
+CallNonvirtualDoubleMethodV
+CallNonvirtualDoubleMethodA
+CallNonvirtualVoidMethod
+CallNonvirtualVoidMethodV
+CallNonvirtualVoidMethodA
+GetFieldID
+GetObjectField
+GetBooleanField
+GetByteField
+GetCharField
+GetShortField
+GetIntField
+GetLongField
+GetFloatField
+GetDoubleField
+SetObjectField
+SetBooleanField
+SetByteField
+SetCharField
+SetShortField
+SetIntField
+SetLongField
+SetFloatField
+SetDoubleField
+GetStaticMethodID
+CallStaticObjectMethod
+CallStaticObjectMethodV
+CallStaticObjectMethodA
+CallStaticBooleanMethod
+CallStaticBooleanMethodV
+CallStaticBooleanMethodA
+CallStaticByteMethod
+CallStaticByteMethodV
+CallStaticByteMethodA
+CallStaticCharMethod
+CallStaticCharMethodV
+CallStaticCharMethodA
+CallStaticShortMethod
+CallStaticShortMethodV
+CallStaticShortMethodA
+CallStaticIntMethod
+CallStaticIntMethodV
+CallStaticIntMethodA
+CallStaticLongMethod
+CallStaticLongMethodV
+CallStaticLongMethodA
+CallStaticFloatMethod
+CallStaticFloatMethodV
+CallStaticFloatMethodA
+CallStaticDoubleMethod
+CallStaticDoubleMethodV
+CallStaticDoubleMethodA
+CallStaticVoidMethod
+CallStaticVoidMethodV
+CallStaticVoidMethodA
+GetStaticFieldID
+GetStaticObjectField
+GetStaticBooleanField
+GetStaticByteField
+GetStaticCharField
+GetStaticShortField
+GetStaticIntField
+GetStaticLongField
+GetStaticFloatField
+GetStaticDoubleField
+SetStaticObjectField
+SetStaticBooleanField
+SetStaticByteField
+SetStaticCharField
+SetStaticShortField
+SetStaticIntField
+SetStaticLongField
+SetStaticFloatField
+SetStaticDoubleField
+NewString
+GetStringLength
+GetStringChars
+ReleaseStringChars
+NewStringUTF
+GetStringUTFLength
+GetStringUTFChars
+ReleaseStringUTFChars
+GetArrayLength
+NewObjectArray
+GetObjectArrayElement
+SetObjectArrayElement
+NewBooleanArray
+NewByteArray
+NewCharArray
+NewShortArray
+NewIntArray
+NewLongArray
+NewFloatArray
+NewDoubleArray
+GetBooleanArrayElements
+GetByteArrayElements
+GetCharArrayElements
+GetShortArrayElements
+GetIntArrayElements
+GetLongArrayElements
+GetFloatArrayElements
+GetDoubleArrayElements
+ReleaseBooleanArrayElements
+ReleaseByteArrayElements
+ReleaseCharArrayElements
+ReleaseShortArrayElements
+ReleaseIntArrayElements
+ReleaseLongArrayElements
+ReleaseFloatArrayElements
+ReleaseDoubleArrayElements
+GetBooleanArrayRegion
+GetByteArrayRegion
+GetCharArrayRegion
+GetShortArrayRegion
+GetIntArrayRegion
+GetLongArrayRegion
+GetFloatArrayRegion
+GetDoubleArrayRegion
+SetBooleanArrayRegion
+SetByteArrayRegion
+SetCharArrayRegion
+SetShortArrayRegion
+SetIntArrayRegion
+SetLongArrayRegion
+SetFloatArrayRegion
+SetDoubleArrayRegion
+RegisterNatives
+UnregisterNatives
+MonitorEnter
+MonitorExit
+GetJavaVM
+GetStringRegion
+GetStringUTFRegion
+GetPrimitiveArrayCritical
+ReleasePrimitiveArrayCritical
+GetStringCritical
+ReleaseStringCritical
+NewWeakGlobalRef
+DeleteWeakGlobalRef
+ExceptionCheck
+NewDirectByteBuffer
+GetDirectBufferAddress
+GetDirectBufferCapacity
+GetObjectRefType
+]]):gmatch'%S+' do
+	local k = '_'..f:sub(1,1):lower()..f:sub(2)
+	assert.eq(JNIEnv[k], nil, k)
+	JNIEnv[k] = function(self, ...)
+		local envptr = self._ptr
+		return envptr[0][f](envptr, ...)
+	end
 end
 
 return JNIEnv

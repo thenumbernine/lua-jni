@@ -633,7 +633,7 @@ function JavaClass:_name()
 end
 
 function JavaClass:_throwNew()
-	self._env:_throwNew(self)
+	self._env:_throwNew(self._ptr)
 end
 
 function JavaClass:__index(k)
