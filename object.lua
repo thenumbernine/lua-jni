@@ -245,12 +245,13 @@ function JavaObject:__index(k)
 
 	if k == 'super' then
 		-- same but with super as the classObj...
-		-- TODO TODO this method won't extend to multiple .super.super's ... hmm ...
 		return JavaObject{
 			env = self._env,
 			ptr = self._ptr,
 			classpath = self._classpath,
-			classObj = self:_getClass():_super(),
+			classObj = self._classObj
+				and self._classObj:_super()
+				or self:_getClass():_super(),
 		}
 	end
 
