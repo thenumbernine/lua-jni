@@ -271,7 +271,7 @@ I think nobody of competence came up with Android's spec.  Especially their segf
 		if jclass == nil then
 			-- I think this throws an exception?
 			local ex = self:_getException()
-			return nil, 'failed to find class '..tostring(classpath), ex
+			return nil, 'failed to find class '..tostring(classpath)..': '..tostring(ex), ex
 		end
 		classObj = self:_saveJClassForClassPath{
 			ptr = jclass,

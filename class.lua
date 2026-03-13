@@ -490,7 +490,7 @@ function JavaClass:_field(args)
 	end
 	if jfieldID == nil then
 		local ex = env:_getException()
-		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(isStatic and ' static' or ''), ex
+		return nil, "failed to find jfieldID="..tostring(fieldname)..' sig='..tostring(sig)..(isStatic and ' static' or '')..': '..tostring(ex), ex
 	end
 
 	args.env = env

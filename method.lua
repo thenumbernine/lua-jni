@@ -163,7 +163,7 @@ function JavaMethod:_new(classObj, ...)
 	)
 	if jobject == nil then 	-- uhm when would this be?
 		local ex = env:_getException()
-		return nil, 'failed to call ctor sig='..require 'ext.tolua'(self._sig), ex
+		return nil, 'failed to call ctor sig='..require 'ext.tolua'(self._sig)..': '..tostring(ex), ex
 	end
 	-- fun fact, for java the ctor has return signature 'void'
 	-- which means the self._sig[1] won't hvae the expected classpath
