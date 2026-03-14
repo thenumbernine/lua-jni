@@ -400,6 +400,12 @@ function JavaClass:_setupReflection()
 
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
+
+	-- this won't go wrong, will it?
+	local jsuper = env:_getSuperclass(self._ptr)
+	if jsuper then
+		self.super = env:_fromJClass(jsuper)
+	end
 end
 
 -- equivalent of .class
@@ -526,12 +532,6 @@ end
 
 function JavaClass:__call(...)
 	return self:_new(...)
-end
-
-function JavaClass:_super()
-	local env = self._env
-	local jsuper = env:_getSuperclass(self._ptr)
-	return env:_fromJClass(jsuper)
 end
 
 -- idk that theres an equivalent operator in java?

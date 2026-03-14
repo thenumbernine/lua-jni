@@ -129,6 +129,8 @@ print('this.super', this.super)
 		},
 	},
 }
+print('Test2.super', Test2.super)
+print('Test2.super == Test', Test2.super == Test)
 local test2 = Test2()
 print('test2.baz', test2.baz)
 print('test2.testFunc', test2:testFunc('here'))

@@ -53,8 +53,8 @@ local doubleArr = J:_newArray('double', 5)
 print('doubleArr', doubleArr)
 print('doubleArr:_getClass()', doubleArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
 print('doubleArr._getClass()._name()', doubleArr:_getClass():_name())	-- "double[]"
-print('doubleArr:_getClass():_super()', doubleArr:_getClass():_super())
---print('doubleArr:_super()', doubleArr:_super())
+print('doubleArr:_getClass().super', doubleArr:_getClass().super)
+--print('doubleArr.super', doubleArr.super)
 
 doubleArr[2] = 2*math.pi
 print('doubleArr[2]', doubleArr[2])
@@ -79,7 +79,7 @@ print('charArr:_getClass()._fields.length', charArr:_getClass()._fields.length)
 print('charArr:_getClass()._methods.length', charArr:_getClass()._methods.length)
 print('charArr:_getClass()', charArr:_getClass())	-- wait, this returns "char[]", probably because that was given to jniEnv to create the array
 print('charArr:_getClass():_name()', charArr:_getClass():_name())
-print('charArr:_getClass():_super()', charArr:_getClass():_super())
+print('charArr:_getClass().super', charArr:_getClass().super)
 --print('J.Array', J.Array)
 
 

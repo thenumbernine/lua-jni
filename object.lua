@@ -250,8 +250,8 @@ function JavaObject:__index(k)
 			ptr = self._ptr,
 			classpath = self._classpath,
 			classObj = self._classObj
-				and self._classObj:_super()
-				or self:_getClass():_super(),
+				and self._classObj.super
+				or self:_getClass().super,
 		}
 	end
 

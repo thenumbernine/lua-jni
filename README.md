@@ -135,8 +135,11 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `env` = `JNIEnv`
 - - `ptr` = `jobject`
 - - `classpath` = string
+- - `classObj` = optional, JavaObject used for nonvirtual call-scope restriction.
 
 - `cl = obj:_getClass()` = get class
+
+- `obj.super` = returns a JavaObject with non-virtual call scope restriction to the superclass. 
 
 - `bool = obj:instanceof(classTo)` = tests if it can cast, returns boolean.
 
@@ -180,7 +183,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_name()` = returns the classpath of the object, using Java's `class.getTypeName()` method.
 
-- `cl:_super()` = returns a JavaClass of the superclass.
+- `cl.super` = returns a JavaClass of the superclass.
 
 - `cl:_throwNew()` = throw a new instance of this class.
 
