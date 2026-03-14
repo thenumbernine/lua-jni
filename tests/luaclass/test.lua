@@ -4,7 +4,7 @@ local assert = require 'ext.assert'
 local J = require 'java'
 
 local Test = J.Object:_subclass{
-	name = 'TestStatic',
+	name = 'Test',
 	fields = {
 		{		-- key=seq int, value=table, use as properties for JavaASMClass
 			name = 'moo',
@@ -14,6 +14,7 @@ local Test = J.Object:_subclass{
 		bar = 'java.lang.String',
 		baz = {
 			isStatic = true,
+			isPublic = true,
 			-- NOTICE I am initializing values as field's ConstantValue attribute
 			-- but it looks like javac initializes values as <clinit> assignment
 			value = {tag='long', value=137},	-- structure used by JavaASMClass
@@ -21,15 +22,23 @@ local Test = J.Object:_subclass{
 		},
 		doo = {				-- key=string value=table, use name for key, and the rest of the value properties
 			isStatic = true,
+			isPublic = true,
 			sig = 'double[]',
 		},
 		'loo',	-- key=seq int, value=string, use name for value
+		
+		{
+			name = 'privateVar',
+			sig = 'int',
+			isPrivate = true,
+		},
 	},
 	ctors = {
 		function(this)
 			print"in custom ctor #1!"
 		end,
 		{
+			isPublic = true,
 			sig = {'void', 'double'},
 			value = function(this, x)
 				print("in custom ctor #2 with double", x)
@@ -43,6 +52,7 @@ local Test = J.Object:_subclass{
 		end,
 -- [=[		
 		testFunc = {
+			isPublic = true,
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
 			value = function(this, ...)
 				print('this=', this)
@@ -65,6 +75,7 @@ local Test = J.Object:_subclass{
 		{
 			name = 'testStatic',
 			isStatic = true,
+			isPublic = true,
 			sig = {'void', 'double'},
 			value = function(...)
 				print('in static Test.testStatic with args:', ...)
@@ -120,6 +131,7 @@ test:testStatic(math.pi)
 local Test2 = Test:_subclass{
 	methods = {
 		testFunc = {
+			isPublic = true,
 			sig = {'double', 'java.lang.String'},
 			value = function(this, s)
 print('this', this)

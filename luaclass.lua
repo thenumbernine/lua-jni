@@ -209,6 +209,7 @@ function M:run(args)
 					field = {
 						name = key,
 						sig = field,
+						isPublic = true,
 					}
 				else
 					-- string = table <=> name = properties
@@ -224,10 +225,19 @@ function M:run(args)
 				field = {
 					name = field,
 					sig = 'java.lang.Object',
+					isPublic = true,
 				}
 			end
 			assert.type(field, 'table')
-			if field.isPublic == nil then field.isPublic = true end
+
+			--[[ default.  i know i should let this fall back on package-scope i.e. no public/private/protected.  meh.
+			if field.isPublic == nil
+			and field.isPrivate == nil
+			and field.isProtected == nil
+			then
+				field.isPublic = true
+			end
+			--]]
 
 			field.name = assert.type(assert.index(field, 'name'), 'string')
 
@@ -303,6 +313,7 @@ return
 			if type(ctor) == 'function' then
 				ctor = {
 					value = ctor,
+					isPublic = true,
 				}
 			end
 
@@ -417,12 +428,14 @@ return
 				code:insert{'return'}	-- no return type
 			end
 
+			--[[ default.  i know i should let this fall back on package-scope i.e. no public/private/protected.  meh.
 			if ctor.isPublic == nil
 			and ctor.isPrivate == nil
 			and ctor.isProtected == nil
 			then
-				ctor.isPublic = true 	--- default.  i know i should let this fall back on package-scope i.e. no public/private/protected.  meh.
+				ctor.isPublic = true
 			end
+			--]]
 
 			ctor.value = nil
 			ctor.code = code
@@ -440,7 +453,8 @@ return
 				if type(method) == 'function' then
 					method = {
 						name = key,
-						value = method
+						value = method,
+						isPublic = true,
 					}
 				else
 					assert.type(method, 'table')
@@ -452,12 +466,16 @@ return
 			assert.type(method, 'table')
 
 			method.isNative = true
+
+			--[[ default.  i know i should let this fall back on package-scope i.e. no public/private/protected.  meh.
 			if method.isPublic == nil
 			and method.isPrivate == nil
 			and method.isProtected == nil
 			then
 				method.isPublic = true
 			end
+			--]]
+
 			method.code = nil
 			asmClassArgs.methods:insert(method)
 
