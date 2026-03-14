@@ -11,6 +11,7 @@ local java_util = require 'java.util'
 local prims = java_util.prims
 local infoForPrims = java_util. infoForPrims
 local getJNISig = java_util.getJNISig
+local sigStrToObj = java_util.sigStrToObj
 local toSlashSepName = java_util.toSlashSepName
 
 local jboolean = ffi.typeof'jboolean'	-- uint8_t
@@ -353,6 +354,11 @@ function JNIEnv:_getJClassClasspath(jclass)
 	if jstringClasspath == nil then return nil end
 	local classpath = self:_fromJString(jstringClasspath)
 	self:_deleteLocalRef(jstringClasspath)
+
+	-- if Class.getType returns it in JNI style (which I guess it should?  but it isn't in Android?) then convert it back.
+	if classpath:match';$' then
+		classpath = sigStrToObj(classpath)
+	end
 	return classpath
 end
 

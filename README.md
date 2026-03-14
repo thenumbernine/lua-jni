@@ -404,8 +404,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 - generics
 - I'm not building proper reflection for arrays I think ... I'm using getFields()/getMethods(), but then I still have to explicitly grab the default ctor or the toString(), so maybe I should use getDeclaredFields()/getDeclaredMethods() and then manaully search inheritence myself? But then should I be caching the class tree refs to parent myself too?
 - call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
-- maybe make a specific `java.thread` subclass centered around [`lua-thread`](http://github.com/thenumbernine/lua-thread)'s "thread.lite", but honesty it is slim enough that I don't see the reason why.
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? Then there's no more need for JavaLuaClass ...
 - type-inference in text-based assembler
 - TODO dex assembler methods, maybe use android studio disasm's `invoke-direct {args...} Lclass/path;->functionname(methodig)return`
-- reduce temp objects created, delete as often as possible.
