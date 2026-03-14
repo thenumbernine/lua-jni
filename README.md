@@ -135,7 +135,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 - - `env` = `JNIEnv`
 - - `ptr` = `jobject`
 - - `classpath` = string
-- - `classObj` = optional, JavaObject used for nonvirtual call-scope restriction.
+- - `nonvirtClass` = optional, JavaObject used for nonvirtual call-scope restriction.
 
 - `cl = obj:_getClass()` = get class
 
@@ -241,7 +241,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `result = method(...)` = call on the method using C API `JNIEnv.Call*Method`.
 
-- `result = method:callNonVirtual(thisObj, classObj, ...)` = call the method using C API `JNIEnv.CallNonvirtual*Method`.
+- `result = method:callForClass(thisObj, classObj, ...)` = call the method using C API `JNIEnv.CallNonvirtual*Method`.
 
 - `obj = method:_new(...)` = for constructor methods, calls C API `JNIEnv.NewObject` on this method.
 

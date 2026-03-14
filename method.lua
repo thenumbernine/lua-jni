@@ -65,7 +65,7 @@ thisOrClass = this or class depending whether its member or static method
 nonVirtualClass = nil, unless this is a non-virtual call, then set it to the class to call from
 ... = args to be converted from Lua to Java
 --]]
-function JavaMethod:callNonVirtual(thisOrClass, nonVirtualClass, ...)
+function JavaMethod:callForClass(thisOrClass, nonVirtualClass, ...)
 	local env = self._env
 
 	-- I don't want to clear exceptions
@@ -172,7 +172,7 @@ function JavaMethod:callNonVirtual(thisOrClass, nonVirtualClass, ...)
 end
 
 function JavaMethod:__call(thisOrClass, ...)
-	return self:callNonVirtual(thisOrClass, nil, ...)
+	return self:callForClass(thisOrClass, nil, ...)
 end
 
 -- calls in Java `new classObj(...)`

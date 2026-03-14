@@ -15,14 +15,14 @@ function JavaCallResolve:init(args)
 	self._name = args.name
 	self._caller = args.caller
 	self._options = args.options
-	self._classObj = args.classObj	-- optional, specify for non-virtual calls
+	self._nonvirtClass = args.nonvirtClass	-- optional, specify for non-virtual calls
 end
 
 function JavaCallResolve:__call(thisOrClass, ...)
 	-- TODO don't convert ... twice from Lua to Java
 	local bestOption = assert(JavaCallResolve.resolve(self._name, self._options, thisOrClass, ...))
-	if self._classObj then
-		return bestOption:callNonVirtual(thisOrClass, self._classObj, ...)
+	if self._nonvirtClass then
+		return bestOption:callForClass(thisOrClass, self._nonvirtClass, ...)
 	else
 		return bestOption(thisOrClass, ...)
 	end

@@ -61,7 +61,7 @@ function JavaObject:init(args)
 	-- This is an optional arg that specifies to use non-virtual
 	-- Keep it nil for dynamic access
 	-- Maybe later I'll keep this always and have a flag for 'isNonVirtual' or something idk
-	self._classObj = args.classObj
+	self._nonvirtClass = args.nonvirtClass
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
@@ -249,8 +249,8 @@ function JavaObject:__index(k)
 			env = self._env,
 			ptr = self._ptr,
 			classpath = self._classpath,
-			classObj = self._classObj
-				and self._classObj.super
+			nonvirtClass = self._nonvirtClass
+				and self._nonvirtClass.super
 				or self:_getClass().super,
 		}
 	end
@@ -283,7 +283,7 @@ function JavaObject:__index(k)
 			name = k,
 			caller = self,
 			options = methodsForName,
-			classObj = self._classObj,
+			nonvirtClass = self._nonvirtClass,
 		}
 	end
 end
