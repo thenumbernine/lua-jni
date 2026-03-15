@@ -129,17 +129,27 @@ function JNIEnv:init(args)
 		name = 'getModifiers',
 		sig = {'int'},
 	})
-	self._java_lang_Class._java_lang_Class_getFields = assert(self._java_lang_Class:_method{
-		name = 'getFields',
+	self._java_lang_Class._java_lang_Class_getDeclaredFields = assert(self._java_lang_Class:_method{
+		name = 'getDeclaredFields',
 		sig = {'java.lang.reflect.Field[]'},
 	})
-	self._java_lang_Class._java_lang_Class_getMethods = assert(self._java_lang_Class:_method{
-		name = 'getMethods',
+	self._java_lang_Class._java_lang_Class_getDeclaredMethods = assert(self._java_lang_Class:_method{
+		name = 'getDeclaredMethods',
 		sig = {'java.lang.reflect.Method[]'},
 	})
-	self._java_lang_Class._java_lang_Class_getConstructors = assert(self._java_lang_Class:_method{
-		name = 'getConstructors',
+	self._java_lang_Class._java_lang_Class_getDeclaredConstructors = assert(self._java_lang_Class:_method{
+		name = 'getDeclaredConstructors',
 		sig = {'java.lang.reflect.Constructor[]'},
+	})
+	--[[
+	self._java_lang_Class._java_lang_Class_getDeclaredClasses = assert(self._java_lang_Class:_method{
+		name = 'getDeclaredClasses',
+		sig = {'java.lang.Class[]'},
+	})
+	--]]
+	self._java_lang_Class._java_lang_Class_getInterfaces = assert(self._java_lang_Class:_method{
+		name = 'getInterfaces',
+		sig = {'java.lang.Class[]'},
 	})
 
 	self._java_lang_reflect_Field = self:import'java.lang.reflect.Field'

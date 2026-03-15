@@ -268,15 +268,33 @@ function JavaObject:__index(k)
 	local classObj = self:_getClass()
 --DEBUG:print('here', classObj._classpath)
 --DEBUG:print(require'ext.table'.keys(classObj._fields):sort():concat', ')
-	local fieldsForName = classObj._fields[k]
+	local fieldsForName = rawget(classObj, '_fields')[k]
 	if fieldsForName then
 		local field = fieldsForName[1]
 		return field:_get(self)	-- call the getter of the field
 	end
 
 --DEBUG:print(require'ext.table'.keys(classObj._methods):sort():concat', ')
-	local methodsForName = classObj._methods[k]
-	if methodsForName then
+	-- TODO this is now ugly
+	-- but the old CallResolve accepts a table of options, so here it is
+	-- (but I'll change so it can consider parent class dist)
+	-- but I can't get rid of it cuz I need to detect due to class handling both methods and inner classes
+	-- but I could get around that with 'getDeclaredClasses' ...
+--[[
+	local methodsForName = table()
+	do
+		local cl = classObj
+		while cl do
+			local methods = rawget(cl, '_methods')[k]
+			if methods then methodsForName:append(methods) end
+			cl = cl.super
+		end
+	end
+--]]
+-- [[
+	local methodsForName = rawget(classObj, '_methods')[k]
+--]]
+	if methodsForName and #methodsForName > 0 then
 --DEBUG:print('#methodsForName', k, #methodsForName)
 		-- now our choice of methodsForName[] will depend on the calling args...
 		return JavaCallResolve{

@@ -183,7 +183,7 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_name()` = returns the classpath of the object, using Java's `class.getTypeName()` method.
 
-- `cl.super` = returns a JavaClass of the superclass.
+- `cl.super` = JavaClass of the superclass.
 
 - `cl:_throwNew()` = throw a new instance of this class.
 
@@ -191,17 +191,17 @@ Notice however there is a limitation to this.  JNI defines `jchar` as C `int`, s
 
 - `cl:_class()` = the method underlying `cl.class`.
 
+- `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
+
+- `cl._fields[name][index]` = list of JavaField containing jfieldIDs with that name.
+- `cl._methods[name][index]` = list of JavaMethod containing jmethodIDs with that name.
+- `cl._interfaces[index]` = list of JavaClass interfaces of this class.
+
 - `cl:_subclass(args)` = builds a JavaLuaClass subclass using this class's JNIEnv and this class as either a parent-class or interface.
 
 - `cl:_cbClass(func, [newLuaState])` = build a Java subclass of this class with the `_samMethod` overridden.
 
 - `cl:_cb(func, [newLuaState])` = for single-abstract-method classes, create a subclass that calls the function and return a `JavaObject` instance of that anonymous subclass.  Pass `newLuaState` to the method upon creation, i.e. set it to `true` to use this method in separate threads.
-
-- `cl:_isAssignableFrom(classTo)` = same as testing a class's instance's instanceof the `classTo`.
-
-- `cl._fields[name][index]` = JavaField of list of jfieldIDs with that name.
-- `cl._methods[name][index]` = JavaMethod of a list of jmethodIDs with that name.
-- `cl._ctors[index]` = list of JavaMethods of ctors.
 
 - `cl:_method(args)` = returns a `JavaMethod` object for a `jmethodID`.
 - args:
@@ -402,7 +402,6 @@ The `java.ffi.jni` file is [`lua-include`](https://github.com/thenumbernine/incl
 # TODO
 
 - generics
-- I'm not building proper reflection for arrays I think ... I'm using getFields()/getMethods(), but then I still have to explicitly grab the default ctor or the toString(), so maybe I should use getDeclaredFields()/getDeclaredMethods() and then manaully search inheritence myself? But then should I be caching the class tree refs to parent myself too?
 - call resolve score should consider subclass distances instead of just IsAssignableFrom.  See the note on caching the whole inheritence structure.
 - make JavaASMClass fields and methods key by name optional.  and value by signature optional? Then there's no more need for JavaLuaClass ...
 - type-inference in text-based assembler

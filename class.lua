@@ -33,12 +33,15 @@ function JavaClass:init(args)
 
 	self._classpath = assert.index(args, 'classpath')
 
+	self.super = false
+
 	-- locking namespace for java name resolve,
 	-- so define all to-be-used variables here,
 	-- even as 'false' for the if-exists tests to fail:
 	self._fields = {}		-- self._fields[fieldname][index] = JavaField
 	self._methods = {}		-- self._methods[fieldname][index] = JavaMethod
-	self._ctors = table()	-- self._ctors[index] = JavaMethod
+	--self._childClasses = {}	-- self._childClasses[classname] = JavaClass
+	self._interfaces = table()
 
 	-- TODO save ctors, methods, and fields separately?
 	-- then no need to class-detect upon __index...
@@ -86,17 +89,19 @@ function JavaClass:init(args)
 			and not k:match'^_'
 			--]]
 			then
-				local fieldsForName = self._fields[k]
+				local fieldsForName = rawget(self, '_fields')[k]
 				if fieldsForName then
 					local field = fieldsForName[1]
 					assert(field._isStatic, "classes can't write to member fields")
 					return field:_set(self, v)	-- call the setter of the field
 				end
 
+				--[[ meh?
 				local methodsForName = self._methods[k]
 				if methodsForName then
 					error("can't overwrite a Java method "..k)
 				end
+				--]]
 				--[[ write protect and only allow _ lua vars
 				error("JavaClass.__newindex("..tostring(k)..', '..tostring(v).."): object is write-protected -- can't write private members afer creation")
 				--]]
@@ -109,11 +114,6 @@ function JavaClass:init(args)
 end
 
 -- call this after creating JavaClass to fill its reflection contents
--- TODO this is using getFields and getMethods
--- should I use getDeclaredFields and getDeclaredMethods ?
---	yes, because that can get private ones as well, and then I can change their accessibility at runtime.
---  and also I can better calculate subclass distance for better calculating correct overload signature to use.
--- TODO use JNI invokes throughout here so I don't need to worry about my own Lua object cache / construction stuff going on
 function JavaClass:_setupReflection()
 	local env = self._env
 
@@ -125,27 +125,21 @@ function JavaClass:_setupReflection()
 
 --DEBUG:print('calling setupReflect on', self._classpath)
 
+	local _ctors = table()	-- _ctors[index] = JavaMethod
+	self._methods['<init>'] = _ctors
+
 	local java_lang_Class = env._java_lang_Class
 	local java_lang_reflect_Field = env._java_lang_reflect_Field
 	local java_lang_reflect_Method = env._java_lang_reflect_Method
 	local java_lang_reflect_Constructor = env._java_lang_reflect_Constructor
 
-	local jobjectFields = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getFields._ptr)
-	local numFields = env:_getArrayLength(jobjectFields)
-
-	local jobjectMethods = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getMethods._ptr)
-	local numMethods = env:_getArrayLength(jobjectMethods)
-
-	-- manually handling memory during _setupReflection()
-	local jobjectCtors = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getConstructors._ptr)
-	local numCtors = env:_getArrayLength(jobjectCtors)
-
---DEBUG:print(self._classpath..' has '..numFields..' fields and '..numMethods..' methods and '..numCtors..' constructors')
-
 	-- now convert the fields/methods into a key-based lua-table to integer-based lua-table for each name ...
+	local jobjectFields = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getDeclaredFields._ptr)
 	if jobjectFields == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get fields from class '..self._classpath..'\n')
 	else
+		local numFields = env:_getArrayLength(jobjectFields)
+--DEBUG:print('...# fields', numFields)
 		for i=0,numFields-1 do
 			-- Field
 			local field = env:_getObjectArrayElement(jobjectFields, i)
@@ -154,6 +148,8 @@ function JavaClass:_setupReflection()
 			local jstringName = env:_callObjectMethod(field, java_lang_reflect_Field._java_lang_reflect_Field_getName._ptr)
 			local name = env:_fromJString(jstringName)
 			env:_deleteLocalRef(jstringName)
+
+--DEBUG:print('...field['..i..']='..require 'ext.tolua'(name))
 
 			-- Class
 			local fieldType = env:_callObjectMethod(field, java_lang_reflect_Field._java_lang_reflect_Field_getType._ptr)
@@ -206,9 +202,11 @@ function JavaClass:_setupReflection()
 
 	-- TODO how does name resolution go? fields or methods first?
 	-- I think they shouldn't ever overlap?
+	local jobjectMethods = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getDeclaredMethods._ptr)
 	if jobjectMethods == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get methods from class '..self._classpath..'\n')
 	else
+		local numMethods = env:_getArrayLength(jobjectMethods)
 		for i=0,numMethods-1 do
 			-- Method
 			local method = env:_getObjectArrayElement(jobjectMethods, i)
@@ -217,6 +215,8 @@ function JavaClass:_setupReflection()
 			local jstringName = env:_callObjectMethod(method, java_lang_reflect_Method._java_lang_reflect_Method_getName._ptr)
 			local name = env:_fromJString(jstringName)
 			env:_deleteLocalRef(jstringName)
+
+--DEBUG:print('...got method', name)
 
 			local sig = table()
 
@@ -287,11 +287,13 @@ function JavaClass:_setupReflection()
 	end
 
 	-- can constructors use JNIEnv.FromReflectedMethod ?
+	local jobjectCtors = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getDeclaredConstructors._ptr)
 	if jobjectCtors == nil then
 		io.stderr:write(' !!! DANGER !!! failed to get constructors from class '..self._classpath..'\n')
 	else
 		local ctorname = '<init>'	-- all constructors have the same name
 		local foundDefaultCtor
+		local numCtors = env:_getArrayLength(jobjectCtors)
 		for i=0,numCtors-1 do
 			-- Constructor
 			local method = env:_getObjectArrayElement(jobjectCtors, i)
@@ -351,12 +353,12 @@ function JavaClass:_setupReflection()
 				isSynthetic = 0 ~= bit.band(modifiers, 0x1000),
 			}
 
-			self._ctors:insert(methodObj)
+			_ctors:insert(methodObj)
 --DEBUG:print('constructor['..i..'] = '..tolua(sig))
 		end
 
 		-- another Java quirk: every function has a default no-arg constructor
-		-- but it won't be listed in the java.lang.Class.getConstructors() list
+		-- but it won't be listed in the java.lang.Class.getDeclaredConstructors() list
 		--  unless it was explicitly defined
 		if not foundDefaultCtor then
 --DEBUG:print('getting default ctor of class', self._classpath)
@@ -369,12 +371,27 @@ function JavaClass:_setupReflection()
 			-- can this ever not exist?
 			-- maybe by protecting it or something?
 			if defaultCtorMethod then
-				self._ctors:insert(defaultCtorMethod)
+				_ctors:insert(defaultCtorMethod)
 			end
 		end
 		env:_deleteLocalRef(jobjectCtors)
 	end
 
+	-- TODO do I even want to do this?
+	-- I can't cache the globalref or Android will fill up its globalrefs...
+	-- if I have to lookup the classes by name with classpath$subclassname then why bother even look in advance?
+	--[[
+	local jobjectClasses = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getDeclaredClasses._ptr)
+	if jobjectClasses ~= nil then
+		io.stderr:write(' !!! DANGER !!! failed to get classes from class '..self._classpath..'\n')
+	else
+		local numClasses = env:_getArrayLength(jobjectClasses)
+		for i=0,numClasses-1 do
+			-- just store the names of child classes
+		end
+		env:_deleteLocalRef(jobjectClasses)
+	end
+	--]]
 
 	-- determine if this is a SAM class or not
 	-- Java says don't SAM abstract-classes.  but then there is all of Swing and JavaFX ...
@@ -401,10 +418,50 @@ function JavaClass:_setupReflection()
 	env._ignoringExceptions = pushIgnore
 	env:_exceptionClear()
 
+
+	-- while we're here, I gotta copy all static fields from any interfaces, so I might as well store them too
+	local jobjectInterfaces = env:_callObjectMethod(self._ptr, java_lang_Class._java_lang_Class_getInterfaces._ptr)
+	if jobjectInterfaces ~= nil then
+		local numInterfaces = env:_getArrayLength(jobjectInterfaces)
+		for i=0,numInterfaces-1 do
+			local jobjectIface = env:_getObjectArrayElement(jobjectInterfaces, i)
+			local cl = env:_fromJClass(jobjectIface)
+			self._interfaces:insert(cl)
+			env:_deleteLocalRef(jobjectIface)
+		end
+		env:_deleteLocalRef(jobjectInterfaces)
+	end
+
+
 	-- this won't go wrong, will it?
 	local jsuper = env:_getSuperclass(self._ptr)
-	if jsuper then
-		self.super = env:_fromJClass(jsuper)
+	if jsuper ~= nil then
+		local super = env:_fromJClass(jsuper)
+		self.super = super
+	end
+
+	local function copyMethodsAndFieldsFrom(cl)
+--DEBUG:print('has super', self.super._classpath)
+
+		-- and while we're here, merge super's fields and methods into ours
+
+		-- [[ can I just use the same method?
+		for name,fields in pairs(cl._fields) do
+			self._fields[name] = self._fields[name] or table()
+			self._fields[name]:append(fields)
+		end
+		for name,methods in pairs(cl._methods) do
+			self._methods[name] = self._methods[name] or table()
+			self._methods[name]:append(methods)
+		end
+		--]]
+	end
+
+	if self.super then
+		copyMethodsAndFieldsFrom(self.super)
+	end
+	for _,iface in ipairs(self._interfaces) do
+		copyMethodsAndFieldsFrom(iface)
 	end
 end
 
@@ -510,8 +567,21 @@ function JavaClass:_new(...)
 		return self:_cb(...)
 	end
 
-	local ctors = self._ctors
-	if not ctors or #ctors == 0 then
+--[[
+	local ctors = table()
+	do
+		local cl = self
+		while cl do
+			local methods = rawget(cl, '_methods')['<init>']
+			if methods then ctors:append(methods) end
+			cl = cl.super
+		end
+	end
+--]]
+-- [[
+	local ctors = rawget(self, '_methods')['<init>']
+--]]
+	if not (ctors and #ctors > 0) then
 		error("can't new, no constructors present for "..self._classpath)
 	else
 		-- TODO here and JavaCallResolve, we are translating args multiple times
@@ -597,7 +667,7 @@ function JavaClass:__index(k)
 	-- now check fields/methods
 --DEBUG:print('here', self._classpath)
 --DEBUG:print(require'ext.table'.keys(self._fields):sort():concat', ')
-	local fieldsForName = self._fields[k]
+	local fieldsForName = rawget(self, '_fields')[k]
 	if fieldsForName then
 		-- assert it is a static field?
 		local field = fieldsForName[1]
@@ -605,8 +675,21 @@ function JavaClass:__index(k)
 	end
 
 --DEBUG:print(require'ext.table'.keys(self._methods):sort():concat', ')
-	local methodsForName = self._methods[k]
-	if methodsForName then
+--[[
+	local methodsForName = table()
+	do
+		local cl = self
+		while cl do
+			local methods = rawget(cl, '_methods')[k]
+			if methods then methodsForName:append(methods) end
+			cl = cl.super
+		end
+	end
+--]]
+-- [[ only this class scope
+	local methodsForName = rawget(self, '_methods')[k]
+--]]
+	if methodsForName and #methodsForName > 0 then
 --DEBUG:print('#methodsForName', k, #methodsForName)
 		-- now our choice of methodsForName[] will depend on the calling args...
 		return JavaCallResolve{
@@ -641,6 +724,7 @@ function JavaClass:_cbClass(func, newLuaState)
 			{
 				name = self._samMethod._name,
 				sig = self._samMethod._sig,
+				isPublic = true,
 				value = func,
 				newLuaState = newLuaState,
 			},
