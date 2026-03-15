@@ -61,7 +61,7 @@ function JavaObject:init(args)
 	-- This is an optional arg that specifies to use non-virtual
 	-- Keep it nil for dynamic access
 	-- Maybe later I'll keep this always and have a flag for 'isNonVirtual' or something idk
-	self._nonvirtClass = args.nonvirtClass
+	self._nonvirtClass = args.nonvirtClass or false
 
 	-- set our __newindex last after we're done writing to it
 	local mt = getmetatable(self)
@@ -128,15 +128,23 @@ function JavaObject:_getClass()
 	return cl
 end
 
+--[[
+if we built this object with a non-virtual-method override (i.e. obj.super)
+then call this to get the override first or the class next (i.e. when resolving methods)
+--]]
+function JavaObject:_getClassOrNonVirtOverride()
+	return self._nonvirtClass or self:_getClass()
+end
+
 -- shorthand for self:_getClass():_method(args)
 -- then again, can I pass a jobject to JNIEnv's GetMethodID ?
 function JavaObject:_method(args)
-	return self:_getClass():_method(args)
+	return self:_getClassOrNonVirtOverride():_method(args)
 end
 
 -- shorthand
 function JavaObject:_field(args)
-	return self:_getClass():_field(args)
+	return self:_getClassOrNonVirtOverride():_field(args)
 end
 
 -- calls in java `obj.toString()`
@@ -183,7 +191,7 @@ end
 
 -- TODO maybe I can call this 'instanceof' anyways since its a reserved-word in Java ...
 function JavaObject:instanceof(classTo)
-	return self:_getClass():_isAssignableFrom(classTo)
+	return self:_getClassOrNonVirtOverride():_isAssignableFrom(classTo)
 end
 
 function JavaObject:_cast(classTo)
@@ -249,9 +257,7 @@ function JavaObject:__index(k)
 			env = self._env,
 			ptr = self._ptr,
 			classpath = self._classpath,
-			nonvirtClass = self._nonvirtClass
-				and self._nonvirtClass.super
-				or self:_getClass().super,
+			nonvirtClass = self:_getClassOrNonVirtOverride().super,
 		}
 	end
 
@@ -265,7 +271,7 @@ function JavaObject:__index(k)
 	--]]
 
 	-- now check fields/methods
-	local classObj = self:_getClass()
+	local classObj = self:_getClassOrNonVirtOverride()
 --DEBUG:print('here', classObj._classpath)
 --DEBUG:print(require'ext.table'.keys(classObj._fields):sort():concat', ')
 	local fieldsForName = rawget(classObj, '_fields')[k]
@@ -339,7 +345,7 @@ function JavaObject:__len()
 		-- String is final, so it's ok
 		return env:_getStringLength(self._ptr)
 	else
-		local classObj = self:_getClass()
+		local classObj = self:_getClassOrNonVirtOverride()
 
 		local lengthField = classObj._fields.length
 		if lengthField then

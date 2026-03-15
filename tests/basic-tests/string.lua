@@ -27,7 +27,7 @@ for _,name in ipairs(table.keys(String._fields):sort()) do
 		print('','',option)
 	end
 end
-for _,option in ipairs(String._ctors) do
+for _,option in ipairs(String._methods['<init>']) do
 	print('','',option)
 end
 for _,name in ipairs(table.keys(String._methods):sort()) do
