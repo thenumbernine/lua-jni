@@ -115,7 +115,7 @@ function JavaCallResolve.resolve(name, options, thisOrClass, ...)
 			"failed to find a matching signature for function "..name..'\n'
 			..'options are:\n'
 			..options:mapi(function(option)
-				return '\t'..tolua(option._sig)
+				return '\t'..tolua(option._sig)..(option._class and (' from '..option._class) or '')
 			end):concat'\n'
 	end
 
