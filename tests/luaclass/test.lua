@@ -80,8 +80,16 @@ local Test = J.Object:_subclass{
 			value = function(...)
 				print('in static Test.testStatic with args:', ...)
 			end,
-		}
+		},
 		--]]
+		{
+			name = 'testBool',
+			isPublic = true,
+			sig = {'java.lang.String', 'boolean'},
+			value = function(this, b)
+				return b and 'yes' or 'no'
+			end,
+		},
 --]=]	
 	},
 }
@@ -150,3 +158,6 @@ print('test2.testFunc', test2:testFunc('here'))
 
 print('test2 from ptr', J:_fromJObject(test2._ptr))
 print("test2 from ptr's super", J:_fromJObject(test2._ptr).super)
+
+assert.eq(tostring(test2:testBool(true)), "yes")
+assert.eq(tostring(test2:testBool(false)), "no")
