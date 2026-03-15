@@ -177,6 +177,7 @@ function JavaClass:_setupReflection()
 				ptr = jfieldID,
 				sig = fieldClassPath,
 				name = name,
+				class = self._classpath,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
 				isPrivate = 0 ~= bit.band(modifiers, 2),
@@ -263,6 +264,7 @@ function JavaClass:_setupReflection()
 				env = env,
 				ptr = jmethodID,
 				name = name,
+				class = self._classpath,
 				sig = sig,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
@@ -337,6 +339,7 @@ function JavaClass:_setupReflection()
 				env = env,
 				ptr = jmethodID,
 				name = ctorname,
+				class = self._classpath,
 				sig = sig,
 				-- or just pass the modifiers?
 				isPublic = 0 ~= bit.band(modifiers, 1),
@@ -523,7 +526,7 @@ function JavaClass:_method(args)
 	end
 
 	args.env = env
-	args.class = self
+	args.class = self._classpath
 	args.ptr = jmethodID
 	return JavaMethod(args)
 end
@@ -558,6 +561,7 @@ function JavaClass:_field(args)
 
 	args.env = env
 	args.ptr = jfieldID
+	args.class = self._classpath
 	return JavaField(args)
 end
 

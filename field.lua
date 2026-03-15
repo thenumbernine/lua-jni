@@ -59,6 +59,7 @@ function JavaField:init(args)
 	self._ptr = assert.index(args, 'ptr')		-- cdata
 	self._sig = assert.index(args, 'sig')		-- string
 	self._name = args.name or false				-- optional but save if provided
+	self._class = args.class or false			-- optional but save if provided.  string of class's classpath.
 
 	-- modifiers
 	self._isPublic = not not args.isPublic

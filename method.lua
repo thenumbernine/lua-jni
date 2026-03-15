@@ -39,11 +39,7 @@ function JavaMethod:init(args)
 	self._sig = args.sig or {}					-- sig desc is in require 'java.class' for now
 	self._sig[1] = self._sig[1] or 'void'
 	self._name = args.name or false				-- optional but save if provided
-
-	-- TODO I was holding this to pass to CallStatic*Method calls
-	-- but I geuss the whole idea of the API is that you can switch what class calls a method (so long as its an appropriate interface/subclass/whatever)
-	-- so maybe I don't want .class to be saved.
-	--self._class = assert.index(args, 'class')	-- JavaClass where the method came from ...
+	self._class = args.class or false			-- optional but save if provided.  string of class's classpath.
 
 	-- modifiers
 	self._isPublic = not not args.isPublic
@@ -140,7 +136,7 @@ function JavaMethod:callForClass(thisOrClass, nonVirtualClass, ...)
 		else
 			result = env._ptr[0][callName](
 				env._ptr,
-				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass the class by default?
 				self._ptr,
 				table.unpack(javaArgObjs, 1, jargc)
 			)
@@ -151,7 +147,7 @@ function JavaMethod:callForClass(thisOrClass, nonVirtualClass, ...)
 		if nonVirtualClass then
 			result = env._ptr[0][callName](
 				env._ptr,
-				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass the class by default?
 				nonVirtualClass._ptr,
 				self._ptr,
 				env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
@@ -159,7 +155,7 @@ function JavaMethod:callForClass(thisOrClass, nonVirtualClass, ...)
 		else
 			result = env._ptr[0][callName](
 				env._ptr,
-				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass self._class by default?
+				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass the class by default?
 				self._ptr,
 				env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 			)
