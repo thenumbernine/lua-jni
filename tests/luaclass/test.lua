@@ -26,7 +26,7 @@ local Test = J.Object:_subclass{
 			sig = 'double[]',
 		},
 		'loo',	-- key=seq int, value=string, use name for value
-		
+
 		{
 			name = 'privateVar',
 			sig = 'int',
@@ -50,7 +50,7 @@ local Test = J.Object:_subclass{
 		toString = function(this)
 			return 'from Test.toString()'
 		end,
--- [=[		
+-- [=[
 		testFunc = {
 			isPublic = true,
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
@@ -90,7 +90,7 @@ local Test = J.Object:_subclass{
 				return b and 'yes' or 'no'
 			end,
 		},
---]=]	
+--]=]
 	},
 }
 print(Test.__name)
@@ -163,3 +163,27 @@ assert.eq(tostring(test2:testBool(true)), "yes")
 assert.eq(tostring(test2:testBool(false)), "no")
 assert.eq(tostring(test2:testBool(J.Boolean(true))), "yes")
 assert.eq(tostring(test2:testBool(J.Boolean(false))), "no")
+
+local Test3 = Test2:_subclass{
+	methods = {
+		{
+			name = 'testBool',
+			isPublic = true,
+			sig = {'java.lang.String', 'boolean'},
+			value = function(this, b)
+				return b and 'YES' or 'NO'
+			end,
+		},
+	},
+}
+local test3 = Test3()
+assert.eq(tostring(test3:testBool(true)), "YES")
+assert.eq(tostring(test3:testBool(false)), "NO")
+assert.eq(tostring(test3:testBool(J.Boolean(true))), "YES")
+assert.eq(tostring(test3:testBool(J.Boolean(false))), "NO")
+assert.eq(tostring(test3.super:testBool(true)), "yes")
+assert.eq(tostring(test3.super:testBool(false)), "no")
+assert.eq(tostring(test3.super:testBool(J.Boolean(true))), "yes")
+assert.eq(tostring(test3.super:testBool(J.Boolean(false))), "no")
+
+print'DONE'
