@@ -153,6 +153,8 @@ function JavaMethod:callForClass(thisOrClass, nonVirtualClass, ...)
 				env:_luaToJavaArgs(2, self._sig, ...)	-- TODO sig as well to know what to convert it to?
 			)
 		else
+--DEBUG:print('calling sig', require 'ext.tolua'(self._sig))
+--DEBUG:print('calling with', env:_luaToJavaArgs(2, self._sig, ...))
 			result = env._ptr[0][callName](
 				env._ptr,
 				assert(env:_luaToJavaArg(thisOrClass)),	-- if it's a static method ... hmm should I pass the class by default?

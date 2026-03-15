@@ -9,7 +9,7 @@ local JavaObject = require 'java.object'
 
 local java_util = require 'java.util'
 local prims = java_util.prims
-local infoForPrims = java_util. infoForPrims
+local infoForPrims = java_util.infoForPrims
 local getJNISig = java_util.getJNISig
 local sigStrToObj = java_util.sigStrToObj
 local toSlashSepName = java_util.toSlashSepName
@@ -737,7 +737,9 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 	elseif t == 'table' then
 --DEBUG:print('arg is table, sig is', sig)
 		if sig then
-			if arg._classpath == sig then return arg._ptr end
+			if arg._classpath == sig then
+				return assert(arg._ptr)
+			end
 
 			-- TODO who is calling this without sig anyways?
 -- ALSO TODO
@@ -746,17 +748,20 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 -- which will resolve?
 -- in fact, Object does resolve
 -- so so far so good
-			if isPrimitive[sig] then
+			local info = infoForPrims[sig]
+			if info then
 				if JavaObject:isa(arg) then
 					local unboxedArgType = getUnboxedPrimitiveForClasspath[arg._classpath]
 					if unboxedArgType then
 						local getValueField = assert.index(getUnboxedValueGetterMethod, arg._classpath)
-						return arg[getValueField](arg)
+						local value = arg[getValueField](arg)
+--DEBUG:print('unboxing from', arg, 'to', value)
+						return info.ctype(value)
 					end
 				end
-
 				error("can't cast object to primitive")
 			end
+
 			local nonarraybase = sig:match'^(.*)%['
 			if nonarraybase then
 				if isPrimitive[nonarraybase] then
@@ -765,7 +770,7 @@ function JNIEnv:_luaToJavaArg(arg, sig)
 			end
 		end
 		-- assert it is a cdata
-		return arg._ptr
+		return assert(arg._ptr)
 	elseif t == 'string' then
 		if isPrimitive[sig] then
 			error("can't cast string to primitive")
@@ -848,12 +853,34 @@ function JNIEnv:_luaToJavaArgs(sigIndex, sig, ...)
 		self:_luaToJavaArgs(sigIndex+1, sig, select(2, ...))
 end
 
-function JNIEnv:_javaToLuaArg(value, returnType)
-	if returnType == 'void' then return end
-	if returnType == 'boolean' then
+function JNIEnv:_javaToLuaArg(value, sig)
+	if sig == 'void' then return end
+	if sig == 'boolean' then
+		if type(value) == 'table'
+		and JavaObject:isa(value)
+		and value._classname == 'java.lang.Boolean'
+		then
+			return value:booleanValue()
+		end
 		return value ~= 0
 	end
-	if isPrimitive[returnType] then return value end
+--DEBUG:print('here with sig', sig, 'and value', type(value), value)
+	if isPrimitive[sig] then
+--DEBUG:print('is prim')
+		if type(value) == 'table'
+		and JavaObject:isa(value)
+		then
+--DEBUG:print('here with value', value._classpath)
+			local unboxedSig = getUnboxedPrimitiveForClasspath[value._classname]
+			if unboxedSig
+			--and getPrimWidening(unboxedSig, sig)
+			then
+				return value[unboxedSig..'Value'](value)
+			-- otherwise what?
+			end
+		end
+		return value
+	end
 
 	-- if Java returned null then return Lua nil
 	-- ... if the JNI is returning null object results as NULL pointers ...
@@ -865,7 +892,7 @@ function JNIEnv:_javaToLuaArg(value, returnType)
 	return JavaObject._createObjectForClassPath{
 		env = self,
 		ptr = value,
-		classpath = returnType,
+		classpath = sig,
 	}
 end
 

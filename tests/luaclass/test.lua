@@ -90,6 +90,16 @@ local Test = J.Object:_subclass{
 				return b and 'yes' or 'no'
 			end,
 		},
+		{
+			name = 'testInt',
+			isPublic = true,
+			sig = {'java.lang.String', 'int'},
+			value = function(this, b)
+print('in testInt with', b)
+				return bit.band(b, 1) == 1 and 'odd' or 'even'
+			end,
+		},
+
 --]=]
 	},
 }
@@ -163,6 +173,11 @@ assert.eq(tostring(test2:testBool(true)), "yes")
 assert.eq(tostring(test2:testBool(false)), "no")
 assert.eq(tostring(test2:testBool(J.Boolean(true))), "yes")
 assert.eq(tostring(test2:testBool(J.Boolean(false))), "no")
+
+assert.eq(tostring(test2:testInt(3)), "odd")
+assert.eq(tostring(test2:testInt(4)), "even")
+assert.eq(tostring(test2:testInt(J.Integer(5))), "odd")
+assert.eq(tostring(test2:testInt(J.Integer(6))), "even")
 
 local Test3 = Test2:_subclass{
 	methods = {

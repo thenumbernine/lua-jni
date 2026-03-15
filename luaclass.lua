@@ -616,6 +616,9 @@ end
 						thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
 					end
 
+--DEBUG:print('wrapper sig', require 'ext.tolua'(sig))
+--DEBUG:print('wrapper arg type', type((...)))
+--DEBUG:print('wrapper args', ...)
 					local result = func(
 						thisOrClass,
 						env:_javaToLuaArgs(2, sig, ...)
