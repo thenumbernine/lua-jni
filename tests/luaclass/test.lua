@@ -161,3 +161,5 @@ print("test2 from ptr's super", J:_fromJObject(test2._ptr).super)
 
 assert.eq(tostring(test2:testBool(true)), "yes")
 assert.eq(tostring(test2:testBool(false)), "no")
+assert.eq(tostring(test2:testBool(J.Boolean(true))), "yes")
+assert.eq(tostring(test2:testBool(J.Boolean(false))), "no")
