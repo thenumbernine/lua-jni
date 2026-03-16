@@ -400,19 +400,29 @@ function JavaClass:_setupReflection()
 	-- Java says don't SAM abstract-classes.  but then there is all of Swing and JavaFX ...
 	--if self._isInterface then
 	for name,options in pairs(self._methods) do
-		for _,option in ipairs(options) do
-			-- see if the first method we find is abstract...
-			if not self._samMethod then
-				if not option._isAbstract then
-					-- it wasn't abstract, fail
+		if name ~= '<init>'
+		and name ~= '<clinit>'
+		then
+			-- TODO what will this do on inherited appended methods that accumulate from parent classes?
+			for _,option in ipairs(options) do
+				-- see if the first method we find is abstract...
+				if not self._samMethod then
+					if option.isStatic
+					then
+						-- ignore static
+					else
+						if not option._isAbstract then
+							-- it wasn't abstract, fail
+							goto detectSAMDone
+						end
+						-- write our sam method and see if there are more...
+						self._samMethod = option
+					end
+				else
+					-- there were more methods, this isn't SAM, clear it and fail
+					self._samMethod = false
 					goto detectSAMDone
 				end
-				-- write our sam method and see if there are more...
-				self._samMethod = option
-			else
-				-- there were more methods, this isn't SAM, clear it and fail
-				self._samMethod = false
-				goto detectSAMDone
 			end
 		end
 	end
