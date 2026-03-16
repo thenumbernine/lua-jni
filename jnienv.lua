@@ -858,7 +858,7 @@ function JNIEnv:_javaToLuaArg(value, sig)
 	if sig == 'boolean' then
 		if type(value) == 'table'
 		and JavaObject:isa(value)
-		and value._classname == 'java.lang.Boolean'
+		and value._classpath == 'java.lang.Boolean'
 		then
 			return value:booleanValue()
 		end
@@ -871,11 +871,10 @@ function JNIEnv:_javaToLuaArg(value, sig)
 		and JavaObject:isa(value)
 		then
 --DEBUG:print('here with value', value._classpath)
-			local unboxedSig = getUnboxedPrimitiveForClasspath[value._classname]
-			if unboxedSig
-			--and getPrimWidening(unboxedSig, sig)
-			then
-				return value[unboxedSig..'Value'](value)
+			local getValueField = getUnboxedValueGetterMethod[value._classpath]
+			if getValueField then
+				-- if we were going lua->java then I'd cast to the jni ctype here too...
+				return value[getValueField](value)
 			-- otherwise what?
 			end
 		end

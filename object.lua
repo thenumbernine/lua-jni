@@ -346,17 +346,12 @@ function JavaObject:__len()
 		return env:_getStringLength(self._ptr)
 	else
 		local classObj = self:_getClassOrNonVirtOverride()
-
-		local lengthField = classObj._fields.length
-		if lengthField then
-			return lengthField:_get(self)
-		end
-
-		local lengthMethod = classObj._methods.length
-		if lengthMethod then
-			return self:length()	-- JavaCallResolve
-		end
-
+		if classObj._fields.length then return self.length end
+		if classObj._fields.size then return self.size end
+		if classObj._fields.count then return self.count end
+		if classObj._methods.length then return self:length() end
+		if classObj._methods.size then return self:size() end
+		if classObj._methods.count then return self:count() end
 		return 0
 	end
 end
