@@ -512,7 +512,8 @@ local func,
 	jvmPtr,
 	sig,
 	isStatic,
-	classpath = ...
+	classpath,
+	usingAndroidJNI = ...
 
 -- rebuild the JavaVM here, once
 -- but I can't rebuild it without the jnienv
@@ -525,9 +526,11 @@ reg.java_callback = func
 reg.method = {sig=sig, isStatic=isStatic}
 reg.classpath = classpath
 reg.getJVM = function(envPtr)
+	local reg = debug.getregistry()
 	if not reg.jvm then
 		reg.jvm = require 'java.vm'{
 			ptr = jvmPtr,
+			usingAndroidJNI = usingAndroidJNI,
 			jniEnv = {
 				ptr = envPtr,
 			},
@@ -535,13 +538,13 @@ reg.getJVM = function(envPtr)
 	end
 	return reg.jvm
 end
-
 ]],
 	func,	-- convert to bytecode and pass into the child Lua state:
 	env._vm._ptr,
 	method.sig,
 	method.isStatic,
-	classpath)
+	classpath,
+	env._usingAndroidJNI)
 
 					end,
 					-- callback function:
