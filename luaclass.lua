@@ -24,32 +24,6 @@ LiteThread.Lua = LiteThread.Lua:subclass()
 function LiteThread.Lua:__gc() end
 
 
-table.union(infoForPrims.boolean, {
-	asmClassReturnOp = 'ireturn',
-})
-table.union(infoForPrims.char, {
-	asmClassReturnOp = 'ireturn',
-})
-table.union(infoForPrims.byte, {
-	asmClassReturnOp = 'ireturn',
-})
-table.union(infoForPrims.short, {
-	asmClassReturnOp = 'ireturn',
-})
-table.union(infoForPrims.int, {
-	asmClassReturnOp = 'ireturn',
-})
-table.union(infoForPrims.long, {
-	asmClassReturnOp = 'lreturn',
-})
-table.union(infoForPrims.float, {
-	asmClassReturnOp = 'freturn',
-})
-table.union(infoForPrims.double, {
-	asmClassReturnOp = 'dreturn',
-})
-
-
 local function jniTypeForSig(s)
 	if s == 'void 'then return 'void' end
 	if s == 'java.lang.String' then return 'jstring' end
@@ -341,14 +315,15 @@ return
 			-- map from arg # (1-based) to stack or register index # (0-based)
 			local argIndex = table()
 			local maxArgIndex = 1
-			for i=2,#sig do
-				local sigi = sig[i]
-				argIndex[i-1] = maxArgIndex
-				maxArgIndex = maxArgIndex + ((sigi == 'long' or sigi == 'double') and 2 or 1)
-			end
 
 			local sigNumArgs = #sig-1
 			local argArraySize = sigNumArgs+1	-- +1 for 'this' unless it's static
+
+			for i=1,sigNumArgs do
+				argIndex[i] = maxArgIndex
+				local primInfo = infoForPrims[sig[i+1]]
+				maxArgIndex = maxArgIndex + (primInfo and primInfo.argSize or 1)
+			end
 
 			if isAndroid then
 				ctor.regsOut = 1
@@ -395,19 +370,8 @@ return
 				-- load all args
 				code:insert{'aload_0'}
 				for i=1,sigNumArgs do		-- 1-based argument index
-					local argSig = sig[i+1]
-					local argOpcode = 'aload'	-- default ot all non-prims: Object
-					if infoForPrims[argSig] then
-						if argSig == 'long' then
-							argOpcode = 'lload'
-						elseif argSig == 'double' then
-							argOpcode = 'dload'
-						elseif argSig == 'float' then
-							argOpcode = 'fload'
-						else	-- all other prims: int
-							argOpcode = 'iload'
-						end
-					end
+					local primInfo = infoForPrims[sig[i+1]]
+					local argOpcode = primInfo and primInfo.asmClassLoadOp or 'aload'	-- default ot all non-prims: Object
 
 					local localVarIndex = argIndex[i]
 					if localVarIndex < 4 then

@@ -74,6 +74,51 @@ local infoForPrims = prims:mapi(function(name)
 	return info, name
 end):setmetatable(nil)
 
+
+table.union(infoForPrims.boolean, {
+	asmClassReturnOp = 'ireturn',
+	asmClassLoadOp = 'iload',
+	argSize = 1,
+})
+table.union(infoForPrims.char, {
+	asmClassReturnOp = 'ireturn',
+	asmClassLoadOp = 'iload',
+	argSize = 1,
+})
+table.union(infoForPrims.byte, {
+	asmClassReturnOp = 'ireturn',
+	asmClassLoadOp = 'iload',
+	argSize = 1,
+})
+table.union(infoForPrims.short, {
+	asmClassReturnOp = 'ireturn',
+	asmClassLoadOp = 'iload',
+	argSize = 1,
+})
+table.union(infoForPrims.int, {
+	asmClassReturnOp = 'ireturn',
+	asmClassLoadOp = 'iload',
+	argSize = 1,
+})
+table.union(infoForPrims.long, {
+	asmClassReturnOp = 'lreturn',
+	asmClassLoadOp = 'lload',
+	argSize = 2,
+})
+table.union(infoForPrims.float, {
+	asmClassReturnOp = 'freturn',
+	asmClassLoadOp = 'fload',
+	argSize = 1,
+})
+table.union(infoForPrims.double, {
+	asmClassReturnOp = 'dreturn',
+	asmClassLoadOp = 'dload',
+	argSize = 2,
+})
+
+
+
+
 local primSigStrForName = {
 	boolean = 'Z',
 	byte = 'B',
