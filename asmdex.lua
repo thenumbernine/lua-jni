@@ -366,6 +366,7 @@ local Instr = class()
 Instr.insert = table.insert
 Instr.append = table.append
 function Instr:traverse(visit) end	-- accumulate any unique constants, ... before we have to sort them ... and then re-visit them all again to get their correct indexes ... smh
+function Instr:regsOut() return 0 end
 
 -- 00|op
 local Instr10x = Instr:subclass()
@@ -936,6 +937,9 @@ function Instr35c_method:maxRegs()
 		readregopt(self[9], -1)
 	) + 1
 end
+function Instr35c_method:regsOut()
+	return #self - 4	-- 5 method args = 9 pieces to self
+end
 function Instr35c_method:traverse(visit)
 	visit:method(self[2], self[3], self[4])
 end
@@ -973,6 +977,9 @@ function Instr3rc_method:write(blob, asm)
 end
 function Instr3rc_method:maxRegs()
 	return math.max(readreg(self[2]), readreg(self[6])) + 1
+end
+function Instr3rc_method:regsOut()
+	return #self	-- TODO idk
 end
 function Instr3rc_method:traverse(visit)
 	return visit:method(self[3], self[4], self[5])
@@ -1014,7 +1021,8 @@ function Instr35c_callsite:write(blob, asm)
 	blob:writeu2(self[3])
 	blob:writeu2(self[4])
 end
-function Instr35c_callsite:maxRegs() return 0 end
+function Instr35c_callsite:maxRegs() return 0 end	-- ???
+function Instr35c_callsite:regsOut() return 0 end	-- ???
 
 local Instr3rc_callsite = Instr:subclass()
 function Instr3rc_callsite:read(hi, blob, asm)
@@ -1083,6 +1091,9 @@ function Instr45cc:maxRegs()
 		readregopt(self[8], -1),
 		readregopt(self[9], -1)
 	) + 1
+end
+function Instr45cc:regsOut()
+	return #self - 4	-- idk really
 end
 function Instr45cc:traverse(visit)
 	visit:method(self[2], self[3], self[4])
@@ -2454,18 +2465,16 @@ function JavaASMDex:compile()
 
 			-- TODO TODO
 			-- this is max # used for *calls*, not for *returns*
-			method.inferredRegsOut =
-				(isStaticNonCtor and 0 or 1)
-				+ (
-					(returnType == 'J' or returnType == 'D') and 2
-					or returnType == 'V' and 0
-					or 1
-				)
+			-- and NOTICE it should be *irrelevant* of the register indexes themselves that are used for the call,
+			-- it should just be the number of registers used.
+			method.inferredRegsOut = 0
 
-			method.inferredMaxRegs = math.max(
-				method.inferredRegsIn,
-				method.inferredRegsOut
-			)
+			-- TODO TODO
+			-- this is the max regs = regs_in plus local reg size.
+			-- regs_in start after local regs
+			-- and regs_in is based on the signature
+			-- How can we infer this?  by subtracting the max read register from the inferred regs in?
+			method.inferredMaxRegs = method.inferredRegsIn
 
 --DEBUG:print('maxRegs vs inferred', method.maxRegs, method.inferredMaxRegs)
 --DEBUG:print('regsIn vs inferred', method.regsIn, method.inferredRegsIn)
@@ -2482,6 +2491,7 @@ function JavaASMDex:compile()
 				cblob:writeu1(lo)
 				inst:write(cblob, self)
 				method.inferredMaxRegs = math.max(method.inferredMaxRegs, inst:maxRegs())
+				method.inferredRegsOut = math.max(method.inferredRegsOut, inst:regsOut())
 			end
 			assert.eq(0, bit.band(#cblob, 1))
 			local codeData = cblob:compile()

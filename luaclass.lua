@@ -120,10 +120,16 @@ args:
 	isProtected
 	isAbstract
 	isInterface		<- btw what is an interface class's parent class?
+
+	usingAndroidJNI = set to non-nil to override the env's _usingAndroidJNI
+	returnASMArgsOnly = set to 'true' to just return the class args, don't load it
+	returnASMOnly = set to 'true' to just return the class, don't load it
 --]]
 function M:run(args)
 	local env = assert.index(args, 'env')
-	local isAndroid = env._usingAndroidJNI
+
+	local isAndroid = args.usingAndroidJNI
+	if isAndroid == nil then isAndroid = env._usingAndroidJNI end
 
 	local classpath = args.name
 	if not classpath then
@@ -326,7 +332,7 @@ return
 			end
 
 			if isAndroid then
-				ctor.regsOut = 1
+				ctor.regsOut = maxArgIndex
 				ctor.regsIn = maxArgIndex
 				ctor.maxRegs = maxArgIndex
 			end
@@ -348,18 +354,25 @@ return
 			if isAndroid then
 				code:insert{'invoke-direct', getJNISig(parentClass), '<init>', '()V', 'v0'}	-- v0 has 'this'
 
-				if #argIndex <= 4 then
+				local regs = table()
+				for i=1,sigNumArgs do
+					regs:insert('v'..argIndex[i])
+					local primInfo = infoForPrims[sig[i+1]]
+					if primInfo and primInfo.argSize == 2 then
+						regs:insert('v'..(argIndex[i]+1))
+					end
+				end
+
+				if #regs <= 4 then
 					code:insert(table{
-						'invoke-virtual',
+						'invoke-direct',
 						getJNISig(classpath),
 						ctorFwdMethodName,
 						getJNISig(sig),
 						'v0',	-- this
-					}:append(
-						argIndex:mapi(function(i) return 'v'..i end)
-					))
+					}:append(regs))
 				else
-					error'TODO invoke-virtual/range'
+					error'TODO invoke-direct/range'
 				end
 				code:insert{'return-void'}	-- no return type
 			else
@@ -614,15 +627,19 @@ end
 			end
 		end
 	end
+	if args.returnASMArgsOnly then return asmClassArgs end
 
-	local cl
+	local asm
 	if isAndroid then
 		local JavaASMDex = require 'java.asmdex'
-		cl = env:_loadClass(JavaASMDex(asmClassArgs))
+		asm = JavaASMDex(asmClassArgs)
 	else
 		local JavaASMClass = require 'java.asmclass'
-		cl = env:_loadClass(JavaASMClass(asmClassArgs))
+		asm = JavaASMClass(asmClassArgs)
 	end
+	if args.returnASMOnly then return asm end
+
+	local cl = env:_loadClass(asm)
 	if not cl then return nil, "failed to define class" end
 
 	if #nativeMethods > 0 then

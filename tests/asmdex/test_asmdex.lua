@@ -7,7 +7,8 @@ local string = require 'ext.string'
 local assert = require 'ext.assert'
 local JavaASMDex = require 'java.asmdex'
 
-local srcfn = path'Test.java'
+--local srcfn = path'Test.java'
+local srcfn = path'TestNative.java'
 --local srcfn = path'TestToString.java'
 --local srcfn = path'io/github/thenumbernine/NativeCallback.java'
 assert(srcfn:exists(), "couldn't find java file "..srcfn)
