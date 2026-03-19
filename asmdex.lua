@@ -2193,6 +2193,22 @@ function JavaASMDex:compile()
 	end
 	traverse(traverser)
 
+	-- now sort type lists by ....... ?
+	typeLists:sort(function(a,b)
+		local pa = ffi.cast('uint8_t*', a)
+		local pb = ffi.cast('uint8_t*', b)
+		local na = #a
+		local nb = #b
+		-- first by its uint16 typeid elements?
+		for i=4,math.min(na, nb)-1,2 do
+			local sa = ffi.cast('uint16_t*', pa + i)[0]
+			local sb = ffi.cast('uint16_t*', pb + i)[0]
+			if sa ~= sb then return sa < sb end
+		end
+		-- next by its length
+		return na < nb
+	end)
+
 	-- 1-based except for nil/empty lists are 0
 	-- return as an index for now, convert to offset later.
 	local function findTypeList(typeStrs)
@@ -2230,6 +2246,7 @@ function JavaASMDex:compile()
 		end
 		-- "and then by argument list (lexicographic ordering, individual arguments ordered by type_id index)."
 		-- uh ... what?
+		-- next I guess they are sorted by argument-lists?
 		return a.argTypeListOfs < b.argTypeListOfs
 	end)
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env luajit
 -- this recompiles , then .dex's the Test.java file, same as test_asmclass.lua
 local os = require 'ext.os'
+local table = require 'ext.table'
 local path = require 'ext.path'
 local string = require 'ext.string'
 local assert = require 'ext.assert'
 local JavaASMDex = require 'java.asmdex'
 
---local srcfn = path'Test.java'
-local srcfn = path'TestToString.java'
+local srcfn = path'Test.java'
+--local srcfn = path'TestToString.java'
 --local srcfn = path'io/github/thenumbernine/NativeCallback.java'
 assert(srcfn:exists(), "couldn't find java file "..srcfn)
 
@@ -16,7 +17,14 @@ local classfn = srcfn:setext'class'
 assert(classfn:exists(), "javac didn't produce a class file "..classfn)
 
 --local androidPath = path(assert(os.getenv'ANDROID_HOME'))/'jbr/bin'	-- path to android studio's javac java etc
-local toolsDir = path(assert(os.home()))/'Android/Sdk/build-tools/36.0.0'	-- path to d8 etc
+
+local toolsVersionsDir = (path(assert(os.home()))/'Android/Sdk/build-tools')
+local toolsVersion = table.wrapfor(toolsVersionsDir :dir())
+	:mapi(function(vk) return vk[1] end)
+	:sort()
+	:last()
+local toolsDir = toolsVersionsDir/toolsVersion  	-- path to d8 etc
+print('toolsDir', toolsDir)
 local d8 = toolsDir/'d8'
 assert(d8:exists())
 
