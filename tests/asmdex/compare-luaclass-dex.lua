@@ -147,6 +147,30 @@ local Test_luaclass_args = {
 			sig = {'void', 'double', 'java.lang.Object'},
 			value = function() end,
 		},
+		{
+			isPublic = true,
+			name = 'getCount',
+			sig = {'int'},
+			value = function() end,
+		},
+		{
+			isPublic = true,
+			name = 'getItem',
+			sig = {'java.lang.Object', 'int'},
+			value = function() end,
+		},
+		{
+			isPublic = true,
+			name = 'getItemId',
+			sig = {'long', 'int'},
+			value = function() end,
+		},
+		{
+			isPublic = true,
+			name = 'getView',
+			sig = {'java.lang.Object', 'int', 'java.lang.Object', 'java.lang.Object'},
+			value = function() end,
+		},
 	},
 }
 

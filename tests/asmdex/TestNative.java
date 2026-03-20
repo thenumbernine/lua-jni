@@ -31,4 +31,9 @@ public class TestNative {
 	public native void foo(Object a, int b);
 	public native void foo(Object a, double b);
 	public native void foo(double a, Object b);
+
+	public native int getCount();
+	public native Object getItem(int i);
+	public native long getItemId(int i);
+	public native Object getView(int i, Object view, Object group);
 }
