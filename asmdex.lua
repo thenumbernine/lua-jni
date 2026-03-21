@@ -1758,14 +1758,14 @@ method.codeData = string.bytes(ffi.string(blob.data.v + blob.ofs, bit.lshift(cod
 								--  so does that mean they are indexes into the insns[] table, or are they byte offsets, or are they file offsets?
 								local trysrc = blob:read(try_item)
 								try.startAddr = trysrc.startAddr
-								try.numInsts = trysrc.numInsts
+								try.instSize = trysrc.instSize
 								try.handlerOfs = trysrc.handlerOfs
 --DEBUG:print('got try #'..j..':', require 'ext.tolua'(try))
 								-- "Elements of the array must be non-overlapping in range and in order from low to high address. "
 								if lasttry then
-									assert.le(lasttry.startAddr + lasttry.numInsts, try.startAddr, "try begins after previous try ends")
+									assert.le(lasttry.startAddr + bit.lshift(lasttry.instSize, 1), try.startAddr, "try begins after previous try ends")
 								end
-								assert.le(try.startAddr + try.numInsts, codeItem.instSize, "try extends past file size")
+								assert.le(try.startAddr + bit.lshift(try.instSize, 1), codeItem.instSize, "try extends past file size")
 								lasttry = try
 							end
 						end
@@ -2517,7 +2517,7 @@ function JavaASMDex:compile()
 			if method.tries then
 				for _,try in ipairs(method.tries) do
 					blob:writeu4(try.startAddr or 0)
-					blob:writeu2(try.numInsts or 0)
+					blob:writeu2(try.instSize or 0)
 					try.handlerOfsOfs = #blob	-- circle back
 					blob:writeu2(try.handlerOfs or 0)
 				end
