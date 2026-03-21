@@ -1763,9 +1763,9 @@ method.codeData = string.bytes(ffi.string(blob.data.v + blob.ofs, bit.lshift(cod
 --DEBUG:print('got try #'..j..':', require 'ext.tolua'(try))
 								-- "Elements of the array must be non-overlapping in range and in order from low to high address. "
 								if lasttry then
-									assert.le(lasttry.startAddr + bit.lshift(lasttry.instSize, 1), try.startAddr, "try begins after previous try ends")
+									assert.le(lasttry.startAddr + lasttry.instSize, try.startAddr, "try begins after previous try ends")
 								end
-								assert.le(try.startAddr + bit.lshift(try.instSize, 1), codeItem.instSize, "try extends past file size")
+								assert.le(try.startAddr + try.instSize, codeItem.instSize, "try extends past file size")
 								lasttry = try
 							end
 						end
