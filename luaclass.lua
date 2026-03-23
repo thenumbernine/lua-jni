@@ -365,14 +365,14 @@ return
 
 				if #regs <= 4 then
 					code:insert(table{
-						'invoke-direct',
+						'invoke-virtual',
 						getJNISig(classpath),
 						ctorFwdMethodName,
 						getJNISig(sig),
 						'v0',	-- this
 					}:append(regs))
 				else
-					error'TODO invoke-direct/range'
+					error'TODO invoke-virtual/range'
 				end
 				code:insert{'return-void'}	-- no return type
 			else
