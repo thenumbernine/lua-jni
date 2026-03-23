@@ -461,6 +461,17 @@ function JavaASM:toAsm()
 				w:insert(getJNISig(method.sig))
 				o:insert(w:concat' ')
 
+				if method.maxRegs then
+					o:insert('\t'..string.trim('.registers '..method.maxRegs..' '..(method.regsIn or '')..' '..(methods.regsOut or '')))
+				end
+				if method.maxStack then
+					o:insert('\t.limit stack '..method.maxStack)
+				end
+				if method.maxLocals then
+					o:insert('\t.limit locals '..method.maxLocals)
+				end
+				-- TODO tries
+
 				if method.code then
 					for _,inst in ipairs(method.code) do
 
