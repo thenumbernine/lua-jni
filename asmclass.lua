@@ -33,9 +33,7 @@ local ReadBlob = java_blob.ReadBlob
 local WriteBlob = java_blob.WriteBlob
 
 local java_util = require 'java.util'
---local classAccessFlags = java_util.classAccessFlags
---local nestedClassAccessFlags = java_util.nestedClassAccessFlags	-- TODO?
-local classAccessFlags = java_util.nestedClassAccessFlags	-- or is the only difference between nested-class and class in .class files whether there's a $ in the filename?
+local classAccessFlags = java_util.classAccessFlags
 local fieldAccessFlags = java_util.fieldAccessFlags
 local methodAccessFlags = java_util.methodAccessFlags
 local setFlagsToObj = java_util.setFlagsToObj

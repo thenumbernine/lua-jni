@@ -309,9 +309,9 @@ local accessFlags = {
 	isDeclaredSynchronized = 0x20000,	-- dalvik-only
 }
 
--- .class class access flags
+-- .class primary-class access flags
 -- maybe I don't need this, and just use nestedClassAccessFlags?
-local classAccessFlags = {
+local primaryClassAccessFlags = {
 	isPublic = 0x0001,
 	isFinal = 0x0010,
 	isSuper = 0x0020,					-- not in dalvik. 'isSuper' for class, 'isSynchronzied' for method
@@ -335,6 +335,22 @@ local nestedClassAccessFlags = {
 	isSynthetic = 0x1000,
 	isAnnotation = 0x2000,
 	isEnum = 0x4000,
+}
+
+-- both primary and nested class access flags combined
+local classAccessFlags = {
+	isPublic = 0x0001,
+	isPrivate = 0x0002,
+	isProtected = 0x0004,
+	isStatic = 0x0008,
+	isFinal = 0x0010,
+	isSuper = 0x0020,					-- not in dalvik. 'isSuper' for class, 'isSynchronzied' for method
+	isInterface = 0x0200,
+	isAbstract = 0x0400,
+	isSynthetic = 0x1000,
+	isAnnotation = 0x2000,
+	isEnum = 0x4000,
+	isModule = 0x8000,					-- dalvik: "unused"
 }
 
 -- .class field access flags
@@ -396,6 +412,7 @@ return {
 	sigStrToObj = sigStrToObj,
 	splitMethodJNISig = splitMethodJNISig,
 	classAccessFlags = classAccessFlags,
+	primaryClassAccessFlags = primaryClassAccessFlags,
 	nestedClassAccessFlags = nestedClassAccessFlags,
 	fieldAccessFlags = fieldAccessFlags,
 	methodAccessFlags = methodAccessFlags,

@@ -7,7 +7,11 @@ local path = require 'ext.path'
 
 local java_util = require 'java.util'
 local getDotSepName = java_util.getDotSepName
+local getJNISig = java_util.getJNISig
 local sigStrToObj = java_util.sigStrToObj
+local classAccessFlags = java_util.classAccessFlags
+local fieldAccessFlags = java_util.fieldAccessFlags
+local methodAccessFlags = java_util.methodAccessFlags
 
 
 local JavaASM = class()
@@ -162,9 +166,59 @@ local function tokenizeLine(line)
 	--]]
 end
 
--- ok here's my attempt at an asm code for java
--- I'll model it somewhat like jasmin: https://jasmin.sourceforge.net/guide.html
--- but no promises, esp how their method refs are a single amalgamation of java/lang/class/path/methodName(Ljni/sig/methods;)V ... nah I'll pass on that.
+
+-- classAccessFlagNames[index] = flagName
+-- classAccessFlagNameForToken[flagToken] = flagName
+-- classAccessFlagTokenForName[flagName] = flagToken
+
+local classAccessFlagNames = table.keys(classAccessFlags):sort()
+local classAccessFlagNameForToken = table.map(classAccessFlags, function(value, name)
+	return name, assert(name:match'^is(.*)$'):lower()
+end):setmetatable(nil)
+local classAccessFlagTokenForName = table.map(classAccessFlagNameForToken, function(v,k) return k,v end):setmetatable(nil)
+
+local fieldAccessFlagNames = table.keys(fieldAccessFlags):sort()
+local fieldAccessFlagNameForToken = table.map(fieldAccessFlags, function(value, name)
+	return name, assert(name:match'^is(.*)$'):lower()
+end):setmetatable(nil)
+local fieldAccessFlagTokenForName = table.map(fieldAccessFlagNameForToken, function(v,k) return k,v end):setmetatable(nil)
+
+local methodAccessFlagNames = table.keys(methodAccessFlags):sort()
+local methodAccessFlagNameForToken = table.map(methodAccessFlags, function(value, name)
+	return name, assert(name:match'^is(.*)$'):lower()
+end):setmetatable(nil)
+local methodAccessFlagTokenForName = table.map(methodAccessFlagNameForToken, function(v,k) return k,v end):setmetatable(nil)
+
+
+--[[
+ok here's my attempt at an asm code for java
+I'll model it somewhat like jasmin: https://jasmin.sourceforge.net/guide.html
+but no promises, esp how their method refs are a single amalgamation of java/lang/class/path/methodName(Ljni/sig/methods;)V ... nah I'll pass on that.
+
+# comment
+
+.source $sourcefile
+
+.class [public] [final] [super] [interface] [abstract] $classpath
+	-or-
+.interface " " " $classpath
+
+.super " " " $superclasspath
+
+.implements $interface1
+.implements $interface2
+	-etc-
+
+.field [public] [private] [protected] [static] $fieldName $fieldType
+
+.method [public] [private] $methodName $methodJNISignature
+.limit stack $stacCount					# .class method max-stack
+.limit locals $localsCount				# .class method max-locals
+.registers $maxRegs $regsIn $regsOut	# .dex method registers
+	instructions
+.end method
+
+--]]
 function JavaASM:fromAsm(code)
 
 	-- assert this is a class and not an object ...
@@ -185,13 +239,11 @@ function JavaASM:fromAsm(code)
 		end
 		local function applyClassFlags(parts)
 			for _,part in ipairs(parts) do
-				args[assert.index({
-					public = 'isPublic',
-					final = 'isFinal',
-					super = 'isSuper',	-- when is this used?
-					interface = 'isInterface',
-					abstract = 'isAbstract',
-				}, part, 'unknown class access-flag')] = true
+				args[assert.index(
+					classAccessFlagNameForToken,
+					part,
+					'unknown class access-flag'
+				)] = true
 			end
 		end
 		do
@@ -242,15 +294,11 @@ function JavaASM:fromAsm(code)
 				field.sig = getDotSepName(field.sig)
 				field.name = assert(parts:remove(), "expected field name")
 				for _,part in ipairs(parts) do
-					field[assert.index({
-						public = 'isPublic',
-						private = 'isPrivate',
-						protected = 'isProtected',
-						static = 'isStatic',
-						final = 'isFinal',
-						volatile = 'isVolatile',
-						transient = 'isTransient',
-					}, part, 'unknown field access-flag')] = true
+					field[assert.index(
+						fieldAccessFlagNameForToken,
+						part,
+						'unknown field access-flag'
+					)] = true
 				end
 				args.fields = args.fields or table()
 				args.fields:insert(field)
@@ -269,17 +317,11 @@ function JavaASM:fromAsm(code)
 				assert.type(method.sig, 'table')
 				method.name = assert(parts:remove(), "expected name")
 				for _,part in ipairs(parts) do
-					method[assert.index({
-						public = 'isPublic',
-						private = 'isPrivate',
-						protected = 'isProtected',
-						static = 'isStatic',
-						final = 'isFinal',
-						synchronized = 'isSynchronized',
-						native = 'isNative',
-						abstract = 'isAbstract',
-						constructor = 'isConstructor',
-					}, part, 'unknown method access-flag')] = true
+					method[assert.index(
+						methodAccessFlagNameForToken,
+						part,
+						'unknown method access-flag'
+					)] = true
 				end
 				args.methods = args.methods or table()
 				args.methods:insert(method)
@@ -298,7 +340,7 @@ function JavaASM:fromAsm(code)
 				currentMethod.maxStack = assert(tonumber(maxStackDef))
 				goto lineDone
 			end
-			local maxLocalsDef = line:match'^%.limit%s+stack%s+(.*)$'
+			local maxLocalsDef = line:match'^%.limit%s+locals%s+(.*)$'
 			if maxLocalsDef then
 				currentMethod.maxLocals = assert(tonumber(maxLocalsDef))
 				goto lineDone
@@ -333,6 +375,102 @@ function JavaASM:fromAsm(code)
 	end
 
 	return self(args)
+end
+
+function JavaAsm:toAsm()
+	local o = table()
+
+	-- dex file format can have multiple classes
+	local classes = self.classes
+	local fields = table(self.fields):mapi(function(field) return table(field):setmetatable(nil) end)
+	local methods = table(self.methods):mapi(function(method) return table(method):setmetatable(nil) end)
+	local buildingSingleClass
+	if not classes then
+		buildingSingleClass = true
+		local class = {
+			sourceFile = self.sourceFile,
+			thisClass = self.thisClass,
+			superClass = self.superClass,
+			interfaces = self.interfaces,
+		}
+		for k,v in pairs(classAccessFlags) do
+			class[k] = self[k]
+			--self[k] = nil
+		end
+		for _,field in ipairs(fields) do
+			field.class = class.thisClass
+		end
+		for _,method in ipairs(methods) do
+			method.class = class.thisClass
+		end
+		classes = table{class}
+	end
+	classes = table(classes):mapi(function(cl) return table(cl):setmetatable(nil) end)
+
+	-- now we have classes, fields, methods ...
+
+	for classIndex,cl in ipairs(classes) do
+		if classIndex > 1 then
+			o:insert(table())
+		end
+		-- notice if it's a .dex file then it will have references to external methods that it isn't defining
+		-- so ... only include fields and methods from these classes
+		local w = table{cl.isInterface and '.interface' or '.class'}
+		for _,flagName in ipairs(classAccessFlagNames) do
+			if flagName ~= 'isInterface' then	-- handled by the .class vs .interface directive
+				if cl[flagName] then
+					w:insert((assert.index(classAccessFlagTokenForName, flagName)))
+				end
+			end
+		end
+		w:insert(class.thisClass)
+		o:insert(w:concat' ')
+
+		if cl.superClass then o:insert('.super '..cl.superClass) end
+
+		if cl.interfaces then
+			for _,iface in ipairs(cl.interfaces) do
+				o:insert('.interface '..iface)
+			end
+		end
+
+		for _,field in ipairs(fields) do
+			if field.class == cl.thisClass then
+				local w = table{'.field'}
+				for _,flagName in ipairs(fieldAccessFlagNames) do
+					if field[flagName] then
+						w:insert((assert.index(fieldAccessFlagTokenForName, flagName)))
+					end
+				end
+				w:insert(field.name)
+				w:insert(field.sig)
+				o:insert(w:concat' ')
+			end
+		end
+
+		for _,method in ipairs(methods) do
+			if method.class == cl.thisClass then
+				local w = table{'.method'}
+				for _,flagName in ipairs(methodAccessFlagNames) do
+					if method[flagName] then
+						w:insert((assert.index(methodAccessFlagTokenForName, flagName)))
+					end
+				end
+				w:insert(method.name)
+				w:insert(getJNISig(method.sig))
+				o:insert(w:concat' ')
+
+				if method.code then
+					for _,inst in ipairs(method.code) do
+						-- TODO if a piece has a space then wrap it in quotes, and it better be a string
+						o:insert('\t'..table.concat(inst, ' '))	-- tab or space separator between instruction args?
+					end
+				end
+				o:insert'.end method'
+			end
+		end
+	end
+	return o:concat'\n'..'\n'
 end
 
 return JavaASM

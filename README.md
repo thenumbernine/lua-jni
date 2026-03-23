@@ -318,7 +318,7 @@ Notice that the names in instructions are slash-separated unlike the dot-separat
 
 - `asmClass = JavaASMClass(args)` = build a `JavaASMClass` from a table of properties.
 - args:
-- - `isPublic`... etc `classAccessFlags` found in `java/util.lua`
+- - `isPublic`... etc `primaryClassAccessFlags` found in `java/util.lua`
 - - `thisClass` = dot-separated name of this class.
 - - `superClass` = dot-separated name of parent class.
 - - `interfaces` = list of dot-separated names of interface classes.
