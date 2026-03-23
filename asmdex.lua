@@ -1829,9 +1829,15 @@ io.stderr:write('!!! TODO !!! debugInfoOfs '..debugInfoOfs..'\n')
 	end
 	for i=#self.methods,1,-1 do
 		local method = self.methods[i]
+		-- if it's not a class that's defined ...
 		if not self.classes:find(nil, function(cl)
 			return cl.thisClass == method.class
-		end) then
+		end)
+		-- ... or if it's a method for this class that isn't native and has no code
+		-- (it is just for a call that references a parent class's method)
+		or (not method.isNative and not cl.code)
+		-- ... then remove it
+		then
 			self.methods:remove(i)
 		end
 	end

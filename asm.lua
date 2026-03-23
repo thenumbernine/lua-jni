@@ -4,6 +4,7 @@ local table = require 'ext.table'
 local assert = require 'ext.assert'
 local string = require 'ext.string'
 local path = require 'ext.path'
+local tolua = require 'ext.tolua'
 
 local java_util = require 'java.util'
 local getDotSepName = java_util.getDotSepName
@@ -377,7 +378,7 @@ function JavaASM:fromAsm(code)
 	return self(args)
 end
 
-function JavaAsm:toAsm()
+function JavaASM:toAsm()
 	local o = table()
 
 	-- dex file format can have multiple classes
@@ -462,8 +463,21 @@ function JavaAsm:toAsm()
 
 				if method.code then
 					for _,inst in ipairs(method.code) do
+
+
 						-- TODO if a piece has a space then wrap it in quotes, and it better be a string
-						o:insert('\t'..table.concat(inst, ' '))	-- tab or space separator between instruction args?
+						o:insert('\t'..table(inst)
+							:mapi(function(part, partIndex)
+								-- TODO make inst desc / check description
+								if inst[1] == 'const-string'
+								and partIndex == 3
+								then
+									return tolua(part)
+								end
+								return part
+							end)
+							:concat' '
+						)	-- tab or space separator between instruction args?
 					end
 				end
 				o:insert'.end method'
