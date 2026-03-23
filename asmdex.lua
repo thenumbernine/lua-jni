@@ -1835,7 +1835,7 @@ io.stderr:write('!!! TODO !!! debugInfoOfs '..debugInfoOfs..'\n')
 		end)
 		-- ... or if it's a method for this class that isn't native and has no code
 		-- (it is just for a call that references a parent class's method)
-		or (not method.isNative and not cl.code)
+		or (not method.isNative and not method.code)
 		-- ... then remove it
 		then
 			self.methods:remove(i)
