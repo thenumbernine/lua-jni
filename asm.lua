@@ -462,7 +462,11 @@ function JavaASM:toAsm()
 				o:insert(w:concat' ')
 
 				if method.maxRegs then
-					o:insert('\t'..string.trim('.registers '..method.maxRegs..' '..(method.regsIn or '')..' '..(methods.regsOut or '')))
+					o:insert('\t'..string.trim(
+						'.registers '..method.maxRegs
+							..' '..(method.regsIn or '')
+							..' '..(method.regsOut or '')
+					))
 				end
 				if method.maxStack then
 					o:insert('\t.limit stack '..method.maxStack)
