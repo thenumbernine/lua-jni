@@ -162,13 +162,15 @@ function M:run(args)
 	local asmClassArgs = {
 		version = 0x41,
 		isPublic = true,
-		isSuper = true,				-- .class only
 		thisClass = classpath,
 		superClass = parentClass,
 		interfaces = interfaces,
 		fields = table(),
 		methods = table(),
 	}
+	if not isAndroid then
+		asmClassArgs.isSuper = true	-- .class only
+	end
 
 	local nativeMethods = vector'JNINativeMethod'
 
@@ -365,14 +367,14 @@ return
 
 				if #regs <= 4 then
 					code:insert(table{
-						'invoke-virtual',
+						'invoke-direct',
 						getJNISig(classpath),
 						ctorFwdMethodName,
 						getJNISig(sig),
 						'v0',	-- this
 					}:append(regs))
 				else
-					error'TODO invoke-virtual/range'
+					error'TODO invoke-direct/range'
 				end
 				code:insert{'return-void'}	-- no return type
 			else

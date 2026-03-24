@@ -7,16 +7,16 @@ local string = require 'ext.string'
 local path = require 'ext.path'
 local J = require 'java'
 
--- you can compile this with test_asmdex.lua
-local dexfn = path'TestNative.dex'
+-- you can compile the .dex file with test_asmdex.lua
 
+--[====[ comparison for TestNative
+local dexfn = path'TestNative.dex'
 -- ok i'm using TestNative.java to compare with ...
 -- TODO I bet I could just read the .dex and then regenerate the same args with JavaLuaClass ...
-local Test_luaclass_args = {
+local luaClassArgs = {
 	env = J,
 	isPublic = true,
 	name = 'TestNative',
-	parent = 'java.lang.Object',
 	fields = {
 		{
 			isPublic = true,
@@ -173,25 +173,76 @@ local Test_luaclass_args = {
 		},
 	},
 }
+--]====]
+-- [====[ comparison for TestGLSurfaceViewRenderer
+local dexfn = path'TestGLSurfaceViewRenderer.dex'
+local luaClassArgs = {
+	env = J,
+	isPublic = true,
+	name = 'TestGLSurfaceViewRenderer',
+	implements = {
+		'android.opengl.GLSurfaceView$Renderer',
+	},
+	methods = {
+		{
+			isPublic = true,
+			name = 'onSurfaceCreated',
+			sig = {
+				'void',
+				'javax.microedition.khronos.opengles.GL10',
+				'javax.microedition.khronos.egl.EGLConfig',
+			},
+			value = function() end,
+		},
+		{
+			isPublic = true,
+			name = 'onSurfaceChanged',
+			sig = {
+				'void',
+				'javax.microedition.khronos.opengles.GL10',
+				'int',
+				'int',
+			},
+			value = function() end,
+		},
+		{
+			isPublic = true,
+			name = 'onDrawFrame',
+			sig = {
+				'void',
+				'javax.microedition.khronos.opengles.GL10',
+			},
+			value = function() end,
+		},
+	},
+}
+--]====]
 
-Test_luaclass_args.returnASMArgsOnly = true
-Test_luaclass_args.usingAndroidJNI = true	-- build for android even tho we're not on android
-local Test_luaclass_asmArgs = require 'java.luaclass'(Test_luaclass_args)
-local Test_luaclass_asm = require 'java.asmdex'(Test_luaclass_asmArgs)
-local luaclassByteCode = Test_luaclass_asm:compile()
-print('TestNative from java.luaclass:')
-print(string.hexdump(luaclassByteCode))
-print()
+luaClassArgs.returnASMArgsOnly = true
+luaClassArgs.usingAndroidJNI = true	-- build for android even tho we're not on android
+local luaClassAsmArgs = require 'java.luaclass'(luaClassArgs)
+local luaClassAsm = require 'java.asmdex'(luaClassAsmArgs)
+local luaclassByteCode = luaClassAsm:compile()
+
+local fa = assert(io.open('compare-a.txt', 'w'))
+
+fa:write'TestNative from java.luaclass:\n'
+fa:write(string.hexdump(luaclassByteCode), '\n')
+fa:write'\n'
 
 local Test_asmFromLuaClass = require 'java.asmdex'(luaclassByteCode)
-print('TestNative from java.asmdex from java.luaclass:')
-print(require 'ext.tolua'(Test_asmFromLuaClass))
-print()
+fa:write'TestNative from java.asmdex from java.luaclass:\n'
+fa:write(require 'ext.tolua'(Test_asmFromLuaClass), '\n')
+fa:write'\n'
+fa:close()
 
-print('TestNative from .dex:')
+local fb = assert(io.open('compare-b.txt', 'w'))
+fb:write'TestNative from .dex:\n'
 local d8ByteCode = dexfn:read()
-print(string.hexdump(d8ByteCode ))
-print()
+fb:write(string.hexdump(d8ByteCode ), '\n')
+fb:write'\n'
+
 local Test_asmFromFile = require 'java.asmdex'(d8ByteCode)
-print(require 'ext.tolua'(Test_asmFromFile))
-print()
+fb:write(require 'ext.tolua'(Test_asmFromFile), '\n')
+fb:write'\n'
+fb:close()
