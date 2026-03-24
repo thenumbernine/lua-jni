@@ -426,6 +426,11 @@ return
 		end
 	end
 
+	-- if newLuaState is set on any methods,
+	-- then use its value as a key for this
+	-- so that matching 'newLuaState's will have matching states
+	local newLuaStateThreads = {}
+
 	if args.methods then
 		for key,method in pairs(args.methods) do
 			if type(key) == 'string' then
@@ -466,28 +471,76 @@ return
 
 			if method.newLuaState then
 				assert.type(func, 'function', "newLuaState requires a Lua function")
+				local inFunc = func
 
 				-- Make a new lite-thread and sub-lua-state for this method
 				-- TODO should it be one per method or one per class?
 				-- TODO some kind of better mix and match of sub-lua-states and methods.
 				-- another TODO ... this will be one sub-Lua-state per-class, which means it will be shared with all objects ...
-				local thread = LiteThread{
+				local thread = newLuaStateThreads[method.newLuaState]
+				if not thread then
+					thread = LiteThread()
 
-					-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
-					threadFuncTypeName = getCFuncTypeForSig(method.sig, method.isStatic),
-
-					-- callback prefix code.
 					-- I need to require java.ffi.jni in here,
 					--  or the ffi.cast(threadFuncTypeName) won't work
-					init = function(thread)
-						-- have to define this before pushing data of its cdata type into the new Lua state...
-						thread.lua[[
--- this is needed for the ffi.cast threadFuncTypeName declaration
-require 'java.ffi.jni'
-]]
+					-- have to define this before pushing data of its cdata type into the new Lua state...
+					thread.lua[[require 'java.ffi.jni']]
+					newLuaStateThreads[method.newLuaState] = thread
+				end
 
-						thread.lua([[
-local func,
+				-- replace 'func' with the thread's function pointer
+				func = thread:createFuncPtr(
+					-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
+					getCFuncTypeForSig(method.sig, method.isStatic),
+
+					-- lua-function code, to run in new lua state / new thread
+					-- closures and upvalues are giving me too many problems
+					-- I'm starting to think that inlining everything is safest.
+					-- inlininig definitely produced the fastest code with the moldwars demos...
+					nil,
+
+					-- inline function code, to run in new lua state / new thread
+					[[
+local envPtr, thisOrClass = ...
+
+-- rebuild env from envPtr in case it's on a new thread
+-- but we can use the same jvm pointer
+-- hmm possible TODO is
+-- 1) cache the JNIEnv and use the 1st copy created always
+-- 2) cache it per tonumber(envPtr) or tostring(envPtr)
+-- 3) always rebuild the JavaVM and JNIEnv
+-- 4) cache the JavaVM like I'm doing now
+local jvm = getJVM(envPtr)
+local env = jvm.jniEnv
+
+-- rebuild args
+
+if isStatic then
+	-- TODO this method but also with a class helper?
+	thisOrClass = env:_fromJClass(thisOrClass)
+else
+	thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
+end
+
+local result = inFunc(
+	env,
+	thisOrClass,
+	env:_javaToLuaArgs(2, sig, select(3, ...))
+)
+
+if sig[1] == 'void' then return end
+if result == nil then return nil end
+
+return env:_luaToJavaArg(result, sig[1])
+]],
+					-- init code to run on the varargs that are passed into the function builder ... (i'm straightening this all out)
+					-- write what you want, it can be read by func()
+					-- just don't overwrite `func`
+					-- and know these will be overwritten: `reg`, `collect`, `safefunc`
+					[[
+
+local func,	-- func is already assigned to the 1st arg of ... in LiteTherad:createFuncPtr
+	inFunc,
 	jvmPtr,
 	sig,
 	isStatic,
@@ -500,14 +553,10 @@ local func,
 -- and the new thread won't be made until after the method call happens
 -- and we're still in init
 -- so instead for now here just make a function for creating it or returning it
-local reg = debug.getregistry()
-reg.java_callback = func
-reg.java_method = {sig=sig, isStatic=isStatic}
-reg.java_classpath = classpath
-reg.java_getJVM = function(envPtr)
-	local reg = debug.getregistry()
-	if not reg.java_jvm then
-		reg.java_jvm = require 'java.vm'{
+local jvm
+local function getJVM(envPtr)
+	if not jvm then
+		jvm = require 'java.vm'{
 			ptr = jvmPtr,
 			usingAndroidJNI = usingAndroidJNI,
 			jniEnv = {
@@ -515,57 +564,18 @@ reg.java_getJVM = function(envPtr)
 			},
 		}
 	end
-	return reg.java_jvm
+	return jvm
 end
 ]],
-	func,	-- convert to bytecode and pass into the child Lua state:
-	env._vm._ptr,
-	method.sig,
-	method.isStatic,
-	classpath,
-	env._usingAndroidJNI)
+					-- rest of varargs are passed into the initCode (func is added to its first arg...)
+					inFunc,	-- convert to bytecode and pass into the child Lua state:
+					env._vm._ptr,
+					method.sig,
+					method.isStatic,
+					classpath,
+					env._usingAndroidJNI
+				)
 
-					end,
-					-- callback function:
-					func = function(envPtr, thisOrClass, ...)
-						-- THIS IS RUN ON A SEPARATE THREAD AND IN THE CHILD LUA STATE
-
-						-- rebuild env from envPtr in case it's on a new thread
-						-- but we can use the same jvm pointer
-						-- hmm possible TODO is
-						-- 1) cache the JNIEnv and use the 1st copy created always
-						-- 2) cache it per tonumber(envPtr) or tostring(envPtr)
-						-- 3) always rebuild the JavaVM and JNIEnv
-						-- 4) cache the JavaVM like I'm doing now
-						local reg = debug.getregistry()
-						local method = reg.java_method
-						local classpath = reg.java_classpath
-						local jvm = reg.java_getJVM(envPtr)
-						local func = reg.java_callback
-						local env = jvm.jniEnv
-						local sig = method.sig
-
-						-- rebuild args
-
-						if method.isStatic then
-							-- TODO this method but also with a class helper?
-							thisOrClass = env:_fromJClass(thisOrClass)
-						else
-							thisOrClass = env:_javaToLuaArg(thisOrClass, classpath)
-						end
-
-						local result = func(
-							env,
-							thisOrClass,
-							env:_javaToLuaArgs(2, sig, ...)
-						)
-
-						if sig[1] == 'void' then return end
-						if result == nil then return nil end
-
-						return env:_luaToJavaArg(result, sig[1])
-					end,
-				}
 
 				-- do this but after done running
 				-- or TODO somehow allow the caller access to it
@@ -574,9 +584,6 @@ end
 				-- save the thread so it doesn't collect
 				closures:insert{thread=thread}
 				usingNewLuaState = true
-
-				-- use the thread's wrapper's function pointer
-				func = thread.funcptr
 			end
 
 
