@@ -485,7 +485,12 @@ return
 					--  or the ffi.cast(threadFuncTypeName) won't work
 					-- have to define this before pushing data of its cdata type into the new Lua state...
 					thread.lua[[require 'java.ffi.jni']]
+
+					-- save it per-newLuaState-value so you can have multiple methods with separate or matching sub-lua-states
 					newLuaStateThreads[method.newLuaState] = thread
+
+					-- save the thread so it doesn't collect
+					closures:insert{thread=thread}
 				end
 
 				-- replace 'func' with the thread's function pointer
@@ -581,8 +586,6 @@ end
 				-- or TODO somehow allow the caller access to it
 				--thread:showErr()
 
-				-- save the thread so it doesn't collect
-				closures:insert{thread=thread}
 				usingNewLuaState = true
 			end
 
