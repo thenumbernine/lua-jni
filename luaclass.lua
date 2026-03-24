@@ -502,12 +502,12 @@ local func,
 -- so instead for now here just make a function for creating it or returning it
 local reg = debug.getregistry()
 reg.java_callback = func
-reg.method = {sig=sig, isStatic=isStatic}
-reg.classpath = classpath
-reg.getJVM = function(envPtr)
+reg.java_method = {sig=sig, isStatic=isStatic}
+reg.java_classpath = classpath
+reg.java_getJVM = function(envPtr)
 	local reg = debug.getregistry()
-	if not reg.jvm then
-		reg.jvm = require 'java.vm'{
+	if not reg.java_jvm then
+		reg.java_jvm = require 'java.vm'{
 			ptr = jvmPtr,
 			usingAndroidJNI = usingAndroidJNI,
 			jniEnv = {
@@ -515,7 +515,7 @@ reg.getJVM = function(envPtr)
 			},
 		}
 	end
-	return reg.jvm
+	return reg.java_jvm
 end
 ]],
 	func,	-- convert to bytecode and pass into the child Lua state:
@@ -538,9 +538,9 @@ end
 						-- 3) always rebuild the JavaVM and JNIEnv
 						-- 4) cache the JavaVM like I'm doing now
 						local reg = debug.getregistry()
-						local method = reg.method
-						local classpath = reg.classpath
-						local jvm = reg.getJVM(envPtr)
+						local method = reg.java_method
+						local classpath = reg.java_classpath
+						local jvm = reg.java_getJVM(envPtr)
 						local func = reg.java_callback
 						local env = jvm.jniEnv
 						local sig = method.sig
