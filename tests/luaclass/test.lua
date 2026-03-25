@@ -55,7 +55,7 @@ local Test = J.Object:_subclass{
 			isPublic = true,
 			sig = {'double', 'java.lang.String', 'java.lang.Object'},
 			value = function(this, ...)
-				print('this=', this)
+				print('this', this)
 				print('in Test.testFunc with args:', ...)
 				return 42
 			end,
@@ -100,6 +100,15 @@ print('in testInt with', b)
 			end,
 		},
 
+		{
+			name = 'testNewLuaState',
+			isPublic = true,
+			sig = {'java.lang.String'},
+			newLuaState = true,
+			value = function(J, this)
+				return J:_str'testing!'
+			end,
+		},
 --]=]
 	},
 }
@@ -144,6 +153,8 @@ print('test:testFunc()', assert.eq(test:testFunc("", "testing"), 42))
 Test(2)
 
 test:testStatic(math.pi)
+
+assert.eq(tostring(test:testNewLuaState()), 'testing!')
 
 
 local Test2 = Test:_subclass{
