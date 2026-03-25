@@ -488,9 +488,6 @@ return
 
 					-- save it per-newLuaState-value so you can have multiple methods with separate or matching sub-lua-states
 					newLuaStateThreads[method.newLuaState] = thread
-
-					-- save the thread so it doesn't collect
-					closures:insert{thread=thread}
 				end
 
 				-- replace 'func' with the thread's function pointer
@@ -498,11 +495,38 @@ return
 					-- make the threadFuncTypeName match those for JNI java.lang.Runnable's run() native signature
 					getCFuncTypeForSig(method.sig, method.isStatic),
 
-					-- lua-function code, to run in new lua state / new thread
-					-- closures and upvalues are giving me too many problems
-					-- I'm starting to think that inlining everything is safest.
-					-- inlininig definitely produced the fastest code with the moldwars demos...
-					nil,
+					-- initCode runs on the varargs that are passed into the function builder ... (i'm straightening this all out)
+					-- write what you want, it can be read by func()
+					-- notice that `safefunc` and `funcinfo` can't be overwritten
+					[[
+local func,
+	inFunc,
+	jvmPtr,
+	sig,
+	isStatic,
+	classpath,
+	usingAndroidJNI = ...
+
+-- rebuild the JavaVM here, once
+-- but I can't rebuild it without the jnienv
+-- and the vm won't create a new jnienv until a new thread is made
+-- and the new thread won't be made until after the method call happens
+-- and we're still in init
+-- so instead for now here just make a function for creating it or returning it
+local jvm
+local function getJVM(envPtr)
+	if not jvm then
+		jvm = require 'java.vm'{
+			ptr = jvmPtr,
+			usingAndroidJNI = usingAndroidJNI,
+			jniEnv = {
+				ptr = envPtr,
+			},
+		}
+	end
+	return jvm
+end
+]],
 
 					-- inline function code, to run in new lua state / new thread
 					[[
@@ -538,41 +562,9 @@ if result == nil then return nil end
 
 return env:_luaToJavaArg(result, sig[1])
 ]],
-					-- init code to run on the varargs that are passed into the function builder ... (i'm straightening this all out)
-					-- write what you want, it can be read by func()
-					-- just don't overwrite `func`
-					-- and know these will be overwritten: `reg`, `collect`, `safefunc`
-					[[
 
-local func,	-- func is already assigned to the 1st arg of ... in LiteTherad:createFuncPtr
-	inFunc,
-	jvmPtr,
-	sig,
-	isStatic,
-	classpath,
-	usingAndroidJNI = ...
-
--- rebuild the JavaVM here, once
--- but I can't rebuild it without the jnienv
--- and the vm won't create a new jnienv until a new thread is made
--- and the new thread won't be made until after the method call happens
--- and we're still in init
--- so instead for now here just make a function for creating it or returning it
-local jvm
-local function getJVM(envPtr)
-	if not jvm then
-		jvm = require 'java.vm'{
-			ptr = jvmPtr,
-			usingAndroidJNI = usingAndroidJNI,
-			jniEnv = {
-				ptr = envPtr,
-			},
-		}
-	end
-	return jvm
-end
-]],
 					-- rest of varargs are passed into the initCode (func is added to its first arg...)
+					wrapper,
 					inFunc,	-- convert to bytecode and pass into the child Lua state:
 					env._vm._ptr,
 					method.sig,
@@ -581,10 +573,13 @@ end
 					env._usingAndroidJNI
 				)
 
-
 				-- do this but after done running
 				-- or TODO somehow allow the caller access to it
 				--thread:showErr()
+
+				local funckey = bit.tohex(ffi.cast('uintptr_t', func), bit.lshift(ffi.sizeof'uintptr_t', 1))
+				-- save the thread so it doesn't collect
+				closures:insert{thread=thread, funckey=funckey}
 
 				usingNewLuaState = true
 			end
@@ -668,9 +663,21 @@ end
 	-- which shows any errors that might have been invoked on the sub-Lua-state in the new thread.
 	if usingNewLuaState then
 		rawset(cl, '_showLuaThreadErrors', function(self)
+
+-- TODO these will only be there if you wrap the function in xpcall yourself
+-- so no, they're nil for now
 			for _,cls in ipairs(closures) do
-				if cls.thread then
-					cls.thread:showErr()
+				local th = cls.thread
+				local funckey = cls.funckey
+				if th then
+print('funckey', funckey)
+					local status = th:getExitStatus(funckey)
+print('status', status)
+					if not status then
+						local errmsg = th:getErrMsg(funckey)
+print('errmsg', errmsg)
+						io.stderr:write(tostring(errmsg), '\n')
+					end
 				end
 			end
 		end)
